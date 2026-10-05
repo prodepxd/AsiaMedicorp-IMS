@@ -16,6 +16,33 @@ function Login({ onLogin }) {
   const [error, setError] = useState("");
   const [usage, setUsage] = useState({});
 
+  async function handleDelete() {
+    if (!item || !canDelete || deleting || saving) return;
+
+    const identifier = item.serial_number || item.item_detail || "this inventory item";
+    if (!window.confirm('Permanently delete "' + identifier + '"? This cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(true);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("items")
+      .delete()
+      .eq("id", item.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      setDeleting(false);
+      return;
+    }
+
+    setDeleting(false);
+    if (onDeleted) onDeleted();
+    onClose();
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setBusy(true);
@@ -91,7 +118,7 @@ function Login({ onLogin }) {
   );
 }
 
-function AddItemModal({ supabase, onClose, onSaved, item = null }) {
+function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false, item = null }) {
   const [masters, setMasters] = useState({
     itemTypes: [],
     manufacturers: [],
@@ -113,6 +140,7 @@ function AddItemModal({ supabase, onClose, onSaved, item = null }) {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
 
   const loadMasters = useCallback(async () => {
@@ -317,10 +345,22 @@ function AddItemModal({ supabase, onClose, onSaved, item = null }) {
             {error && <div className="error-message">{error}</div>}
 
             <div className="modal-actions">
-              <button type="button" className="secondary-button" onClick={onClose}>Cancel</button>
-              <button type="submit" className="primary-button" disabled={saving}>
-                {saving ? (item ? "Saving..." : "Adding item...") : (item ? "Save changes" : "Add item")}
-              </button>
+              {item && canDelete && (
+                <button
+                  type="button"
+                  className="danger-button modal-delete-button"
+                  onClick={handleDelete}
+                  disabled={saving || deleting}
+                >
+                  {deleting ? "Deleting..." : "Delete item"}
+                </button>
+              )}
+              <div className="modal-actions-right">
+                <button type="button" className="secondary-button" onClick={onClose}>Cancel</button>
+                <button type="submit" className="primary-button" disabled={saving || deleting}>
+                  {saving ? (item ? "Saving..." : "Adding item...") : (item ? "Save changes" : "Add item")}
+                </button>
+              </div>
             </div>
           </form>
         )}
@@ -329,7 +369,7 @@ function AddItemModal({ supabase, onClose, onSaved, item = null }) {
   );
 }
 
-function GlobalStock({ supabase, canEdit }) {
+function GlobalStock({ supabase, canEdit, canDelete = false }) {
   const [items, setItems] = useState([]);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
@@ -529,8 +569,10 @@ function GlobalStock({ supabase, canEdit }) {
         <AddItemModal
           supabase={supabase}
           item={editingItem}
+          canDelete={canDelete}
           onClose={() => setEditingItem(null)}
           onSaved={loadItems}
+          onDeleted={loadItems}
         />
       )}
     </section>
@@ -559,6 +601,7 @@ function MasterData({ supabase }) {
   const [showInactive, setShowInactive] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: "", manufacturer_id: "" });
+  const [usage, setUsage] = useState({});
   const [error, setError] = useState("");
 
   const definition = MASTER_DEFINITIONS.find((item) => item.key === activeKey);
@@ -1046,6 +1089,7 @@ function App() {
           <GlobalStock
             supabase={supabase}
             canEdit={profile.role === "admin" || profile.role === "manager"}
+            canDelete={profile.role === "admin"}
           />
         ) : active === "Admin / Master Data" ? (
           <MasterData supabase={supabase} />
