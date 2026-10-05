@@ -105,7 +105,7 @@ function AddItemModal({ supabase, onClose, onSaved }) {
     manufacturer_id: "",
     model_id: "",
     item_detail: "",
-    location_id: "",
+    current_location_id: "",
     status_id: "",
     quality_status_id: "",
     quality_note: "",
@@ -233,7 +233,9 @@ function AddItemModal({ supabase, onClose, onSaved }) {
               <label>
                 Manufacturer
                 <select value={form.manufacturer_id} onChange={(event) => updateField("manufacturer_id", event.target.value)}>
-                  <option value="">Not set</option>
+                  <option value="">
+                    {masters.manufacturers.length ? "Not set" : "No manufacturers configured"}
+                  </option>
                   {masters.manufacturers.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
                 </select>
               </label>
@@ -241,15 +243,23 @@ function AddItemModal({ supabase, onClose, onSaved }) {
               <label>
                 Model
                 <select value={form.model_id} onChange={(event) => updateField("model_id", event.target.value)} disabled={!form.manufacturer_id}>
-                  <option value="">{form.manufacturer_id ? "Not set" : "Select manufacturer first"}</option>
+                  <option value="">
+                    {!form.manufacturer_id
+                      ? "Select manufacturer first"
+                      : availableModels.length
+                        ? "Not set"
+                        : "No models configured for this manufacturer"}
+                  </option>
                   {availableModels.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
                 </select>
               </label>
 
               <label>
                 Location
-                <select value={form.location_id} onChange={(event) => updateField("location_id", event.target.value)}>
-                  <option value="">Not set</option>
+                <select value={form.current_location_id} onChange={(event) => updateField("current_location_id", event.target.value)}>
+                  <option value="">
+                    {masters.locations.length ? "Not set" : "No locations configured"}
+                  </option>
                   {masters.locations.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
                 </select>
               </label>
