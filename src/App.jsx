@@ -181,7 +181,7 @@ function AddItemModal({ supabase, onClose, onSaved }) {
       manufacturer_id: form.manufacturer_id || null,
       model_id: form.model_id || null,
       item_detail: form.item_detail.trim() || null,
-      location_id: form.location_id || null,
+      current_location_id: form.current_location_id || null,
       status_id: form.status_id,
       quality_status_id: form.quality_status_id,
       quality_note: form.quality_note.trim() || null,
