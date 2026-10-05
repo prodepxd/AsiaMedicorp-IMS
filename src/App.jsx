@@ -14,6 +14,7 @@ function Login({ onLogin }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [usage, setUsage] = useState({});
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -577,9 +578,34 @@ function MasterData({ supabase }) {
     if (rowsError) {
       setError(rowsError.message);
       setRows([]);
-    } else {
-      setRows(data || []);
+      setUsage({});
+      setLoading(false);
+      return;
     }
+
+    const loadedRows = data || [];
+    setRows(loadedRows);
+
+    const usageResults = await Promise.all(
+      loadedRows.map(async (row) => {
+        const { data: count, error: usageError } = await supabase.rpc(
+          "master_record_usage",
+          { p_table_name: activeKey, p_record_id: row.id }
+        );
+        return { id: row.id, count: usageError ? null : Number(count || 0), error: usageError };
+      })
+    );
+
+    const usageMap = {};
+    const usageError = usageResults.find((result) => result.error);
+    usageResults.forEach((result) => {
+      usageMap[result.id] = result.count;
+    });
+
+    if (usageError) {
+      setError(usageError.error.message);
+    }
+    setUsage(usageMap);
     setLoading(false);
   }, [supabase, activeKey, definition.needsManufacturer]);
 
@@ -660,6 +686,31 @@ function MasterData({ supabase }) {
 
     setSaving(false);
     cancelEdit();
+    await loadRows();
+    if (activeKey === "manufacturers") await loadManufacturers();
+  }
+
+
+  async function deleteRow(row) {
+    const count = usage[row.id];
+
+    if (count === null || count === undefined || count > 0) return;
+
+    if (!window.confirm('Permanently delete "' + row.name + '"? This cannot be undone.')) {
+      return;
+    }
+
+    setError("");
+    const { error: deleteError } = await supabase
+      .from(activeKey)
+      .delete()
+      .eq("id", row.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
     await loadRows();
     if (activeKey === "manufacturers") await loadManufacturers();
   }
@@ -786,6 +837,20 @@ function MasterData({ supabase }) {
                     <div className="row-actions">
                       <button className="table-button" onClick={() => beginEdit(row)}>Edit</button>
                       <button className="table-button" onClick={() => toggleActive(row)}>{row.is_active ? "Deactivate" : "Reactivate"}</button>
+                      <button
+                        className="table-button delete-button"
+                        disabled={usage[row.id] !== 0}
+                        title={
+                          usage[row.id] === 0
+                            ? "Permanently delete"
+                            : usage[row.id] > 0
+                              ? "Cannot delete: this value is in use"
+                              : "Checking usage..."
+                        }
+                        onClick={() => deleteRow(row)}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </td>
                 </tr>
