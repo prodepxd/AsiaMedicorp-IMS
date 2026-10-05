@@ -449,7 +449,8 @@ function ItemDetailView({ item, canEdit, onBack, onEdit }) {
 function GlobalStock({ supabase, canEdit, canDelete = false }) {
   const [items, setItems] = useState([]);
   const [showAddItem, setShowAddItem] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);\n  const [editingItem, setEditingItem] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -542,6 +543,42 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
     });
   }, [items, search, typeFilter, statusFilter, locationFilter]);
 
+  if (editingItem) {
+    return (
+      <AddItemModal
+        supabase={supabase}
+        item={editingItem}
+        canDelete={canDelete}
+        pageMode
+        onClose={() => {
+          setEditingItem(null);
+          setSelectedItem(editingItem);
+        }}
+        onSaved={async () => {
+          await loadItems();
+          const updatedItem = items.find((value) => value.id === editingItem.id);
+          setSelectedItem(updatedItem || editingItem);
+        }}
+        onDeleted={async () => {
+          await loadItems();
+          setEditingItem(null);
+          setSelectedItem(null);
+        }}
+      />
+    );
+  }
+
+  if (selectedItem) {
+    return (
+      <ItemDetailView
+        item={selectedItem}
+        canEdit={canEdit}
+        onBack={() => setSelectedItem(null)}
+        onEdit={() => setEditingItem(selectedItem)}
+      />
+    );
+  }
+
   return (
     <section className="stock-card">
       <div className="stock-toolbar">
@@ -564,7 +601,6 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
 
       <div className="stock-filters">
         <input
-          className="stock-search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search serial, detail, manufacturer, model..."
@@ -616,9 +652,9 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
             {filteredItems.map((item) => (
               <tr
                 key={item.id}
-                className={canEdit ? "stock-row-clickable" : ""}
-                onClick={() => canEdit && setEditingItem(item)}
-                title={canEdit ? "Click to edit this item" : undefined}
+                className="stock-row-clickable"
+                onClick={() => setSelectedItem(item)}
+                title="Click to view this item"
               >
                 <td><strong>{item.serial_number || "—"}</strong></td>
                 <td>{item.item_types?.name || "—"}</td>
@@ -635,6 +671,7 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
           </tbody>
         </table>
       </div>
+
       {showAddItem && (
         <AddItemModal
           supabase={supabase}
@@ -642,11 +679,9 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
           onSaved={loadItems}
         />
       )}
-
     </section>
   );
 }
-
 
 const MASTER_DEFINITIONS = [
   { key: "item_types", label: "Item Types", singular: "item type" },
