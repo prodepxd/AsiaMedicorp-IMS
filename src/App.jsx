@@ -499,9 +499,9 @@ function GlobalStock({ supabase, canEdit }) {
             {filteredItems.map((item) => (
               <tr
                 key={item.id}
-                className="stock-row-clickable"
-                onClick={() => setEditingItem(item)}
-                title="Click to edit this item"
+                className={canEdit ? "stock-row-clickable" : ""}
+                onClick={() => canEdit && setEditingItem(item)}
+                title={canEdit ? "Click to edit this item" : undefined}
               >
                 <td><strong>{item.serial_number || "—"}</strong></td>
                 <td>{item.item_types?.name || "—"}</td>
