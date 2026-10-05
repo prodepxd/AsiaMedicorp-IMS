@@ -90,7 +90,7 @@ function Login({ onLogin }) {
   );
 }
 
-function AddItemModal({ supabase, onClose, onSaved }) {
+function AddItemModal({ supabase, onClose, onSaved, item = null }) {
   const [masters, setMasters] = useState({
     itemTypes: [],
     manufacturers: [],
@@ -142,11 +142,31 @@ function AddItemModal({ supabase, onClose, onSaved }) {
     const goodQuality = qualities.find((value) => value.name === "Good");
 
     setMasters({ itemTypes, manufacturers, models, locations, statuses, qualities });
-    setForm((current) => ({
-      ...current,
-      status_id: current.status_id || stockStatus?.id || "",
-      quality_status_id: current.quality_status_id || goodQuality?.id || "",
-    }));
+    setForm(
+      item
+        ? {
+            serial_number: item.serial_number || "",
+            item_type_id: item.item_type_id || "",
+            manufacturer_id: item.manufacturer_id || "",
+            model_id: item.model_id || "",
+            item_detail: item.item_detail || "",
+            current_location_id: item.current_location_id || "",
+            status_id: item.status_id || "",
+            quality_status_id: item.quality_status_id || "",
+            quality_note: item.quality_note || "",
+          }
+        : {
+            serial_number: "",
+            item_type_id: "",
+            manufacturer_id: "",
+            model_id: "",
+            item_detail: "",
+            current_location_id: "",
+            status_id: stockStatus?.id || "",
+            quality_status_id: goodQuality?.id || "",
+            quality_note: "",
+          }
+    );
     setLoading(false);
   }, [supabase]);
 
@@ -187,10 +207,12 @@ function AddItemModal({ supabase, onClose, onSaved }) {
       quality_note: form.quality_note.trim() || null,
     };
 
-    const { error: insertError } = await supabase.from("items").insert(payload);
+    const result = item
+      ? await supabase.from("items").update(payload).eq("id", item.id)
+      : await supabase.from("items").insert(payload);
 
-    if (insertError) {
-      setError(insertError.message);
+    if (result.error) {
+      setError(result.error.message);
       setSaving(false);
       return;
     }
@@ -206,8 +228,8 @@ function AddItemModal({ supabase, onClose, onSaved }) {
         <div className="modal-header">
           <div>
             <p className="section-kicker">INVENTORY</p>
-            <h2>Add inventory item</h2>
-            <p>Create one physical item record in Global Stock.</p>
+            <h2>{item ? "Edit inventory item" : "Add inventory item"}</h2>
+            <p>{item ? "Update the details of this physical inventory item." : "Create one physical item record in Global Stock."}</p>
           </div>
           <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
         </div>
@@ -296,7 +318,7 @@ function AddItemModal({ supabase, onClose, onSaved }) {
             <div className="modal-actions">
               <button type="button" className="secondary-button" onClick={onClose}>Cancel</button>
               <button type="submit" className="primary-button" disabled={saving}>
-                {saving ? "Adding item..." : "Add item"}
+                {saving ? (item ? "Saving..." : "Adding item...") : (item ? "Save changes" : "Add item")}
               </button>
             </div>
           </form>
@@ -309,6 +331,7 @@ function AddItemModal({ supabase, onClose, onSaved }) {
 function GlobalStock({ supabase, canEdit }) {
   const [items, setItems] = useState([]);
   const [showAddItem, setShowAddItem] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -327,6 +350,13 @@ function GlobalStock({ supabase, canEdit }) {
           id,
           serial_number,
           item_detail,
+          item_type_id,
+          manufacturer_id,
+          model_id,
+          current_location_id,
+          status_id,
+          quality_status_id,
+          quality_note,
           created_at,
           item_types(name),
           manufacturers(name),
@@ -466,7 +496,12 @@ function GlobalStock({ supabase, canEdit }) {
               </tr>
             )}
             {filteredItems.map((item) => (
-              <tr key={item.id}>
+              <tr
+                key={item.id}
+                className="stock-row-clickable"
+                onClick={() => setEditingItem(item)}
+                title="Click to edit this item"
+              >
                 <td><strong>{item.serial_number || "—"}</strong></td>
                 <td>{item.item_types?.name || "—"}</td>
                 <td>
@@ -486,6 +521,14 @@ function GlobalStock({ supabase, canEdit }) {
         <AddItemModal
           supabase={supabase}
           onClose={() => setShowAddItem(false)}
+          onSaved={loadItems}
+        />
+      )}
+      {editingItem && (
+        <AddItemModal
+          supabase={supabase}
+          item={editingItem}
+          onClose={() => setEditingItem(null)}
           onSaved={loadItems}
         />
       )}
