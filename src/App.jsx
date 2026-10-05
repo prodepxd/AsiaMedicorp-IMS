@@ -368,10 +368,270 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
   );
 }
 
+
+function ItemDetailModal({ supabase, item, canEdit, canDelete, onClose, onEdit, onDeleted }) {
+  const [photos, setPhotos] = useState([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [deletingPhoto, setDeletingPhoto] = useState("");
+  const [error, setError] = useState("");
+
+  const loadPhotos = useCallback(async () => {
+    setLoadingPhotos(true);
+    setError("");
+
+    const { data, error: photosError } = await supabase
+      .from("item_photos")
+      .select("id, storage_path, caption, created_at")
+      .eq("item_id", item.id)
+      .order("created_at", { ascending: true });
+
+    if (photosError) {
+      setError(photosError.message);
+      setPhotos([]);
+      setLoadingPhotos(false);
+      return;
+    }
+
+    const rows = data || [];
+    if (!rows.length) {
+      setPhotos([]);
+      setLoadingPhotos(false);
+      return;
+    }
+
+    const { data: signed, error: signedError } = await supabase.storage
+      .from("item-photos")
+      .createSignedUrls(rows.map((row) => row.storage_path), 3600);
+
+    if (signedError) {
+      setError(signedError.message);
+      setPhotos([]);
+      setLoadingPhotos(false);
+      return;
+    }
+
+    const signedMap = new Map(
+      (signed || []).map((entry) => [entry.path, entry.signedUrl])
+    );
+
+    setPhotos(
+      rows.map((row) => ({
+        ...row,
+        signedUrl: signedMap.get(row.storage_path) || "",
+      }))
+    );
+    setLoadingPhotos(false);
+  }, [supabase, item.id]);
+
+  useEffect(() => {
+    loadPhotos();
+  }, [loadPhotos]);
+
+  async function handleUpload(event) {
+    const files = Array.from(event.target.files || []);
+    event.target.value = "";
+    if (!files.length) return;
+
+    setUploading(true);
+    setError("");
+
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) {
+        setError("Only image files can be uploaded.");
+        continue;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        setError(`"${file.name}" is larger than the 10 MB limit.`);
+        continue;
+      }
+
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+      const path = `${item.id}/${crypto.randomUUID()}-${safeName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("item-photos")
+        .upload(path, file, { upsert: false, contentType: file.type });
+
+      if (uploadError) {
+        setError(uploadError.message);
+        continue;
+      }
+
+      const { error: insertError } = await supabase
+        .from("item_photos")
+        .insert({
+          item_id: item.id,
+          storage_path: path,
+        });
+
+      if (insertError) {
+        await supabase.storage.from("item-photos").remove([path]);
+        setError(insertError.message);
+      }
+    }
+
+    setUploading(false);
+    await loadPhotos();
+  }
+
+  async function handleDeletePhoto(photo) {
+    if (deletingPhoto) return;
+    if (!window.confirm("Delete this item photo? This cannot be undone.")) return;
+
+    setDeletingPhoto(photo.id);
+    setError("");
+
+    const { error: storageError } = await supabase.storage
+      .from("item-photos")
+      .remove([photo.storage_path]);
+
+    if (storageError) {
+      setError(storageError.message);
+      setDeletingPhoto("");
+      return;
+    }
+
+    const { error: deleteError } = await supabase
+      .from("item_photos")
+      .delete()
+      .eq("id", photo.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      setDeletingPhoto("");
+      return;
+    }
+
+    setDeletingPhoto("");
+    await loadPhotos();
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <div className="detail-modal-card" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <p className="section-kicker">INVENTORY ITEM</p>
+            <h2>{item.models?.name || item.item_types?.name || "Item detail"}</h2>
+            <p>{item.serial_number || "No serial number recorded"}</p>
+          </div>
+          <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
+        </div>
+
+        <div className="detail-content">
+          <div className="detail-header-grid">
+            <div className="detail-identity">
+              <span className="detail-type">{item.item_types?.name || "Item"}</span>
+              <h3>{item.models?.name || "Model not set"}</h3>
+              <p>{item.manufacturers?.name || "Manufacturer not set"}</p>
+              <div className="detail-badges">
+                <span className="status-pill">{item.statuses?.name || "—"}</span>
+                <span className="detail-quality">{item.quality_statuses?.name || "—"}</span>
+              </div>
+            </div>
+
+            <div className="detail-actions">
+              {canEdit && (
+                <button className="secondary-button" onClick={() => onEdit(item)}>
+                  Edit item
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  className="danger-button"
+                  onClick={() => {
+                    if (window.confirm("Permanently delete this inventory item? This cannot be undone.")) {
+                      onDeleted();
+                    }
+                  }}
+                >
+                  Delete item
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="detail-fields">
+            <div><span>Serial number</span><strong>{item.serial_number || "—"}</strong></div>
+            <div><span>Item type</span><strong>{item.item_types?.name || "—"}</strong></div>
+            <div><span>Manufacturer</span><strong>{item.manufacturers?.name || "—"}</strong></div>
+            <div><span>Model</span><strong>{item.models?.name || "—"}</strong></div>
+            <div><span>Current location</span><strong>{item.locations?.name || "—"}</strong></div>
+            <div><span>Status</span><strong>{item.statuses?.name || "—"}</strong></div>
+            <div><span>Quality</span><strong>{item.quality_statuses?.name || "—"}</strong></div>
+            <div><span>Created</span><strong>{item.created_at ? new Date(item.created_at).toLocaleString() : "—"}</strong></div>
+          </div>
+
+          <div className="detail-description">
+            <span>Item detail / description</span>
+            <p>{item.item_detail || "No description recorded."}</p>
+          </div>
+
+          {item.quality_note && (
+            <div className="detail-note">
+              <span>Quality note</span>
+              <p>{item.quality_note}</p>
+            </div>
+          )}
+
+          <div className="photo-section">
+            <div className="photo-section-header">
+              <div>
+                <p className="section-kicker">PHOTOS</p>
+                <h3>Item photos</h3>
+                <p>Reference photos for this individual physical item.</p>
+              </div>
+              {canEdit && (
+                <label className="secondary-button photo-upload-button">
+                  {uploading ? "Uploading..." : "+ Add photos"}
+                  <input type="file" accept="image/*" multiple onChange={handleUpload} disabled={uploading} />
+                </label>
+              )}
+            </div>
+
+            {error && <div className="error-message detail-error">{error}</div>}
+
+            {loadingPhotos ? (
+              <div className="photo-empty">Loading photos...</div>
+            ) : photos.length ? (
+              <div className="photo-grid">
+                {photos.map((photo) => (
+                  <div className="photo-card" key={photo.id}>
+                    {photo.signedUrl ? (
+                      <img src={photo.signedUrl} alt={photo.caption || "Inventory item"} />
+                    ) : (
+                      <div className="photo-missing">Preview unavailable</div>
+                    )}
+                    {canEdit && (
+                      <button
+                        className="photo-delete"
+                        onClick={() => handleDeletePhoto(photo)}
+                        disabled={deletingPhoto === photo.id}
+                        title="Delete photo"
+                      >
+                        {deletingPhoto === photo.id ? "..." : "×"}
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="photo-empty">No photos have been added to this item yet.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GlobalStock({ supabase, canEdit, canDelete = false }) {
   const [items, setItems] = useState([]);
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [detailItem, setDetailItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -538,9 +798,9 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
             {filteredItems.map((item) => (
               <tr
                 key={item.id}
-                className={canEdit ? "stock-row-clickable" : ""}
-                onClick={() => canEdit && setEditingItem(item)}
-                title={canEdit ? "Click to edit this item" : undefined}
+                className="stock-row-clickable"
+                onClick={() => setDetailItem(item)}
+                title="Click to view item details"
               >
                 <td><strong>{item.serial_number || "—"}</strong></td>
                 <td>{item.item_types?.name || "—"}</td>
@@ -562,6 +822,24 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
           supabase={supabase}
           onClose={() => setShowAddItem(false)}
           onSaved={loadItems}
+        />
+      )}
+      {detailItem && (
+        <ItemDetailModal
+          supabase={supabase}
+          item={detailItem}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onClose={() => setDetailItem(null)}
+          onEdit={(itemToEdit) => {
+            setDetailItem(null);
+            setEditingItem(itemToEdit);
+          }}
+          onDeleted={() => {
+            setDetailItem(null);
+            setEditingItem(null);
+            loadItems();
+          }}
         />
       )}
       {editingItem && (
