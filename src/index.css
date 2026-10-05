@@ -183,8 +183,16 @@ button { cursor: pointer; }
 .item-form input:focus, .item-form select:focus, .item-form textarea:focus { border-color: #3b82f6; }
 .item-form select:disabled { opacity: .55; cursor: not-allowed; }
 .modal-actions {
-  display: flex; justify-content: flex-end; gap: 9px; padding-top: 4px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px;
 }
+.modal-actions-right { display: flex; align-items: center; gap: 9px; margin-left: auto; }
+.danger-button {
+  border: 1px solid #6b3030; border-radius: 9px; padding: 9px 13px;
+  color: #f2a0a0; background: #241215; font-weight: 700;
+}
+.danger-button:hover:not(:disabled) { color: #fff; border-color: #c43d3d; background: #45181c; }
+.danger-button:disabled { color: #6f5a5d; border-color: #3d292c; background: #171214; cursor: not-allowed; opacity: .75; }
+.modal-delete-button { margin-right: auto; }
 @media (max-width: 600px) {
   .form-grid { grid-template-columns: 1fr; }
   .modal-backdrop { padding: 10px; }
