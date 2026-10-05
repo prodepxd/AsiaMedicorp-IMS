@@ -1,35 +1,196 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase, supabaseConfigured } from "./lib/supabase";
 
 const navItems = [
   { label: "Global Stock", icon: "▦" },
   { label: "Purchases", icon: "↘" },
   { label: "Shipments", icon: "⇄" },
   { label: "Sales", icon: "↗" },
-  { label: "Admin / Master Data", icon: "⚙" },
+  { label: "Admin / Master Data", icon: "⚙", adminOnly: true },
 ];
 
-const filters = [
-  { label: "Item Type", options: ["All types", "Machine", "Probe", "PCB"] },
-  { label: "Status", options: ["All statuses", "In Stock", "In Transit", "Sold"] },
-  { label: "Quality", options: ["All quality", "Good", "Defective"] },
-  { label: "Location", options: ["All locations"] },
-];
+function Login({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError) {
+      setError(signInError.message);
+      setBusy(false);
+      return;
+    }
+
+    onLogin(data.session);
+    setBusy(false);
+  }
+
+  return (
+    <main className="login-shell">
+      <section className="login-card">
+        <div className="brand-mark">AM</div>
+        <p className="eyebrow">ASIA MEDICORP</p>
+        <h1>Inventory Management System</h1>
+        <p className="login-copy">Sign in to access the secure inventory workspace.</p>
+
+        <form onSubmit={handleSubmit} className="login-form">
+          <label>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="name@company.com"
+              autoComplete="email"
+              required
+            />
+          </label>
+
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Enter your password"
+              autoComplete="current-password"
+              required
+            />
+          </label>
+
+          {error && <div className="error-message">{error}</div>}
+
+          <button className="primary-button login-button" disabled={busy}>
+            {busy ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+
+        <p className="login-footer">Access is controlled by your assigned IMS role.</p>
+      </section>
+    </main>
+  );
+}
 
 function App() {
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("Global Stock");
-  const [search, setSearch] = useState("");
-  const [filterValues, setFilterValues] = useState(
-    Object.fromEntries(filters.map(({ label, options }) => [label, options[0]]))
-  );
+  const [error, setError] = useState("");
 
-  const summary = useMemo(
-    () => [
-      ["Total Items", "—", "Waiting for database access"],
-      ["In Stock", "—", "Current inventory"],
-      ["In Transit", "—", "Active shipments"],
-      ["Defective", "—", "Quality attention"],
-    ],
-    []
+  useEffect(() => {
+    if (!supabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
+    let mounted = true;
+
+    async function loadSession() {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      if (data.session) {
+        setSession(data.session);
+        await loadProfile(data.session.user.id);
+      }
+      setLoading(false);
+    }
+
+    async function loadProfile(userId) {
+      const { data, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, full_name, role, is_active")
+        .eq("id", userId)
+        .single();
+
+      if (!mounted) return;
+
+      if (profileError) {
+        setError(profileError.message);
+        return;
+      }
+
+      if (!data.is_active) {
+        await supabase.auth.signOut();
+        setError("Your IMS account is inactive. Please contact an administrator.");
+        setSession(null);
+        return;
+      }
+
+      setProfile(data);
+    }
+
+    loadSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_event, nextSession) => {
+        if (!mounted) return;
+        setSession(nextSession);
+        if (nextSession) {
+          await loadProfile(nextSession.user.id);
+        } else {
+          setProfile(null);
+        }
+      }
+    );
+
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    setSession(null);
+    setProfile(null);
+    setActive("Global Stock");
+  }
+
+  if (!supabaseConfigured) {
+    return (
+      <main className="login-shell">
+        <section className="login-card">
+          <div className="brand-mark">AM</div>
+          <p className="eyebrow">CONFIGURATION REQUIRED</p>
+          <h1>Supabase connection is not configured.</h1>
+          <p className="login-copy">
+            The deployment is missing its Supabase environment configuration.
+            Check the GitHub Actions repository secrets and redeploy.
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (loading) {
+    return (
+      <main className="login-shell">
+        <section className="login-card loading-card">
+          <div className="brand-mark">AM</div>
+          <p>Loading secure workspace...</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (!session || !profile) {
+    return <Login onLogin={setSession} />;
+  }
+
+  const visibleNav = navItems.filter(
+    (item) => !item.adminOnly || profile.role === "admin"
   );
 
   return (
@@ -45,7 +206,7 @@ function App() {
 
         <nav className="nav">
           <p className="nav-title">WORKSPACE</p>
-          {navItems.map((item) => (
+          {visibleNav.map((item) => (
             <button
               key={item.label}
               className={active === item.label ? "nav-item active" : "nav-item"}
@@ -59,7 +220,7 @@ function App() {
 
         <div className="sidebar-footer">
           <div className="secure-badge">● Secure workspace</div>
-          <span>Asia Medicorp IMS · V1</span>
+          <span>{profile.role.toUpperCase()} access</span>
         </div>
       </aside>
 
@@ -69,95 +230,27 @@ function App() {
             <p className="eyebrow">INVENTORY MANAGEMENT SYSTEM</p>
             <h1>{active}</h1>
           </div>
-          <div className="connection-pill">
-            <span className="status-dot" />
-            Database connection pending
+          <div className="user-area">
+            <div>
+              <strong>{profile.full_name || session.user.email}</strong>
+              <span>{profile.role}</span>
+            </div>
+            <button className="signout-button" onClick={signOut}>
+              Sign out
+            </button>
           </div>
         </header>
-
-        <section className="summary-grid">
-          {summary.map(([title, value, note]) => (
-            <article className="summary-card" key={title}>
-              <span>{title}</span>
-              <strong>{value}</strong>
-              <small>{note}</small>
-            </article>
-          ))}
-        </section>
 
         <section className="content-card">
           <div className="section-heading">
             <div>
-              <p className="section-kicker">GLOBAL STOCK</p>
-              <h2>All current inventory</h2>
+              <p className="section-kicker">{active.toUpperCase()}</p>
+              <h2>Workspace ready</h2>
               <p>
-                Search and filter the complete inventory once authorized database
-                access is enabled.
+                Authentication is connected. The next step is to add role-based
+                database policies and connect each module to live data.
               </p>
             </div>
-            <button className="primary-button" type="button">
-              + Add Item
-            </button>
-          </div>
-
-          <div className="toolbar">
-            <label className="search-box">
-              <span>⌕</span>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search serial number, detail, manufacturer or model..."
-              />
-            </label>
-
-            {filters.map(({ label, options }) => (
-              <select
-                key={label}
-                value={filterValues[label]}
-                onChange={(event) =>
-                  setFilterValues((current) => ({
-                    ...current,
-                    [label]: event.target.value,
-                  }))
-                }
-                aria-label={label}
-              >
-                {options.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            ))}
-          </div>
-
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Serial Number</th>
-                  <th>Type</th>
-                  <th>Manufacturer</th>
-                  <th>Model</th>
-                  <th>Status</th>
-                  <th>Quality</th>
-                  <th>Location</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td colSpan="7">
-                    <div className="empty-state">
-                      <div className="empty-icon">▦</div>
-                      <strong>No inventory loaded yet</strong>
-                      <span>
-                        The Global Stock screen is ready. We will connect it to
-                        Supabase after authentication and access policies are
-                        configured.
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
           </div>
         </section>
       </main>
