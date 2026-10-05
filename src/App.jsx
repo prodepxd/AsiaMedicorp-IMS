@@ -538,18 +538,6 @@ function ItemDetailModal({ supabase, item, canEdit, canDelete, onClose, onEdit, 
                   Edit item
                 </button>
               )}
-              {canDelete && (
-                <button
-                  className="danger-button"
-                  onClick={() => {
-                    if (window.confirm("Permanently delete this inventory item? This cannot be undone.")) {
-                      onDeleted();
-                    }
-                  }}
-                >
-                  Delete item
-                </button>
-              )}
             </div>
           </div>
 
