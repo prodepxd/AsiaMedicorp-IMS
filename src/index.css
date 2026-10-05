@@ -279,3 +279,81 @@ button { cursor: pointer; }
 .delete-button:disabled { color: #5c6673; border-color: #293441; background: #111923; cursor: not-allowed; opacity: .72; }
 
 
+
+
+.item-detail-card {
+  border: 1px solid #1b2a3d;
+  border-radius: 16px;
+  background: #0c1929;
+  overflow: hidden;
+}
+.item-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px;
+  border-bottom: 1px solid #1b2a3d;
+}
+.item-detail-header h2 { margin: 5px 0; font-size: 1.35rem; }
+.item-detail-header p:not(.section-kicker) { margin: 0; color: #71859d; font-size: .8rem; }
+.item-detail-actions { display: flex; gap: 9px; flex-wrap: wrap; justify-content: flex-end; }
+.item-detail-body { padding: 24px; }
+.item-photo-placeholder {
+  min-height: 230px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 24px;
+  border: 1px dashed #31455d;
+  border-radius: 14px;
+  background: #091624;
+}
+.item-photo-placeholder > div { display: grid; justify-items: center; gap: 7px; color: #61758c; }
+.photo-placeholder-icon { font-size: 2rem; color: #40556d; }
+.item-photo-placeholder strong { color: #8fa4ba; font-size: .9rem; }
+.item-photo-placeholder span:last-child { font-size: .7rem; }
+.item-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: #1b2a3d;
+  border: 1px solid #1b2a3d;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.item-detail-field { padding: 16px; background: #0a1726; }
+.item-detail-field span, .item-detail-notes span {
+  display: block;
+  color: #61758c;
+  font-size: .66rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.item-detail-field strong { display: block; margin-top: 6px; color: #dbe7f5; font-size: .82rem; }
+.item-detail-notes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+.item-detail-notes > div {
+  padding: 16px;
+  border: 1px solid #1b2a3d;
+  border-radius: 12px;
+  background: #0a1726;
+}
+.item-detail-notes p { margin: 8px 0 0; color: #aebed0; font-size: .78rem; line-height: 1.55; white-space: pre-wrap; }
+.item-page-shell {
+  min-height: 0;
+}
+.item-page-card {
+  width: 100%;
+  max-height: none;
+  box-shadow: none;
+}
+@media (max-width: 760px) {
+  .item-detail-header { flex-direction: column; }
+  .item-detail-actions { justify-content: flex-start; }
+  .item-detail-grid, .item-detail-notes { grid-template-columns: 1fr; }
+  .item-detail-body { padding: 16px; }
+}
