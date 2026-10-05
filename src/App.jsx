@@ -90,8 +90,215 @@ function Login({ onLogin }) {
   );
 }
 
-function GlobalStock({ supabase }) {
+function AddItemModal({ supabase, onClose, onSaved }) {
+  const [masters, setMasters] = useState({
+    itemTypes: [],
+    manufacturers: [],
+    models: [],
+    locations: [],
+    statuses: [],
+    qualities: [],
+  });
+  const [form, setForm] = useState({
+    serial_number: "",
+    item_type_id: "",
+    manufacturer_id: "",
+    model_id: "",
+    item_detail: "",
+    location_id: "",
+    status_id: "",
+    quality_status_id: "",
+    quality_note: "",
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadMasters = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    const results = await Promise.all([
+      supabase.from("item_types").select("id, name").eq("is_active", true).order("name"),
+      supabase.from("manufacturers").select("id, name").eq("is_active", true).order("name"),
+      supabase.from("models").select("id, name, manufacturer_id").eq("is_active", true).order("name"),
+      supabase.from("locations").select("id, name").eq("is_active", true).order("name"),
+      supabase.from("statuses").select("id, name").eq("is_active", true).order("name"),
+      supabase.from("quality_statuses").select("id, name").eq("is_active", true).order("name"),
+    ]);
+
+    const failed = results.find((result) => result.error);
+    if (failed) {
+      setError(failed.error.message);
+      setLoading(false);
+      return;
+    }
+
+    const [itemTypes, manufacturers, models, locations, statuses, qualities] = results.map(
+      (result) => result.data || []
+    );
+
+    const stockStatus = statuses.find((value) => value.name === "In Stock");
+    const goodQuality = qualities.find((value) => value.name === "Good");
+
+    setMasters({ itemTypes, manufacturers, models, locations, statuses, qualities });
+    setForm((current) => ({
+      ...current,
+      status_id: current.status_id || stockStatus?.id || "",
+      quality_status_id: current.quality_status_id || goodQuality?.id || "",
+    }));
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    loadMasters();
+  }, [loadMasters]);
+
+  const availableModels = useMemo(
+    () =>
+      masters.models.filter(
+        (model) => !form.manufacturer_id || model.manufacturer_id === form.manufacturer_id
+      ),
+    [masters.models, form.manufacturer_id]
+  );
+
+  function updateField(field, value) {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "manufacturer_id" ? { model_id: "" } : {}),
+    }));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+
+    const payload = {
+      serial_number: form.serial_number.trim() || null,
+      item_type_id: form.item_type_id,
+      manufacturer_id: form.manufacturer_id || null,
+      model_id: form.model_id || null,
+      item_detail: form.item_detail.trim() || null,
+      location_id: form.location_id || null,
+      status_id: form.status_id,
+      quality_status_id: form.quality_status_id,
+      quality_note: form.quality_note.trim() || null,
+    };
+
+    const { error: insertError } = await supabase.from("items").insert(payload);
+
+    if (insertError) {
+      setError(insertError.message);
+      setSaving(false);
+      return;
+    }
+
+    setSaving(false);
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <div className="modal-card" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <p className="section-kicker">INVENTORY</p>
+            <h2>Add inventory item</h2>
+            <p>Create one physical item record in Global Stock.</p>
+          </div>
+          <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
+        </div>
+
+        {loading ? (
+          <div className="modal-loading">Loading master data...</div>
+        ) : (
+          <form className="item-form" onSubmit={handleSubmit}>
+            <div className="form-grid">
+              <label>
+                Item type *
+                <select value={form.item_type_id} onChange={(event) => updateField("item_type_id", event.target.value)} required>
+                  <option value="">Select type</option>
+                  {masters.itemTypes.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
+                </select>
+              </label>
+
+              <label>
+                Serial number
+                <input value={form.serial_number} onChange={(event) => updateField("serial_number", event.target.value)} placeholder="Optional" />
+              </label>
+
+              <label>
+                Manufacturer
+                <select value={form.manufacturer_id} onChange={(event) => updateField("manufacturer_id", event.target.value)}>
+                  <option value="">Not set</option>
+                  {masters.manufacturers.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
+                </select>
+              </label>
+
+              <label>
+                Model
+                <select value={form.model_id} onChange={(event) => updateField("model_id", event.target.value)} disabled={!form.manufacturer_id}>
+                  <option value="">{form.manufacturer_id ? "Not set" : "Select manufacturer first"}</option>
+                  {availableModels.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
+                </select>
+              </label>
+
+              <label>
+                Location
+                <select value={form.location_id} onChange={(event) => updateField("location_id", event.target.value)}>
+                  <option value="">Not set</option>
+                  {masters.locations.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
+                </select>
+              </label>
+
+              <label>
+                Status *
+                <select value={form.status_id} onChange={(event) => updateField("status_id", event.target.value)} required>
+                  <option value="">Select status</option>
+                  {masters.statuses.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
+                </select>
+              </label>
+
+              <label>
+                Quality *
+                <select value={form.quality_status_id} onChange={(event) => updateField("quality_status_id", event.target.value)} required>
+                  <option value="">Select quality</option>
+                  {masters.qualities.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
+                </select>
+              </label>
+
+              <label>
+                Quality note
+                <input value={form.quality_note} onChange={(event) => updateField("quality_note", event.target.value)} placeholder="Optional note" />
+              </label>
+            </div>
+
+            <label>
+              Item detail / description
+              <textarea value={form.item_detail} onChange={(event) => updateField("item_detail", event.target.value)} placeholder="Free-text description of this physical item" rows="3" />
+            </label>
+
+            {error && <div className="error-message">{error}</div>}
+
+            <div className="modal-actions">
+              <button type="button" className="secondary-button" onClick={onClose}>Cancel</button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? "Adding item..." : "Add item"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GlobalStock({ supabase, canEdit }) {
   const [items, setItems] = useState([]);
+  const [showAddItem, setShowAddItem] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -185,9 +392,16 @@ function GlobalStock({ supabase }) {
           <h2>Global Stock</h2>
           <p>All individual inventory items currently recorded in the IMS.</p>
         </div>
-        <button className="secondary-button" onClick={loadItems} disabled={loading}>
-          {loading ? "Refreshing..." : "Refresh"}
-        </button>
+        <div className="stock-actions">
+          {canEdit && (
+            <button className="primary-button" onClick={() => setShowAddItem(true)}>
+              + Add item
+            </button>
+          )}
+          <button className="secondary-button" onClick={loadItems} disabled={loading}>
+            {loading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
       </div>
 
       <div className="stock-filters">
@@ -258,6 +472,13 @@ function GlobalStock({ supabase }) {
           </tbody>
         </table>
       </div>
+      {showAddItem && (
+        <AddItemModal
+          supabase={supabase}
+          onClose={() => setShowAddItem(false)}
+          onSaved={loadItems}
+        />
+      )}
     </section>
   );
 }
@@ -441,7 +662,10 @@ function App() {
         </header>
 
         {active === "Global Stock" ? (
-          <GlobalStock supabase={supabase} />
+          <GlobalStock
+            supabase={supabase}
+            canEdit={profile.role === "admin" || profile.role === "manager"}
+          />
         ) : (
           <section className="content-card">
             <div className="section-heading">
