@@ -493,6 +493,268 @@ function GlobalStock({ supabase, canEdit }) {
   );
 }
 
+
+const MASTER_DEFINITIONS = [
+  { key: "item_types", label: "Item Types", singular: "item type" },
+  { key: "manufacturers", label: "Manufacturers", singular: "manufacturer" },
+  { key: "models", label: "Models", singular: "model", needsManufacturer: true },
+  { key: "locations", label: "Locations", singular: "location" },
+  { key: "statuses", label: "Statuses", singular: "status" },
+  { key: "quality_statuses", label: "Quality Statuses", singular: "quality status" },
+  { key: "transit_statuses", label: "Transit Statuses", singular: "transit status" },
+  { key: "suppliers", label: "Suppliers", singular: "supplier" },
+  { key: "customers", label: "Customers", singular: "customer" },
+];
+
+function MasterData({ supabase }) {
+  const [activeKey, setActiveKey] = useState("item_types");
+  const [rows, setRows] = useState([]);
+  const [manufacturers, setManufacturers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: "", manufacturer_id: "" });
+  const [error, setError] = useState("");
+
+  const definition = MASTER_DEFINITIONS.find((item) => item.key === activeKey);
+
+  const loadRows = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    const selectFields = definition.needsManufacturer
+      ? "id, name, manufacturer_id, is_active"
+      : "id, name, is_active";
+
+    const { data, error: rowsError } = await supabase
+      .from(activeKey)
+      .select(selectFields)
+      .order("name");
+
+    if (rowsError) {
+      setError(rowsError.message);
+      setRows([]);
+    } else {
+      setRows(data || []);
+    }
+    setLoading(false);
+  }, [supabase, activeKey, definition.needsManufacturer]);
+
+  const loadManufacturers = useCallback(async () => {
+    const { data, error: manufacturerError } = await supabase
+      .from("manufacturers")
+      .select("id, name")
+      .eq("is_active", true)
+      .order("name");
+
+    if (manufacturerError) {
+      setError(manufacturerError.message);
+      return;
+    }
+    setManufacturers(data || []);
+  }, [supabase]);
+
+  useEffect(() => {
+    loadRows();
+    if (definition.needsManufacturer) loadManufacturers();
+  }, [loadRows, loadManufacturers, definition.needsManufacturer]);
+
+  function selectMaster(key) {
+    setActiveKey(key);
+    setEditing(null);
+    setForm({ name: "", manufacturer_id: "" });
+    setError("");
+  }
+
+  function beginAdd() {
+    setEditing({ mode: "add" });
+    setForm({ name: "", manufacturer_id: "" });
+    setError("");
+  }
+
+  function beginEdit(row) {
+    setEditing({ mode: "edit", id: row.id });
+    setForm({ name: row.name, manufacturer_id: row.manufacturer_id || "" });
+    setError("");
+  }
+
+  function cancelEdit() {
+    setEditing(null);
+    setForm({ name: "", manufacturer_id: "" });
+    setError("");
+  }
+
+  async function saveRow(event) {
+    event.preventDefault();
+    const name = form.name.trim();
+
+    if (!name) {
+      setError("Name is required.");
+      return;
+    }
+    if (definition.needsManufacturer && !form.manufacturer_id) {
+      setError("Select a manufacturer for this model.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+
+    const payload = {
+      name,
+      ...(definition.needsManufacturer ? { manufacturer_id: form.manufacturer_id } : {}),
+    };
+
+    const result = editing?.mode === "edit"
+      ? await supabase.from(activeKey).update(payload).eq("id", editing.id)
+      : await supabase.from(activeKey).insert(payload);
+
+    if (result.error) {
+      setError(result.error.message);
+      setSaving(false);
+      return;
+    }
+
+    setSaving(false);
+    cancelEdit();
+    await loadRows();
+    if (activeKey === "manufacturers") await loadManufacturers();
+  }
+
+  async function toggleActive(row) {
+    const action = row.is_active ? "deactivate" : "reactivate";
+    if (!window.confirm(action[0].toUpperCase() + action.slice(1) + ' "' + row.name + '"?')) return;
+
+    setError("");
+    const { error: updateError } = await supabase
+      .from(activeKey)
+      .update({ is_active: !row.is_active })
+      .eq("id", row.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    await loadRows();
+    if (activeKey === "manufacturers") await loadManufacturers();
+  }
+
+  const visibleRows = rows.filter((row) => showInactive || row.is_active);
+  const manufacturerName = (id) =>
+    manufacturers.find((manufacturer) => manufacturer.id === id)?.name || "Unknown manufacturer";
+
+  return (
+    <section className="master-card">
+      <div className="master-header">
+        <div>
+          <p className="section-kicker">ADMINISTRATION</p>
+          <h2>Master Data</h2>
+          <p>Manage reusable values used throughout the IMS. Deactivated records remain in history.</p>
+        </div>
+        <div className="master-header-actions">
+          <label className="inactive-toggle">
+            <input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} />
+            Show inactive
+          </label>
+          <button className="primary-button" onClick={beginAdd}>+ Add {definition.singular}</button>
+        </div>
+      </div>
+
+      <div className="master-tabs">
+        {MASTER_DEFINITIONS.map((item) => (
+          <button
+            key={item.key}
+            className={item.key === activeKey ? "master-tab active" : "master-tab"}
+            onClick={() => selectMaster(item.key)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="master-content">
+        <div className="master-content-title">
+          <div>
+            <strong>{definition.label}</strong>
+            <span>{visibleRows.length} record{visibleRows.length === 1 ? "" : "s"}</span>
+          </div>
+          <button className="secondary-button" onClick={loadRows} disabled={loading}>
+            {loading ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
+
+        {editing && (
+          <form className="master-edit-form" onSubmit={saveRow}>
+            <div className="master-form-field">
+              <label>{definition.needsManufacturer ? "Model name" : definition.label.replace(/s$/, "") + " name"}</label>
+              <input
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                placeholder={"Enter " + definition.singular + " name"}
+                autoFocus
+                required
+              />
+            </div>
+
+            {definition.needsManufacturer && (
+              <div className="master-form-field">
+                <label>Manufacturer</label>
+                <select value={form.manufacturer_id} onChange={(event) => setForm((current) => ({ ...current, manufacturer_id: event.target.value }))} required>
+                  <option value="">Select manufacturer</option>
+                  {manufacturers.map((manufacturer) => (
+                    <option key={manufacturer.id} value={manufacturer.id}>{manufacturer.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="master-form-actions">
+              <button type="button" className="secondary-button" onClick={cancelEdit}>Cancel</button>
+              <button type="submit" className="primary-button" disabled={saving}>
+                {saving ? "Saving..." : editing.mode === "edit" ? "Save changes" : "Add"}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {error && <div className="error-message master-error">{error}</div>}
+
+        <div className="master-table-wrap">
+          <table className="master-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                {definition.needsManufacturer && <th>Manufacturer</th>}
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!loading && visibleRows.length === 0 && (
+                <tr><td colSpan={definition.needsManufacturer ? 4 : 3} className="empty-cell">No records found.</td></tr>
+              )}
+              {visibleRows.map((row) => (
+                <tr key={row.id}>
+                  <td><strong>{row.name}</strong></td>
+                  {definition.needsManufacturer && <td>{manufacturerName(row.manufacturer_id)}</td>}
+                  <td><span className={row.is_active ? "active-pill" : "inactive-pill"}>{row.is_active ? "Active" : "Inactive"}</span></td>
+                  <td>
+                    <div className="row-actions">
+                      <button className="table-button" onClick={() => beginEdit(row)}>Edit</button>
+                      <button className="table-button" onClick={() => toggleActive(row)}>{row.is_active ? "Deactivate" : "Reactivate"}</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -676,6 +938,8 @@ function App() {
             supabase={supabase}
             canEdit={profile.role === "admin" || profile.role === "manager"}
           />
+        ) : active === "Admin / Master Data" ? (
+          <MasterData supabase={supabase} />
         ) : (
           <section className="content-card">
             <div className="section-heading">
