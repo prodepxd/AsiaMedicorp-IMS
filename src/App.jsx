@@ -14,34 +14,6 @@ function Login({ onLogin }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [usage, setUsage] = useState({});
-
-  async function handleDelete() {
-    if (!item || !canDelete || deleting || saving) return;
-
-    const identifier = item.serial_number || item.item_detail || "this inventory item";
-    if (!window.confirm('Permanently delete "' + identifier + '"? This cannot be undone.')) {
-      return;
-    }
-
-    setDeleting(true);
-    setError("");
-
-    const { error: deleteError } = await supabase
-      .from("items")
-      .delete()
-      .eq("id", item.id);
-
-    if (deleteError) {
-      setError(deleteError.message);
-      setDeleting(false);
-      return;
-    }
-
-    setDeleting(false);
-    if (onDeleted) onDeleted();
-    onClose();
-  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -217,6 +189,33 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
       [field]: value,
       ...(field === "manufacturer_id" ? { model_id: "" } : {}),
     }));
+  }
+
+  async function handleDelete() {
+    if (!item || !canDelete || deleting || saving) return;
+
+    const identifier = item.serial_number || item.item_detail || "this inventory item";
+    if (!window.confirm('Permanently delete "' + identifier + '"? This cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(true);
+    setError("");
+
+    const { error: deleteError } = await supabase
+      .from("items")
+      .delete()
+      .eq("id", item.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      setDeleting(false);
+      return;
+    }
+
+    setDeleting(false);
+    if (onDeleted) onDeleted();
+    onClose();
   }
 
   async function handleSubmit(event) {
