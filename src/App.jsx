@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
 
 const navItems = [
@@ -87,6 +87,178 @@ function Login({ onLogin }) {
         <p className="login-footer">Access is controlled by your assigned IMS role.</p>
       </section>
     </main>
+  );
+}
+
+function GlobalStock({ supabase }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
+
+  const loadItems = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    const { data, error: itemsError } = await supabase
+      .from("items")
+      .select(
+        `
+          id,
+          serial_number,
+          item_detail,
+          created_at,
+          item_types(name),
+          manufacturers(name),
+          models(name),
+          locations(name),
+          statuses(name),
+          quality_statuses(name)
+        `
+      )
+      .order("created_at", { ascending: false });
+
+    if (itemsError) {
+      setError(itemsError.message);
+      setItems([]);
+    } else {
+      setItems(data || []);
+    }
+
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
+
+  const types = useMemo(
+    () => [...new Set(items.map((item) => item.item_types?.name).filter(Boolean))].sort(),
+    [items]
+  );
+
+  const statuses = useMemo(
+    () => [...new Set(items.map((item) => item.statuses?.name).filter(Boolean))].sort(),
+    [items]
+  );
+
+  const locations = useMemo(
+    () => [...new Set(items.map((item) => item.locations?.name).filter(Boolean))].sort(),
+    [items]
+  );
+
+  const filteredItems = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return items.filter((item) => {
+      const haystack = [
+        item.serial_number,
+        item.item_detail,
+        item.item_types?.name,
+        item.manufacturers?.name,
+        item.models?.name,
+        item.locations?.name,
+        item.statuses?.name,
+        item.quality_statuses?.name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return (
+        (!term || haystack.includes(term)) &&
+        (typeFilter === "all" || item.item_types?.name === typeFilter) &&
+        (statusFilter === "all" || item.statuses?.name === statusFilter) &&
+        (locationFilter === "all" || item.locations?.name === locationFilter)
+      );
+    });
+  }, [items, search, typeFilter, statusFilter, locationFilter]);
+
+  return (
+    <section className="stock-card">
+      <div className="stock-toolbar">
+        <div>
+          <p className="section-kicker">LIVE INVENTORY</p>
+          <h2>Global Stock</h2>
+          <p>All individual inventory items currently recorded in the IMS.</p>
+        </div>
+        <button className="secondary-button" onClick={loadItems} disabled={loading}>
+          {loading ? "Refreshing..." : "Refresh"}
+        </button>
+      </div>
+
+      <div className="stock-filters">
+        <input
+          className="stock-search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search serial, detail, manufacturer, model..."
+        />
+        <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+          <option value="all">All types</option>
+          {types.map((value) => <option key={value} value={value}>{value}</option>)}
+        </select>
+        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <option value="all">All statuses</option>
+          {statuses.map((value) => <option key={value} value={value}>{value}</option>)}
+        </select>
+        <select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
+          <option value="all">All locations</option>
+          {locations.map((value) => <option key={value} value={value}>{value}</option>)}
+        </select>
+      </div>
+
+      <div className="stock-summary">
+        <div><span>Total items</span><strong>{items.length}</strong></div>
+        <div><span>Showing</span><strong>{filteredItems.length}</strong></div>
+        <div><span>In stock</span><strong>{items.filter((item) => item.statuses?.name === "In Stock").length}</strong></div>
+        <div><span>In transit</span><strong>{items.filter((item) => item.statuses?.name === "In Transit").length}</strong></div>
+      </div>
+
+      {error && <div className="error-message stock-error">{error}</div>}
+
+      <div className="stock-table-wrap">
+        <table className="stock-table">
+          <thead>
+            <tr>
+              <th>Serial number</th>
+              <th>Type</th>
+              <th>Manufacturer / Model</th>
+              <th>Detail</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th>Quality</th>
+            </tr>
+          </thead>
+          <tbody>
+            {!loading && filteredItems.length === 0 && (
+              <tr>
+                <td colSpan="7" className="empty-cell">
+                  {items.length === 0 ? "No inventory items have been added yet." : "No items match the current filters."}
+                </td>
+              </tr>
+            )}
+            {filteredItems.map((item) => (
+              <tr key={item.id}>
+                <td><strong>{item.serial_number || "—"}</strong></td>
+                <td>{item.item_types?.name || "—"}</td>
+                <td>
+                  <strong>{item.manufacturers?.name || "—"}</strong>
+                  <span className="table-subtext">{item.models?.name || "Model not set"}</span>
+                </td>
+                <td>{item.item_detail || "—"}</td>
+                <td>{item.locations?.name || "—"}</td>
+                <td><span className="status-pill">{item.statuses?.name || "—"}</span></td>
+                <td>{item.quality_statuses?.name || "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -268,18 +440,22 @@ function App() {
           </div>
         </header>
 
-        <section className="content-card">
-          <div className="section-heading">
-            <div>
-              <p className="section-kicker">{active.toUpperCase()}</p>
-              <h2>Workspace ready</h2>
-              <p>
-                Authentication is connected. The next step is to add role-based
-                database policies and connect each module to live data.
-              </p>
+        {active === "Global Stock" ? (
+          <GlobalStock supabase={supabase} />
+        ) : (
+          <section className="content-card">
+            <div className="section-heading">
+              <div>
+                <p className="section-kicker">{active.toUpperCase()}</p>
+                <h2>Module ready</h2>
+                <p>
+                  Authentication and role access are connected. This module will
+                  be built on the live IMS database next.
+                </p>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
       </main>
     </div>
   );
