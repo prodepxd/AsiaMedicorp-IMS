@@ -260,3 +260,12 @@ button { cursor: pointer; }
   .master-form-actions { justify-content: flex-end; }
   .master-table th, .master-table td { padding-left: 14px; padding-right: 14px; }
 }
+
+
+.stock-row-clickable { cursor: pointer; }
+.stock-row-clickable:hover td { background: #0f2134; }
+.stock-row-clickable .model-text { display: block; margin-top: 3px; color: #dbe7f5; font-weight: 700; }
+.stock-row-clickable .manufacturer-text { display: block; margin: 0; color: #63788f; font-size: .68rem; font-weight: 500; }
+.delete-button { color: #f2a0a0; border-color: #6b3030; background: #241215; }
+.delete-button:hover:not(:disabled) { color: #fff; border-color: #c43d3d; background: #45181c; }
+.delete-button:disabled { color: #5c6673; border-color: #293441; background: #111923; cursor: not-allowed; opacity: .72; }
