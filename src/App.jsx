@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
 
 const navItems = [
@@ -20,7 +20,7 @@ function Login({ onLogin }) {
     setBusy(true);
     setError("");
 
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+    const { error: signInError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -31,7 +31,7 @@ function Login({ onLogin }) {
       return;
     }
 
-    onLogin(data.session);
+    await onLogin();
     setBusy(false);
   }
 
@@ -88,10 +88,36 @@ function App() {
   const [active, setActive] = useState("Global Stock");
   const [error, setError] = useState("");
 
+  const loadProfile = useCallback(async (userId) => {
+    const { data, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, full_name, role, is_active")
+      .eq("id", userId)
+      .single();
+
+    if (profileError) {
+      setError(profileError.message);
+      setProfile(null);
+      return false;
+    }
+
+    if (!data.is_active) {
+      await supabase.auth.signOut();
+      setError("Your IMS account is inactive. Please contact an administrator.");
+      setSession(null);
+      setProfile(null);
+      return false;
+    }
+
+    setProfile(data);
+    setError("");
+    return true;
+  }, []);
+
   useEffect(() => {
     if (!supabaseConfigured) {
       setLoading(false);
-      return;
+      return undefined;
     }
 
     let mounted = true;
@@ -107,36 +133,14 @@ function App() {
       setLoading(false);
     }
 
-    async function loadProfile(userId) {
-      const { data, error: profileError } = await supabase
-        .from("profiles")
-        .select("id, full_name, role, is_active")
-        .eq("id", userId)
-        .single();
-
-      if (!mounted) return;
-
-      if (profileError) {
-        setError(profileError.message);
-        return;
-      }
-
-      if (!data.is_active) {
-        await supabase.auth.signOut();
-        setError("Your IMS account is inactive. Please contact an administrator.");
-        setSession(null);
-        return;
-      }
-
-      setProfile(data);
-    }
-
     loadSession();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event, nextSession) => {
         if (!mounted) return;
+
         setSession(nextSession);
+
         if (nextSession) {
           await loadProfile(nextSession.user.id);
         } else {
@@ -149,7 +153,16 @@ function App() {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [loadProfile]);
+
+  async function handleLogin() {
+    const { data } = await supabase.auth.getSession();
+
+    if (data.session) {
+      setSession(data.session);
+      await loadProfile(data.session.user.id);
+    }
+  }
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -186,7 +199,7 @@ function App() {
   }
 
   if (!session || !profile) {
-    return <Login onLogin={setSession} />;
+    return <Login onLogin={handleLogin} />;
   }
 
   const visibleNav = navItems.filter(
