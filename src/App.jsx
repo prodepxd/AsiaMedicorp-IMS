@@ -20,19 +20,28 @@ function Login({ onLogin }) {
     setBusy(true);
     setError("");
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (signInError) {
-      setError(signInError.message);
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
+
+      if (!data.session) {
+        setError("Sign-in succeeded, but no active session was returned. Please try again.");
+        return;
+      }
+
+      await onLogin(data.session);
+    } catch (submitError) {
+      setError(submitError?.message || "Unable to sign in. Please try again.");
+    } finally {
       setBusy(false);
-      return;
     }
-
-    await onLogin();
-    setBusy(false);
   }
 
   return (
@@ -136,14 +145,12 @@ function App() {
     loadSession();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, nextSession) => {
+      (_event, nextSession) => {
         if (!mounted) return;
 
         setSession(nextSession);
 
-        if (nextSession) {
-          await loadProfile(nextSession.user.id);
-        } else {
+        if (!nextSession) {
           setProfile(null);
         }
       }
@@ -155,12 +162,19 @@ function App() {
     };
   }, [loadProfile]);
 
-  async function handleLogin() {
-    const { data } = await supabase.auth.getSession();
+  async function handleLogin(nextSession) {
+    const activeSession =
+      nextSession || (await supabase.auth.getSession()).data.session;
 
-    if (data.session) {
-      setSession(data.session);
-      await loadProfile(data.session.user.id);
+    if (!activeSession) {
+      throw new Error("No active session was returned after sign-in.");
+    }
+
+    setSession(activeSession);
+    const loaded = await loadProfile(activeSession.user.id);
+
+    if (!loaded) {
+      throw new Error("The account signed in, but its IMS profile could not be loaded.");
     }
   }
 
