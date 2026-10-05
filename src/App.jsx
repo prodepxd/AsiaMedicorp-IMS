@@ -381,10 +381,34 @@ function ItemTransitHistory({ supabase, itemId }) {
       setLoading(true);
       setError("");
 
-      const { data, error: eventsError } = await supabase
+      const { data: shipmentItems, error: shipmentItemsError } = await supabase
+        .from("shipment_items")
+        .select("shipment_id")
+        .eq("item_id", itemId);
+
+      if (shipmentItemsError) {
+        if (mounted) {
+          setError(shipmentItemsError.message);
+          setEvents([]);
+          setLoading(false);
+        }
+        return;
+      }
+
+      const shipmentIds = [...new Set((shipmentItems || []).map((row) => row.shipment_id).filter(Boolean))];
+
+      if (shipmentIds.length === 0) {
+        if (mounted) {
+          setEvents([]);
+          setLoading(false);
+        }
+        return;
+      }
+
+      const { data: loaded, error: eventsError } = await supabase
         .from("transit_events")
         .select("*")
-        .eq("item_id", itemId);
+        .in("shipment_id", shipmentIds);
 
       if (eventsError) {
         if (mounted) {
@@ -395,7 +419,7 @@ function ItemTransitHistory({ supabase, itemId }) {
         return;
       }
 
-      const loaded = data || [];
+      const eventRows = loaded || [];
       const firstId = (event, names) => {
         for (const name of names) {
           if (event[name]) return event[name];
@@ -404,18 +428,14 @@ function ItemTransitHistory({ supabase, itemId }) {
       };
 
       const locationIds = [...new Set(
-        loaded.flatMap((event) => [
+        eventRows.flatMap((event) => [
           firstId(event, ["from_location_id"]),
           firstId(event, ["to_location_id"]),
         ]).filter(Boolean)
       )];
 
       const statusIds = [...new Set(
-        loaded.map((event) => firstId(event, ["transit_status_id"])).filter(Boolean)
-      )];
-
-      const shipmentIds = [...new Set(
-        loaded.map((event) => firstId(event, ["shipment_id"])).filter(Boolean)
+        eventRows.map((event) => firstId(event, ["transit_status_id"])).filter(Boolean)
       )];
 
       const [locationsResult, statusesResult, shipmentsResult] = await Promise.all([
@@ -425,9 +445,7 @@ function ItemTransitHistory({ supabase, itemId }) {
         statusIds.length
           ? supabase.from("transit_statuses").select("id, name").in("id", statusIds)
           : Promise.resolve({ data: [], error: null }),
-        shipmentIds.length
-          ? supabase.from("shipments").select("*").in("id", shipmentIds)
-          : Promise.resolve({ data: [], error: null }),
+        supabase.from("shipments").select("id, reference_number").in("id", shipmentIds),
       ]);
 
       const relatedError = [locationsResult, statusesResult, shipmentsResult].find((result) => result.error);
@@ -452,7 +470,7 @@ function ItemTransitHistory({ supabase, itemId }) {
         event.updated_at ||
         null;
 
-      const sorted = loaded
+      const sorted = eventRows
         .map((event) => ({
           ...event,
           _fromLocation: locationMap[firstId(event, ["from_location_id"])] || "—",
@@ -477,8 +495,7 @@ function ItemTransitHistory({ supabase, itemId }) {
   }, [supabase, itemId]);
 
   function shipmentReference(shipment) {
-    if (!shipment) return "—";
-    return shipment.reference_number || shipment.shipment_reference || shipment.reference || shipment.name || "Shipment";
+    return shipment?.reference_number || "—";
   }
 
   return (
