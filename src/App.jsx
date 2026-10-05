@@ -369,7 +369,166 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
 }
 
 
-function ItemDetailView({ item, canEdit, onBack, onEdit }) {
+function ItemTransitHistory({ supabase, itemId }) {
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadHistory() {
+      setLoading(true);
+      setError("");
+
+      const { data, error: eventsError } = await supabase
+        .from("transit_events")
+        .select("*")
+        .eq("item_id", itemId);
+
+      if (eventsError) {
+        if (mounted) {
+          setError(eventsError.message);
+          setEvents([]);
+          setLoading(false);
+        }
+        return;
+      }
+
+      const loaded = data || [];
+      const firstId = (event, names) => {
+        for (const name of names) {
+          if (event[name]) return event[name];
+        }
+        return null;
+      };
+
+      const locationIds = [...new Set(
+        loaded.flatMap((event) => [
+          firstId(event, ["from_location_id"]),
+          firstId(event, ["to_location_id"]),
+        ]).filter(Boolean)
+      )];
+
+      const statusIds = [...new Set(
+        loaded.map((event) => firstId(event, ["transit_status_id"])).filter(Boolean)
+      )];
+
+      const shipmentIds = [...new Set(
+        loaded.map((event) => firstId(event, ["shipment_id"])).filter(Boolean)
+      )];
+
+      const [locationsResult, statusesResult, shipmentsResult] = await Promise.all([
+        locationIds.length
+          ? supabase.from("locations").select("id, name").in("id", locationIds)
+          : Promise.resolve({ data: [], error: null }),
+        statusIds.length
+          ? supabase.from("transit_statuses").select("id, name").in("id", statusIds)
+          : Promise.resolve({ data: [], error: null }),
+        shipmentIds.length
+          ? supabase.from("shipments").select("*").in("id", shipmentIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      const relatedError = [locationsResult, statusesResult, shipmentsResult].find((result) => result.error);
+      if (relatedError) {
+        if (mounted) {
+          setError(relatedError.error.message);
+          setEvents([]);
+          setLoading(false);
+        }
+        return;
+      }
+
+      const locationMap = Object.fromEntries((locationsResult.data || []).map((row) => [row.id, row.name]));
+      const statusMap = Object.fromEntries((statusesResult.data || []).map((row) => [row.id, row.name]));
+      const shipmentMap = Object.fromEntries((shipmentsResult.data || []).map((row) => [row.id, row]));
+
+      const dateValue = (event) =>
+        event.timestamp ||
+        event.occurred_at ||
+        event.event_at ||
+        event.created_at ||
+        event.updated_at ||
+        null;
+
+      const sorted = loaded
+        .map((event) => ({
+          ...event,
+          _fromLocation: locationMap[firstId(event, ["from_location_id"])] || "—",
+          _toLocation: locationMap[firstId(event, ["to_location_id"])] || "—",
+          _status: statusMap[firstId(event, ["transit_status_id"])] || "—",
+          _shipment: shipmentMap[firstId(event, ["shipment_id"])] || null,
+          _date: dateValue(event),
+        }))
+        .sort((a, b) => new Date(b._date || 0) - new Date(a._date || 0));
+
+      if (mounted) {
+        setEvents(sorted);
+        setLoading(false);
+      }
+    }
+
+    loadHistory();
+
+    return () => {
+      mounted = false;
+    };
+  }, [supabase, itemId]);
+
+  function shipmentReference(shipment) {
+    if (!shipment) return "—";
+    return shipment.reference_number || shipment.shipment_reference || shipment.reference || shipment.name || "Shipment";
+  }
+
+  return (
+    <div className="item-transit-history">
+      <div className="item-transit-history-header">
+        <div>
+          <p className="section-kicker">MOVEMENT HISTORY</p>
+          <h3>Transit / Movement History</h3>
+          <p>Recorded movements for this individual inventory item.</p>
+        </div>
+        {events.length > 0 && <span className="history-count">{events.length} event{events.length === 1 ? "" : "s"}</span>}
+      </div>
+
+      {loading ? (
+        <div className="history-empty">Loading movement history...</div>
+      ) : error ? (
+        <div className="error-message history-error">{error}</div>
+      ) : events.length === 0 ? (
+        <div className="history-empty">
+          No transit history recorded. Movement history will appear here when this item is included in a shipment.
+        </div>
+      ) : (
+        <div className="transit-history-list">
+          {events.map((event) => (
+            <div className="transit-history-row" key={event.id}>
+              <div className="transit-history-date">
+                <strong>{event._date ? new Date(event._date).toLocaleString() : "Date not recorded"}</strong>
+              </div>
+              <div className="transit-history-route">
+                <div className="transit-history-route-line">
+                  <strong>{event._fromLocation}</strong>
+                  <span>→</span>
+                  <strong>{event._toLocation}</strong>
+                </div>
+                <div className="transit-history-meta">
+                  <span>Shipping: {shipmentReference(event._shipment)}</span>
+                  <span className="status-pill">{event._status}</span>
+                </div>
+                {event.notes && <p>{event.notes}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function ItemDetailView({ supabase, item, canEdit, onBack, onEdit }) {
   return (
     <section className="item-detail-card">
       <div className="item-detail-header">
@@ -440,6 +599,8 @@ function ItemDetailView({ item, canEdit, onBack, onEdit }) {
             <p>{item.quality_note || "No quality note recorded."}</p>
           </div>
         </div>
+
+        <ItemTransitHistory supabase={supabase} itemId={item.id} />
       </div>
     </section>
   );
@@ -571,6 +732,7 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
   if (selectedItem) {
     return (
       <ItemDetailView
+        supabase={supabase}
         item={selectedItem}
         canEdit={canEdit}
         onBack={() => setSelectedItem(null)}
