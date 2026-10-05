@@ -1,6 +1,6 @@
 -- Asia Medicorp IMS
 -- Safe master-data deletion support.
--- Run this once in Supabase SQL Editor.
+-- Run this entire script in Supabase SQL Editor whenever this function is updated.
 
 create or replace function public.master_record_usage(
   p_table_name text,
@@ -35,13 +35,12 @@ begin
     raise exception 'Unsupported master-data table';
   end if;
 
+  -- Count all normal single-column foreign-key references.
   for fk in
     select
-      c.oid,
       n.nspname as child_schema,
       child.relname as child_table,
-      child_col.attname as child_column,
-      parent_col.attname as parent_column
+      child_col.attname as child_column
     from pg_constraint c
     join pg_class child on child.oid = c.conrelid
     join pg_namespace n on n.oid = child.relnamespace
@@ -49,9 +48,6 @@ begin
     join pg_attribute child_col
       on child_col.attrelid = c.conrelid
      and child_col.attnum = c.conkey[1]
-    join pg_attribute parent_col
-      on parent_col.attrelid = c.confrelid
-     and parent_col.attnum = c.confkey[1]
     where c.contype = 'f'
       and parent.relname = p_table_name
       and array_length(c.conkey, 1) = 1
@@ -68,6 +64,20 @@ begin
     execute sql into ref_count using p_record_id;
     usage_count := usage_count + coalesce(ref_count, 0);
   end loop;
+
+  -- models are also referenced by items through the composite
+  -- (model_id, manufacturer_id) -> models(id, manufacturer_id) FK.
+  -- The generic loop above intentionally excludes composite FKs, so
+  -- count item.model_id explicitly to prevent an in-use model from
+  -- appearing deletable.
+  if p_table_name = 'models' then
+    select count(*)
+      into ref_count
+      from public.items
+     where model_id = p_record_id;
+
+    usage_count := usage_count + coalesce(ref_count, 0);
+  end if;
 
   return usage_count;
 end;
