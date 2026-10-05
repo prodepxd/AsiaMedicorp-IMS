@@ -506,8 +506,8 @@ function GlobalStock({ supabase, canEdit }) {
                 <td><strong>{item.serial_number || "—"}</strong></td>
                 <td>{item.item_types?.name || "—"}</td>
                 <td>
-                  <strong>{item.manufacturers?.name || "—"}</strong>
-                  <span className="table-subtext">{item.models?.name || "Model not set"}</span>
+                  <span className="table-subtext manufacturer-text">{item.manufacturers?.name || "—"}</span>
+                  <strong className="model-text">{item.models?.name || "Model not set"}</strong>
                 </td>
                 <td>{item.item_detail || "—"}</td>
                 <td>{item.locations?.name || "—"}</td>
@@ -632,6 +632,7 @@ function MasterData({ supabase }) {
     setActiveKey(key);
     setEditing(null);
     setForm({ name: "", manufacturer_id: "" });
+    setUsage({});
     setError("");
   }
 
