@@ -90,7 +90,7 @@ function Login({ onLogin }) {
   );
 }
 
-function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false, item = null }) {
+function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false, item = null, pageMode = false }) {
   const [masters, setMasters] = useState({
     itemTypes: [],
     manufacturers: [],
@@ -251,15 +251,15 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
   }
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <div className="modal-card" onMouseDown={(event) => event.stopPropagation()}>
+    <div className={pageMode ? "item-page-shell" : "modal-backdrop"} role="presentation" onMouseDown={pageMode ? undefined : onClose}>
+      <div className={pageMode ? "modal-card item-page-card" : "modal-card"} onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
             <p className="section-kicker">INVENTORY</p>
             <h2>{item ? "Edit inventory item" : "Add inventory item"}</h2>
             <p>{item ? "Update the details of this physical inventory item." : "Create one physical item record in Global Stock."}</p>
           </div>
-          <button className="modal-close" onClick={onClose} aria-label="Close">×</button>
+          <button className="modal-close" onClick={onClose} aria-label={pageMode ? "Back" : "Close"}>{pageMode ? "←" : "×"}</button>
         </div>
 
         {loading ? (
@@ -369,10 +369,87 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
 }
 
 
+function ItemDetailView({ item, canEdit, onBack, onEdit }) {
+  return (
+    <section className="item-detail-card">
+      <div className="item-detail-header">
+        <div>
+          <p className="section-kicker">INVENTORY ITEM</p>
+          <h2>{item.serial_number || item.item_detail || "Inventory item"}</h2>
+          <p>Detailed information for this individual physical item.</p>
+        </div>
+        <div className="item-detail-actions">
+          <button className="secondary-button" onClick={onBack}>← Back to Global Stock</button>
+          {canEdit && (
+            <button className="primary-button" onClick={onEdit}>Edit item</button>
+          )}
+        </div>
+      </div>
+
+      <div className="item-detail-body">
+        <div className="item-photo-placeholder" aria-label="Photo placeholder">
+          <div>
+            <span className="photo-placeholder-icon">▧</span>
+            <strong>Photo</strong>
+            <span>Photo support will be added later</span>
+          </div>
+        </div>
+
+        <div className="item-detail-grid">
+          <div className="item-detail-field">
+            <span>Serial number</span>
+            <strong>{item.serial_number || "—"}</strong>
+          </div>
+          <div className="item-detail-field">
+            <span>Item type</span>
+            <strong>{item.item_types?.name || "—"}</strong>
+          </div>
+          <div className="item-detail-field">
+            <span>Manufacturer</span>
+            <strong>{item.manufacturers?.name || "—"}</strong>
+          </div>
+          <div className="item-detail-field">
+            <span>Model</span>
+            <strong>{item.models?.name || "Model not set"}</strong>
+          </div>
+          <div className="item-detail-field">
+            <span>Current location</span>
+            <strong>{item.locations?.name || "—"}</strong>
+          </div>
+          <div className="item-detail-field">
+            <span>Status</span>
+            <strong>{item.statuses?.name || "—"}</strong>
+          </div>
+          <div className="item-detail-field">
+            <span>Quality status</span>
+            <strong>{item.quality_statuses?.name || "—"}</strong>
+          </div>
+          <div className="item-detail-field">
+            <span>Created</span>
+            <strong>{item.created_at ? new Date(item.created_at).toLocaleString() : "—"}</strong>
+          </div>
+        </div>
+
+        <div className="item-detail-notes">
+          <div>
+            <span>Item detail / description</span>
+            <p>{item.item_detail || "No description recorded."}</p>
+          </div>
+          <div>
+            <span>Quality note</span>
+            <p>{item.quality_note || "No quality note recorded."}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+
 function GlobalStock({ supabase, canEdit, canDelete = false }) {
   const [items, setItems] = useState([]);
   const [showAddItem, setShowAddItem] = useState(false);
-  const [editingItem, setEditingItem] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);\n  const [editingItem, setEditingItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -565,16 +642,7 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
           onSaved={loadItems}
         />
       )}
-      {editingItem && (
-        <AddItemModal
-          supabase={supabase}
-          item={editingItem}
-          canDelete={canDelete}
-          onClose={() => setEditingItem(null)}
-          onSaved={loadItems}
-          onDeleted={loadItems}
-        />
-      )}
+
     </section>
   );
 }
