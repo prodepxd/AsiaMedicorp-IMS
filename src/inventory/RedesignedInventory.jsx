@@ -122,22 +122,17 @@ function Select({ value, onChange, options, placeholder = "Select", disabled = f
   );
 }
 
-function ItemForm({ supabase, type, onClose, onSaved }) {
+function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
+  const [type, setType] = useState(initialType || "");
   const [masters, setMasters] = useState({
-    equipmentManufacturers: [],
-    hardDiskManufacturers: [],
-    machineModels: [],
-    probeModels: [],
-    probeTypes: [],
-    boardTypes: [],
-    locations: [],
-    statuses: [],
-    qualities: [],
+    equipmentManufacturers: [], hardDiskManufacturers: [], machineModels: [],
+    probeModels: [], probeTypes: [], boardTypes: [], locations: [], statuses: [], qualities: [],
   });
   const [form, setForm] = useState(emptyForm());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [step, setStep] = useState(initialType ? 1 : 0);
 
   useEffect(() => {
     let alive = true;
@@ -157,22 +152,12 @@ function ItemForm({ supabase, type, onClose, onSaved }) {
       const results = await Promise.all(requests);
       const failed = results.find((r) => r.error);
       if (!alive) return;
-      if (failed) {
-        setError(failed.error.message);
-        setLoading(false);
-        return;
-      }
+      if (failed) { setError(failed.error.message); setLoading(false); return; }
       const values = results.map((r) => r.data || []);
       setMasters({
-        equipmentManufacturers: values[0],
-        hardDiskManufacturers: values[1],
-        machineModels: values[2],
-        probeModels: values[3],
-        probeTypes: values[4],
-        boardTypes: values[5],
-        locations: values[6],
-        statuses: values[7],
-        qualities: values[8],
+        equipmentManufacturers: values[0], hardDiskManufacturers: values[1],
+        machineModels: values[2], probeModels: values[3], probeTypes: values[4],
+        boardTypes: values[5], locations: values[6], statuses: values[7], qualities: values[8],
       });
       const stock = values[7].find((x) => x.name === "In Stock");
       const good = values[8].find((x) => x.name === "Good");
@@ -184,16 +169,184 @@ function ItemForm({ supabase, type, onClose, onSaved }) {
   }, [supabase]);
 
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const machineModels = masters.machineModels.filter((m) => !form.manufacturer_id || m.manufacturer_id === form.manufacturer_id);
+  const probeModels = masters.probeModels.filter((m) => !form.manufacturer_id || m.manufacturer_id === form.manufacturer_id);
 
-  const machineModels = masters.machineModels.filter(
-    (m) => !form.manufacturer_id || m.manufacturer_id === form.manufacturer_id
-  );
-  const probeModels = masters.probeModels.filter(
-    (m) => !form.manufacturer_id || m.manufacturer_id === form.manufacturer_id
-  );
+  const stepsForType = {
+    Machine: [
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+      {key:"manufacturer_id",label:"Manufacturer",type:"manufacturer",required:true},
+      {key:"model_id",label:"Model",type:"machine_model",required:true},
+      {key:"manufacturer_year",label:"Manufacturer year",type:"number",required:true,min:1900,max:2100},
+      {key:"monitor_size",label:"Monitor size",type:"select",options:SELECT_OPTIONS.monitor_size,required:true},
+      {key:"software_version",label:"Software version",type:"text",required:true},
+      {key:"functions",label:"Functions",type:"functions",optional:true},
+      {key:"portable",label:"Portable",type:"select",options:SELECT_OPTIONS.portable,required:true},
+      {key:"connectors",label:"Number of connectors",type:"select",options:SELECT_OPTIONS.connectors,required:true},
+    ],
+    Probe: [
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+      {key:"manufacturer_id",label:"Manufacturer",type:"manufacturer",required:true},
+      {key:"model_id",label:"Model",type:"probe_model",required:true},
+      {key:"probe_type_id",label:"Probe type",type:"probe_type",required:true},
+      {key:"year",label:"Year",type:"number",optional:true,min:1900,max:2100},
+    ],
+    Board: [
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+      {key:"machine_model_id",label:"Works with which machine",type:"machine_model",required:true},
+      {key:"board_type_id",label:"Board type",type:"board_type",required:true},
+      {key:"part_number",label:"Part number",type:"text",required:true},
+      {key:"version_number",label:"Version number",type:"text",required:true},
+      {key:"repaired",label:"Repaired",type:"select",options:SELECT_OPTIONS.repaired,required:true},
+    ],
+    PSU: [
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+      {key:"machine_model_id",label:"Works with which machine",type:"machine_model",required:true},
+    ],
+    Monitor: [
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+      {key:"machine_model_id",label:"Works with which machine",type:"machine_model",required:true},
+      {key:"monitor_size",label:"Size",type:"select",options:SELECT_OPTIONS.monitor_size,required:true},
+      {key:"video_input",label:"Video input",type:"select",options:SELECT_OPTIONS.video_input,required:true},
+    ],
+    "EMI Filter": [
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+      {key:"emi_type",label:"Type",type:"select",options:SELECT_OPTIONS.emi_type,required:true},
+    ],
+    "Hard Disk": [
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+      {key:"manufacturer_id",label:"Manufacturer",type:"hard_disk_manufacturer",required:true},
+      {key:"capacity_gb",label:"Capacity (GB)",type:"number",required:true,min:0,step:1},
+      {key:"size_inches",label:"Size (inches)",type:"number",required:true,min:0,step:0.1},
+      {key:"hard_disk_type",label:"Type",type:"select",options:SELECT_OPTIONS.hard_disk_type,required:true},
+      {key:"machine_model_id",label:"Works with which machine",type:"machine_model",optional:true},
+      {key:"software_version",label:"Software version",type:"text",optional:true},
+    ],
+    Keyboard: [
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+      {key:"machine_model_id",label:"Works with which machine",type:"machine_model",required:true},
+    ],
+  };
 
-  async function save(event) {
-    event.preventDefault();
+  const steps = type ? stepsForType[type] || [] : [];
+  const currentField = step > 0 ? steps[step - 1] : null;
+  const totalSteps = steps.length + 1;
+
+  function selectType(nextType) {
+    setType(nextType);
+    setForm(emptyForm());
+    setError("");
+    setStep(1);
+  }
+
+  function currentValueValid() {
+    if (!currentField || !currentField.required) return true;
+    const value = form[currentField.key];
+    if (Array.isArray(value)) return true;
+    return String(value ?? "").trim() !== "";
+  }
+
+  function nextStep() {
+    setError("");
+    if (!currentValueValid()) {
+      setError(currentField.label + " is required.");
+      return;
+    }
+    setStep((value) => Math.min(value + 1, totalSteps - 1));
+  }
+
+  function previousStep() {
+    setError("");
+    setStep((value) => Math.max(1, value - 1));
+  }
+
+  function fieldControl(field) {
+    const value = form[field.key] ?? "";
+    const onChange = (event) => set(field.key, event.target.value);
+
+    if (field.type === "functions") {
+      return <div className="redesign-checks">{["4D","Cardiac","Elastography"].map((name) =>
+        <label key={name}><input type="checkbox" checked={form.functions.includes(name)}
+          onChange={(event) => set("functions", event.target.checked ? [...form.functions, name] : form.functions.filter((item) => item !== name))}/>{name}</label>
+      )}</div>;
+    }
+
+    if (field.type === "manufacturer") return <Select value={value}
+      onChange={(event) => { set("manufacturer_id", event.target.value); set("model_id", ""); }}
+      options={masters.equipmentManufacturers.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "hard_disk_manufacturer") return <Select value={value} onChange={onChange}
+      options={masters.hardDiskManufacturers.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "machine_model") {
+      const options = field.key === "model_id"
+        ? machineModels.map((x) => ({value:x.id,label:x.name}))
+        : masters.machineModels.map((x) => ({value:x.id,label:x.name}));
+      return <Select value={value} onChange={onChange} options={options}
+        placeholder={field.key === "model_id" ? (form.manufacturer_id ? "Select model" : "Select manufacturer first") : (field.optional ? "Optional / unassigned" : "Select machine")}
+        disabled={field.key === "model_id" && !form.manufacturer_id} required={field.required}/>;
+    }
+
+    if (field.type === "probe_model") return <Select value={value} onChange={onChange}
+      options={probeModels.map((x) => ({value:x.id,label:x.name}))}
+      placeholder={form.manufacturer_id ? "Select model" : "Select manufacturer first"}
+      disabled={!form.manufacturer_id} required />;
+
+    if (field.type === "probe_type") return <Select value={value} onChange={onChange}
+      options={masters.probeTypes.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "board_type") return <Select value={value} onChange={onChange}
+      options={masters.boardTypes.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "location") return <Select value={value} onChange={onChange}
+      options={masters.locations.map((x) => ({value:x.id,label:x.name}))} placeholder="Not set" />;
+
+    if (field.type === "status") return <Select value={value} onChange={onChange}
+      options={masters.statuses.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "quality") return <Select value={value} onChange={onChange}
+      options={masters.qualities.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "select") return <Select value={value} onChange={onChange}
+      options={field.options} required={field.required} />;
+
+    return <input type={field.type === "number" ? "number" : "text"} min={field.min} max={field.max}
+      step={field.step} value={value} onChange={onChange} autoFocus />;
+  }
+
+  async function save() {
     setSaving(true);
     setError("");
 
@@ -208,70 +361,44 @@ function ItemForm({ supabase, type, onClose, onSaved }) {
 
     let details;
     if (type === "Machine") details = {
-      manufacturer_id: form.manufacturer_id,
-      model_id: form.model_id,
-      manufacturer_year: form.manufacturer_year ? Number(form.manufacturer_year) : null,
-      monitor_size: form.monitor_size ? Number(form.monitor_size) : null,
-      software_version: form.software_version.trim() || null,
-      functions: form.functions,
-      portable: form.portable === "Yes" ? true : form.portable === "No" ? false : null,
-      connector_count: form.connectors ? Number(form.connectors) : null,
+      manufacturer_id: form.manufacturer_id, model_id: form.model_id,
+      manufacturer_year: Number(form.manufacturer_year), monitor_size: Number(form.monitor_size),
+      software_version: form.software_version.trim(), functions: form.functions,
+      portable: form.portable === "Yes", connector_count: Number(form.connectors),
     };
     if (type === "Probe") details = {
-      manufacturer_id: form.manufacturer_id,
-      model_id: form.model_id,
-      probe_type_id: form.probe_type_id,
-      year: form.year ? Number(form.year) : null,
+      manufacturer_id: form.manufacturer_id, model_id: form.model_id,
+      probe_type_id: form.probe_type_id, year: form.year ? Number(form.year) : null,
     };
     if (type === "Board") details = {
-      compatible_machine_model_id: form.machine_model_id,
-      board_type_id: form.board_type_id,
-      part_number: form.part_number.trim() || null,
-      version_number: form.version_number.trim() || null,
-      repaired: form.repaired === "Yes" ? true : form.repaired === "No" ? false : null,
+      compatible_machine_model_id: form.machine_model_id, board_type_id: form.board_type_id,
+      part_number: form.part_number.trim(), version_number: form.version_number.trim(),
+      repaired: form.repaired === "Yes",
     };
     if (type === "PSU") details = { compatible_machine_model_id: form.machine_model_id };
     if (type === "Monitor") details = {
-      compatible_machine_model_id: form.machine_model_id,
-      size: form.monitor_size ? Number(form.monitor_size) : null,
-      video_input: form.video_input || null,
+      compatible_machine_model_id: form.machine_model_id, size: Number(form.monitor_size),
+      video_input: form.video_input,
     };
     if (type === "EMI Filter") details = { filter_type: form.emi_type };
     if (type === "Hard Disk") details = {
-      manufacturer_id: form.manufacturer_id,
-      capacity_gb: form.capacity_gb ? Number(form.capacity_gb) : null,
-      size_inches: form.size_inches ? Number(form.size_inches) : null,
-      disk_type: form.hard_disk_type,
-      compatible_compatible_machine_model_id: form.machine_model_id || null,
+      manufacturer_id: form.manufacturer_id, capacity_gb: Number(form.capacity_gb),
+      size_inches: Number(form.size_inches), disk_type: form.hard_disk_type,
+      compatible_machine_model_id: form.machine_model_id || null,
       software_version: form.software_version.trim() || null,
     };
     if (type === "Keyboard") details = { compatible_machine_model_id: form.machine_model_id };
 
-    if (!details) {
-      setError("Unable to prepare item details.");
-      setSaving(false);
-      return;
-    }
-
     const { data: item, error: itemError } = await supabase.from("items").insert(common).select("id").single();
-    if (itemError) {
-      setError(itemError.message);
-      setSaving(false);
-      return;
-    }
+    if (itemError) { setError(itemError.message); setSaving(false); return; }
 
     const table = {
-      Machine: "machine_details",
-      Probe: "probe_details",
-      Board: "board_details",
-      PSU: "psu_details",
-      Monitor: "monitor_details",
-      "EMI Filter": "emi_filter_details",
-      "Hard Disk": "hard_disk_details",
-      Keyboard: "keyboard_details",
+      Machine:"machine_details", Probe:"probe_details", Board:"board_details", PSU:"psu_details",
+      Monitor:"monitor_details", "EMI Filter":"emi_filter_details", "Hard Disk":"hard_disk_details",
+      Keyboard:"keyboard_details",
     }[type];
 
-    const { error: detailError } = await supabase.from(table).insert({ item_id: item.id, ...details });
+    const { error: detailError } = await supabase.from(table).insert({item_id:item.id,...details});
     if (detailError) {
       await supabase.from("items").delete().eq("id", item.id);
       setError(detailError.message);
@@ -283,85 +410,45 @@ function ItemForm({ supabase, type, onClose, onSaved }) {
     onSaved();
   }
 
-  const field = (name) => {
-    const commonProps = { value: form[name], onChange: (e) => set(name, e.target.value) };
-    if (SELECT_OPTIONS[name]) return <Select {...commonProps} options={SELECT_OPTIONS[name]} required={["monitor_size","portable","connectors","video_input","repaired","emi_type","hard_disk_type"].includes(name)} />;
-    return <input {...commonProps} />;
-  };
+  if (loading) return <div className="modal-backdrop"><div className="modal-card redesign-modal"><div className="modal-loading">Loading master data...</div></div></div>;
 
-  function specificFields() {
-    if (type === "Machine") return (
-      <>
-        <Field label="Manufacturer" required><Select value={form.manufacturer_id} onChange={(e) => { set("manufacturer_id", e.target.value); set("model_id", ""); }} options={masters.equipmentManufacturers.map(x => ({ value:x.id, label:x.name }))} required /></Field>
-        <Field label="Model" required><Select value={form.model_id} onChange={(e) => set("model_id", e.target.value)} options={machineModels.map(x => ({ value:x.id, label:x.name }))} placeholder={form.manufacturer_id ? "Select model" : "Select manufacturer first"} disabled={!form.manufacturer_id} required /></Field>
-        <Field label="Manufacturer year" required><input type="number" min="1900" max="2100" value={form.manufacturer_year} onChange={(e)=>set("manufacturer_year",e.target.value)} required /></Field>
-        <Field label="Monitor size" required>{field("monitor_size")}</Field>
-        <Field label="Software version"><input value={form.software_version} onChange={(e)=>set("software_version",e.target.value)} /></Field>
-        <Field label="Portable" required>{field("portable")}</Field>
-        <Field label="Number of connectors" required>{field("connectors")}</Field>
-        <div className="redesign-field"><span>Functions</span><div className="redesign-checks">{["4D","Cardiac","Elastography"].map(x=><label key={x}><input type="checkbox" checked={form.functions.includes(x)} onChange={(e)=>set("functions",e.target.checked?[...form.functions,x]:form.functions.filter(v=>v!==x))}/>{x}</label>)}</div></div>
-      </>
-    );
-    if (type === "Probe") return (
-      <>
-        <Field label="Manufacturer" required><Select value={form.manufacturer_id} onChange={(e)=>{set("manufacturer_id",e.target.value);set("model_id","");}} options={masters.equipmentManufacturers.map(x=>({value:x.id,label:x.name}))} required /></Field>
-        <Field label="Model" required><Select value={form.model_id} onChange={(e)=>set("model_id",e.target.value)} options={probeModels.map(x=>({value:x.id,label:x.name}))} disabled={!form.manufacturer_id} placeholder={form.manufacturer_id?"Select model":"Select manufacturer first"} required /></Field>
-        <Field label="Probe type" required><Select value={form.probe_type_id} onChange={(e)=>set("probe_type_id",e.target.value)} options={masters.probeTypes.map(x=>({value:x.id,label:x.name}))} required /></Field>
-        <Field label="Year"><input type="number" min="1900" max="2100" value={form.year} onChange={(e)=>set("year",e.target.value)} /></Field>
-      </>
-    );
-    if (type === "Board") return (
-      <>
-        <Field label="Works with which machine" required><Select value={form.machine_model_id} onChange={(e)=>set("machine_model_id",e.target.value)} options={masters.machineModels.map(x=>({value:x.id,label:x.name}))} required /></Field>
-        <Field label="Board type" required><Select value={form.board_type_id} onChange={(e)=>set("board_type_id",e.target.value)} options={masters.boardTypes.map(x=>({value:x.id,label:x.name}))} required /></Field>
-        <Field label="Part number" required><input value={form.part_number} onChange={(e)=>set("part_number",e.target.value)} required /></Field>
-        <Field label="Version number" required><input value={form.version_number} onChange={(e)=>set("version_number",e.target.value)} required /></Field>
-        <Field label="Repaired" required>{field("repaired")}</Field>
-      </>
-    );
-    if (type === "PSU") return <Field label="Works with which machine" required><Select value={form.machine_model_id} onChange={(e)=>set("machine_model_id",e.target.value)} options={masters.machineModels.map(x=>({value:x.id,label:x.name}))} required /></Field>;
-    if (type === "Monitor") return (
-      <>
-        <Field label="Works with which machine" required><Select value={form.machine_model_id} onChange={(e)=>set("machine_model_id",e.target.value)} options={masters.machineModels.map(x=>({value:x.id,label:x.name}))} required /></Field>
-        <Field label="Size" required>{field("monitor_size")}</Field>
-        <Field label="Video input" required>{field("video_input")}</Field>
-      </>
-    );
-    if (type === "EMI Filter") return <Field label="Type" required>{field("emi_type")}</Field>;
-    if (type === "Hard Disk") return (
-      <>
-        <Field label="Manufacturer" required><Select value={form.manufacturer_id} onChange={(e)=>set("manufacturer_id",e.target.value)} options={masters.hardDiskManufacturers.map(x=>({value:x.id,label:x.name}))} required /></Field>
-        <Field label="Capacity (GB)" required><input type="number" min="0" step="1" value={form.capacity_gb} onChange={(e)=>set("capacity_gb",e.target.value)} required /></Field>
-        <Field label="Size (inches)" required><input type="number" min="0" step="0.1" value={form.size_inches} onChange={(e)=>set("size_inches",e.target.value)} required /></Field>
-        <Field label="Type" required>{field("hard_disk_type")}</Field>
-        <Field label="Works with which machine"><Select value={form.machine_model_id} onChange={(e)=>set("machine_model_id",e.target.value)} options={masters.machineModels.map(x=>({value:x.id,label:x.name}))} placeholder="Optional / unassigned" /></Field>
-        <Field label="Software version"><input value={form.software_version} onChange={(e)=>set("software_version",e.target.value)} /></Field>
-      </>
-    );
-    return <Field label="Works with which machine" required><Select value={form.machine_model_id} onChange={(e)=>set("machine_model_id",e.target.value)} options={masters.machineModels.map(x=>({value:x.id,label:x.name}))} required /></Field>;
-  }
+  const isTypeStep = step === 0;
+  const isLastStep = type && step === steps.length;
 
-  return (
-    <div className="modal-backdrop">
-      <div className="modal-card redesign-modal">
-        <div className="modal-header"><div><p className="section-kicker">ADD INVENTORY</p><h2>Add {type}</h2><p>Enter the characteristics specific to this item type.</p></div><button className="modal-close" onClick={onClose}>×</button></div>
-        {loading ? <div className="modal-loading">Loading master data...</div> : (
-          <form className="redesign-form" onSubmit={save}>
-            <div className="redesign-form-section"><h3>Step 1 · Common inventory information</h3><div className="redesign-grid">
-              <Field label="Serial number"><input value={form.serial_number} onChange={(e)=>set("serial_number",e.target.value)} /></Field>
-              <Field label="Location"><Select value={form.current_location_id} onChange={(e)=>set("current_location_id",e.target.value)} options={masters.locations.map(x=>({value:x.id,label:x.name}))} placeholder="Not set" /></Field>
-              <Field label="Status" required><Select value={form.status_id} onChange={(e)=>set("status_id",e.target.value)} options={masters.statuses.map(x=>({value:x.id,label:x.name}))} required /></Field>
-              <Field label="Quality" required><Select value={form.quality_status_id} onChange={(e)=>set("quality_status_id",e.target.value)} options={masters.qualities.map(x=>({value:x.id,label:x.name}))} required /></Field>
-              <Field label="Quality note"><input value={form.quality_note} onChange={(e)=>set("quality_note",e.target.value)} /></Field>
-            </div></div>
-            <div className="redesign-form-section"><h3>Step 2 · {type} characteristics</h3><div className="redesign-grid">{specificFields()}</div></div>
-            {error && <div className="error-message">{error}</div>}
-            <div className="modal-actions"><div></div><div className="modal-actions-right"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={saving}>{saving?"Adding...":"Add item"}</button></div></div>
-          </form>
-        )}
+  return <div className="modal-backdrop"><div className="modal-card redesign-modal">
+    <div className="modal-header"><div>
+      <p className="section-kicker">ADD INVENTORY</p>
+      <h2>{isTypeStep ? "Select item type" : "Add " + type}</h2>
+      <p>{isTypeStep ? "Choose the item type first. Only its relevant characteristics will be shown." : "Step " + step + " of " + steps.length + ". Enter one characteristic at a time."}</p>
+    </div><button className="modal-close" onClick={onClose}>×</button></div>
+
+    {isTypeStep ? <div className="redesign-form"><div className="redesign-form-section">
+      <h3>Step 1 · Item type</h3>
+      <div className="redesign-type-picker">{ITEM_TYPES.map((itemType) =>
+        <button key={itemType} type="button"
+          className={itemType === type ? "redesign-type-option selected" : "redesign-type-option"}
+          onClick={() => selectType(itemType)}>{itemType}</button>
+      )}</div>
+    </div>{error && <div className="error-message">{error}</div>}
+      <div className="modal-actions"><div/><div className="modal-actions-right"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button></div></div>
+    </div> : <div className="redesign-form">
+      <div className="redesign-form-section"><h3>{currentField.label}{currentField.required ? " *" : ""}</h3>
+        <div className="redesign-grid"><Field label={currentField.label} required={currentField.required}>{fieldControl(currentField)}</Field></div>
       </div>
-    </div>
-  );
+      {error && <div className="error-message">{error}</div>}
+      <div className="modal-actions"><div>
+        <button type="button" className="secondary-button" onClick={() => setStep(0)}>Change item type</button>
+      </div><div className="modal-actions-right">
+        <button type="button" className="secondary-button" onClick={step === 1 ? onClose : previousStep}>{step === 1 ? "Cancel" : "Back"}</button>
+        {!isLastStep
+          ? <button type="button" className="primary-button" onClick={nextStep}>Next</button>
+          : <button type="button" className="primary-button" onClick={async () => {
+              if (!currentValueValid()) { setError(currentField.label + " is required."); return; }
+              await save();
+            }} disabled={saving}>{saving ? "Adding..." : "Add item"}</button>}
+      </div></div>
+    </div>}
+  </div></div>;
 }
 
 export function RedesignedGlobalStock({ supabase, canEdit }) {
