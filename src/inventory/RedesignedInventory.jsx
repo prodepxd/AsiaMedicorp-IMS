@@ -1028,7 +1028,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     <div className="modal-header redesign-modal-header"><div>
       <p className="section-kicker">{editItem ? "EDIT INVENTORY" : "ADD INVENTORY"}</p>
       <h2>{isTypeStep ? "Select item type" : (editItem ? "Edit " : "Add ") + type}</h2>
-      <p>{isTypeStep ? "Choose the item type first. Only its relevant characteristics will be shown." : "{editItem ? "Update the item details one characteristic at a time." : "Enter the item details one characteristic at a time."}"}</p>
+      <p>{isTypeStep ? "Choose the item type first. Only its relevant characteristics will be shown." : (editItem ? "Update the item details one characteristic at a time." : "Enter the item details one characteristic at a time.")}</p>
     </div><button className="modal-close" onClick={onClose}>×</button></div>
     {!isTypeStep && <div className="redesign-progress">
       <div className="redesign-progress-meta"><span>Step {step} of {steps.length}</span><strong>{currentField.label}</strong></div>
