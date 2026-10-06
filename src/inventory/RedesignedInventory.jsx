@@ -49,7 +49,7 @@ const MASTER_GROUPS = [
   { key: "equipment_manufacturers", label: "Equipment Manufacturers", table: "equipment_manufacturers" },
   { key: "machine_models", label: "Machine Models", table: "machine_models", manufacturer: true },
   { key: "probe_types", label: "Probe Types", table: "probe_types" },
-  { key: "probe_models", label: "Probe Models", table: "probe_models" },
+  { key: "probe_models", label: "Probe Models", table: "probe_models", probeType: true },
   { key: "hard_disk_manufacturers", label: "Hard Disk Manufacturers", table: "hard_disk_manufacturers" },
   { key: "board_types", label: "Board Types", table: "board_types" },
   { key: "locations", label: "Locations", table: "locations" },
@@ -143,7 +143,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
         supabase.from("equipment_manufacturers").select("id,name").order("name"),
         supabase.from("hard_disk_manufacturers").select("id,name").order("name"),
         supabase.from("machine_models").select("id,name,manufacturer_id").order("name"),
-        supabase.from("probe_models").select("id,name").order("name"),
+        supabase.from("probe_models").select("id,name,probe_type_id").order("name"),
         supabase.from("probe_types").select("id,name").order("name"),
         supabase.from("board_types").select("id,name").order("name"),
         supabase.from("locations").select("id,name").eq("is_active", true).order("name"),
@@ -406,13 +406,18 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       </div>
     );
 
-    if (field.type === "probe_model") return <Select value={value} onChange={onChange}
-      options={masters.probeModels.map((x) => ({value:x.id,label:x.name}))}
-      placeholder="Select model"
-      required />;
+    if (field.type === "probe_model") {
+      const probeModels = masters.probeModels.filter((x) => !form.probe_type_id || x.probe_type_id === form.probe_type_id);
+      return <Select value={value} onChange={onChange}
+        options={probeModels.map((x) => ({value:x.id,label:x.name}))}
+        placeholder={form.probe_type_id ? "Select model" : "Select probe type first"}
+        disabled={!form.probe_type_id}
+        required />;
+    }
 
-    if (field.type === "probe_type") return <Select value={value} onChange={onChange}
-      options={masters.probeTypes.map((x) => ({value:x.id,label:x.name}))} required />;
+    if (field.type === "probe_type") return <Select value={value}
+      onChange={(event) => { set("probe_type_id", event.target.value); set("model_id", ""); }}
+      options={masters.probeTypes.map((x) => ({value:x.id,label:x.name}))} required />
 
     if (field.type === "board_type") return <Select value={value} onChange={onChange}
       options={masters.boardTypes.map((x) => ({value:x.id,label:x.name}))} required />;
@@ -943,93 +948,145 @@ export function RedesignedMasterData({ supabase, canEdit }) {
   const [active, setActive] = useState(MASTER_GROUPS[0]);
   const [rows, setRows] = useState([]);
   const [refs, setRefs] = useState([]);
-  const [form, setForm] = useState({name:"",manufacturer_id:""});
+  const [form, setForm] = useState({name:"",manufacturer_id:"",probe_type_id:""});
   const [editing, setEditing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [referenceCounts, setReferenceCounts] = useState({});
-  const [referenceCheckErrors, setReferenceCheckErrors] = useState({});
 
   async function load() {
-    setLoading(true); setError("");
-    setReferenceCounts({});
-    setReferenceCheckErrors({});
-    const select = active.manufacturer ? "id,name,manufacturer_id,is_active" : "id,name,is_active";
+    setLoading(true);
+    setError("");
+    const select = active.manufacturer
+      ? "id,name,manufacturer_id,is_active"
+      : active.probeType
+        ? "id,name,probe_type_id,is_active"
+        : "id,name,is_active";
     const result = await supabase.from(active.table).select(select).order("name");
-    if (result.error) { setError(result.error.message); setRows([]); setLoading(false); return; }
-    const loadedRows = result.data || [];
-    setRows(loadedRows);
+    if (result.error) {
+      setError(result.error.message);
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+    setRows(result.data || []);
+
     if (active.manufacturer) {
       const r = await supabase.from("equipment_manufacturers").select("id,name").order("name");
-      if (r.error) setError(r.error.message); else setRefs(r.data||[]);
-    } else setRefs([]);
-
-    // Reference checks are advisory only. The database foreign keys are the
-    // authoritative protection for records that are genuinely still in use.
-    const counts = {};
-    loadedRows.forEach((row) => {
-      counts[row.id] = false;
-    });
-    setReferenceCounts(counts);
-    setReferenceCheckErrors({});
+      if (r.error) setError(r.error.message);
+      else setRefs(r.data || []);
+    } else if (active.probeType) {
+      const r = await supabase.from("probe_types").select("id,name").order("name");
+      if (r.error) setError(r.error.message);
+      else setRefs(r.data || []);
+    } else {
+      setRefs([]);
+    }
     setLoading(false);
   }
 
-  useEffect(()=>{load();},[active.table]);
+  useEffect(() => { load(); }, [active.table]);
 
   function begin(row=null) {
     setEditing(row ? row.id : "new");
-    setForm({name:row?.name||"",manufacturer_id:row?.manufacturer_id||""});
+    setForm({
+      name: row?.name || "",
+      manufacturer_id: row?.manufacturer_id || "",
+      probe_type_id: row?.probe_type_id || "",
+    });
     setError("");
   }
 
   async function save(e) {
-    e.preventDefault(); setSaving(true); setError("");
-    if (!form.name.trim()) { setError("Name is required."); setSaving(false); return; }
-    if (active.manufacturer && !form.manufacturer_id) { setError("Manufacturer is required."); setSaving(false); return; }
-    const payload = {name:form.name.trim(), ...(active.manufacturer ? {manufacturer_id:form.manufacturer_id} : {})};
-    const result = editing==="new" ? await supabase.from(active.table).insert(payload) : await supabase.from(active.table).update(payload).eq("id",editing);
-    if (result.error) { setError(result.error.message); setSaving(false); return; }
-    setSaving(false); setEditing(null); setForm({name:"",manufacturer_id:""}); await load();
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    if (!form.name.trim()) {
+      setError("Name is required.");
+      setSaving(false);
+      return;
+    }
+    if (active.manufacturer && !form.manufacturer_id) {
+      setError("Manufacturer is required.");
+      setSaving(false);
+      return;
+    }
+    if (active.probeType && !form.probe_type_id) {
+      setError("Probe type is required.");
+      setSaving(false);
+      return;
+    }
+
+    const payload = {
+      name: form.name.trim(),
+      ...(active.manufacturer ? {manufacturer_id: form.manufacturer_id} : {}),
+      ...(active.probeType ? {probe_type_id: form.probe_type_id} : {}),
+    };
+    const result = editing === "new"
+      ? await supabase.from(active.table).insert(payload)
+      : await supabase.from(active.table).update(payload).eq("id", editing);
+
+    if (result.error) {
+      setError(result.error.message);
+      setSaving(false);
+      return;
+    }
+    setSaving(false);
+    setEditing(null);
+    setForm({name:"",manufacturer_id:"",probe_type_id:""});
+    await load();
   }
 
   async function remove(row) {
     if (!canEdit) return;
-    if (!window.confirm('Delete "'+row.name+'"? This cannot be undone.')) return;
-
+    if (!window.confirm('Delete "' + row.name + '"? This cannot be undone.')) return;
     setError("");
     const result = await supabase.from(active.table).delete().eq("id", row.id);
-
     if (result.error) {
-      if (result.error.code === "23503") {
-        setError("This record is still referenced by existing data and cannot be deleted.");
-      } else {
-        setError(result.error.message || "We could not delete this record. Please try again.");
-      }
+      setError(result.error.code === "23503"
+        ? "This record is still referenced by existing data and cannot be deleted."
+        : (result.error.message || "We could not delete this record. Please try again."));
       await load();
       return;
     }
-
     await load();
   }
 
   return (
     <section className="master-card redesign-master">
-      <div className="master-header"><div><p className="section-kicker">ADMINISTRATION</p><h2>Master Data</h2><p>Item types are fixed. Manage only the reusable reference data required by the IMS.</p></div></div>
-      <div className="master-tabs redesign-master-tabs">{MASTER_GROUPS.map(g=><button key={g.key} className={g.key===active.key?"master-tab active":"master-tab"} onClick={()=>{setActive(g);setEditing(null);setError("");}}>{g.label}</button>)}</div>
+      <div className="master-header">
+        <div><p className="section-kicker">ADMINISTRATION</p><h2>Master Data</h2><p>Item types are fixed. Manage only the reusable reference data required by the IMS.</p></div>
+      </div>
+      <div className="master-tabs redesign-master-tabs">
+        {MASTER_GROUPS.map(g => <button key={g.key} className={g.key===active.key?"master-tab active":"master-tab"} onClick={()=>{setActive(g);setEditing(null);setError("");}}>{g.label}</button>)}
+      </div>
       <div className="master-content">
-        <div className="master-content-title"><div><strong>{active.label}</strong><span>{rows.length} record{rows.length===1?"":"s"}</span></div><button className="primary-button" onClick={()=>begin()} disabled={!canEdit}>+ Add</button></div>
-        {editing && <form className="master-edit-form" onSubmit={save}><div className="master-form-field"><label>Name</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} autoFocus /></div>{active.manufacturer&&<div className="master-form-field"><label>Manufacturer</label><Select value={form.manufacturer_id} onChange={e=>setForm({...form,manufacturer_id:e.target.value})} options={refs.map(x=>({value:x.id,label:x.name}))} required /></div>}<div className="master-form-actions"><button type="button" className="secondary-button" onClick={()=>setEditing(null)}>Cancel</button><button className="primary-button" disabled={saving}>{saving?"Saving...":"Save"}</button></div></form>}
+        <div className="master-content-title">
+          <div><strong>{active.label}</strong><span>{rows.length} record{rows.length===1?"":"s"}</span></div>
+          <button className="primary-button" onClick={()=>begin()} disabled={!canEdit}>+ Add</button>
+        </div>
+        {editing && <form className="master-edit-form" onSubmit={save}>
+          <div className="master-form-field"><label>Name</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} autoFocus /></div>
+          {active.manufacturer && <div className="master-form-field"><label>Manufacturer</label><Select value={form.manufacturer_id} onChange={e=>setForm({...form,manufacturer_id:e.target.value})} options={refs.map(x=>({value:x.id,label:x.name}))} required /></div>}
+          {active.probeType && <div className="master-form-field"><label>Probe Type</label><Select value={form.probe_type_id} onChange={e=>setForm({...form,probe_type_id:e.target.value})} options={refs.map(x=>({value:x.id,label:x.name}))} placeholder="Select probe type" required /></div>}
+          <div className="master-form-actions"><button type="button" className="secondary-button" onClick={()=>setEditing(null)}>Cancel</button><button className="primary-button" disabled={saving}>{saving?"Saving...":"Save"}</button></div>
+        </form>}
         {error&&<div className="error-message master-error">{error}</div>}
-        <div className="master-table-wrap"><table className="master-table"><thead><tr><th>Name</th>{active.manufacturer&&<th>Manufacturer</th>}<th>Active</th><th>Action</th></tr></thead><tbody>{!loading&&rows.length===0&&<tr><td colSpan={active.manufacturer?4:3} className="empty-cell">No records found.</td></tr>}{rows.map(row=><tr key={row.id}><td><strong>{row.name}</strong></td>{active.manufacturer&&<td>{refs.find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}<td>{row.is_active===false?"Inactive":"Active"}</td><td><div className="row-actions"><button className="table-button" onClick={()=>begin(row)} disabled={!canEdit}>Edit</button><button
-  className="table-button delete-button"
-  onClick={()=>remove(row)}
-  disabled={!canEdit}
-  title={canEdit ? "Delete" : "Only admins can delete master data"}
->
-  Delete
-</button></div></td></tr>)}</tbody></table></div>
+        <div className="master-table-wrap">
+          <table className="master-table">
+            <thead><tr><th>Name</th>{active.manufacturer&&<th>Manufacturer</th>}{active.probeType&&<th>Probe Type</th>}<th>Active</th><th>Action</th></tr></thead>
+            <tbody>
+              {!loading&&rows.length===0&&<tr><td colSpan={active.manufacturer||active.probeType?4:3} className="empty-cell">No records found.</td></tr>}
+              {rows.map(row=><tr key={row.id}>
+                <td><strong>{row.name}</strong></td>
+                {active.manufacturer&&<td>{refs.find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}
+                {active.probeType&&<td>{refs.find(x=>x.id===row.probe_type_id)?.name||"—"}</td>}
+                <td>{row.is_active===false?"Inactive":"Active"}</td>
+                <td><div className="row-actions"><button className="table-button" onClick={()=>begin(row)} disabled={!canEdit}>Edit</button><button className="table-button delete-button" onClick={()=>remove(row)} disabled={!canEdit} title={canEdit?"Delete":"Only admins can delete master data"}>Delete</button></div></td>
+              </tr>)}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   );
