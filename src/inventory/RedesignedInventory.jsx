@@ -142,7 +142,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
         supabase.from("equipment_manufacturers").select("id,name").order("name"),
         supabase.from("hard_disk_manufacturers").select("id,name").order("name"),
         supabase.from("machine_models").select("id,name,manufacturer_id").order("name"),
-        supabase.from("probe_models").select("id,name,manufacturer_id").order("name"),
+        supabase.from("probe_models").select("id,name").order("name"),
         supabase.from("probe_types").select("id,name").order("name"),
         supabase.from("board_types").select("id,name").order("name"),
         supabase.from("locations").select("id,name").eq("is_active", true).order("name"),
