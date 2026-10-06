@@ -64,13 +64,11 @@ create table probe_types(
 
 create table probe_models(
   id uuid primary key default gen_random_uuid(),
-  manufacturer_id uuid not null references equipment_manufacturers(id) on delete restrict,
-  name text not null,
+  name text not null unique,
   description text,
   is_active boolean not null default true,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique(manufacturer_id,name)
+  updated_at timestamptz not null default now()
 );
 
 create table board_types(
@@ -284,3 +282,28 @@ begin
 end $$;
 
 commit;
+
+
+-- Probe models are independent of manufacturer
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='probe_models' and column_name='manufacturer_id'
+  ) then
+    alter table public.probe_models drop constraint if exists probe_models_manufacturer_id_fkey;
+    alter table public.probe_models drop column manufacturer_id;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid='public.probe_models'::regclass
+      and contype='u'
+      and conname='probe_models_name_key'
+  ) then
+    alter table public.probe_models add constraint probe_models_name_key unique (name);
+  end if;
+end $$;
