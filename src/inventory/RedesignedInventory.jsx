@@ -469,7 +469,7 @@ export function RedesignedGlobalStock({ supabase, canEdit }) {
   );
 }
 
-export function RedesignedMasterData({ supabase }) {
+export function RedesignedMasterData({ supabase, canEdit }) {
   const [active, setActive] = useState(MASTER_GROUPS[0]);
   const [rows, setRows] = useState([]);
   const [refs, setRefs] = useState([]);
