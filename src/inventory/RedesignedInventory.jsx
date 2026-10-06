@@ -14,12 +14,12 @@ const ITEM_TYPES = [
 const TYPE_CONFIG = {
   Machine: ["manufacturer", "model", "manufacturer_year", "monitor_size", "software_version", "functions", "portable", "connectors"],
   Probe: ["manufacturer", "model", "probe_type", "year"],
-  Board: ["compatible_manufacturer", "machine_model", "board_type", "part_number", "version_number", "repaired"],
-  PSU: ["compatible_manufacturer", "machine_model"],
-  Monitor: ["compatible_manufacturer", "machine_model", "monitor_size", "video_input"],
+  Board: ["compatible_machine", "board_type", "part_number", "version_number", "repaired"],
+  PSU: ["compatible_machine"],
+  Monitor: ["compatible_machine", "monitor_size", "video_input"],
   "EMI Filter": ["emi_type"],
-  "Hard Disk": ["manufacturer", "capacity_gb", "size_inches", "hard_disk_type", "compatible_manufacturer", "machine_model", "software_version"],
-  Keyboard: ["compatible_manufacturer", "machine_model"],
+  "Hard Disk": ["manufacturer", "capacity_gb", "size_inches", "hard_disk_type", "compatible_machine", "software_version"],
+  Keyboard: ["compatible_machine"],
 };
 
 const FIELD_LABELS = {
@@ -33,8 +33,7 @@ const FIELD_LABELS = {
   connectors: "Number of connectors",
   probe_type: "Probe type",
   year: "Year",
-  compatible_manufacturer: "Compatible manufacturer",
-  machine_model: "Compatible machine model",
+  compatible_machine: "Compatible machine",
   board_type: "Board type",
   part_number: "Part number",
   version_number: "Version number",
@@ -184,7 +183,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       {key:"manufacturer_year",label:"Manufacturer year",type:"number",required:true,min:1900,max:2100},
       {key:"functions",label:"Functions",type:"functions",optional:true},
       {key:"connectors",label:"Number of connectors",type:"radio",options:SELECT_OPTIONS.connectors,required:true},
-      {key:"monitor_size",label:"Monitor size",type:"select",options:SELECT_OPTIONS.monitor_size,required:true},
+      {key:"monitor_size",label:"Monitor size",type:"radio",options:SELECT_OPTIONS.monitor_size,required:true},
       {key:"software_version",label:"Software version",type:"text",required:true},
       {key:"portable",label:"Portable",type:"radio",options:SELECT_OPTIONS.portable,required:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
@@ -204,8 +203,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     Board: [
-      {key:"compatible_machine_manufacturer_id",label:"Compatible manufacturer",type:"compatible_manufacturer",required:true},
-      {key:"machine_model_id",label:"Compatible machine model",type:"compatible_machine_model",required:true},
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",required:true},
       {key:"board_type_id",label:"Board type",type:"board_type",required:true},
       {key:"part_number",label:"Part number",type:"text",required:true},
       {key:"version_number",label:"Version number",type:"text",required:true},
@@ -217,8 +215,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     PSU: [
-      {key:"compatible_machine_manufacturer_id",label:"Compatible manufacturer",type:"compatible_manufacturer",required:true},
-      {key:"machine_model_id",label:"Compatible machine model",type:"compatible_machine_model",required:true},
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",required:true},
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"status_id",label:"Status",type:"status",required:true},
@@ -226,9 +223,8 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     Monitor: [
-      {key:"compatible_machine_manufacturer_id",label:"Compatible manufacturer",type:"compatible_manufacturer",required:true},
-      {key:"machine_model_id",label:"Compatible machine model",type:"compatible_machine_model",required:true},
-      {key:"monitor_size",label:"Size",type:"select",options:SELECT_OPTIONS.monitor_size,required:true},
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",required:true},
+      {key:"monitor_size",label:"Size",type:"radio",options:SELECT_OPTIONS.monitor_size,required:true},
       {key:"video_input",label:"Video input",type:"radio",options:SELECT_OPTIONS.video_input,required:true},
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
@@ -249,8 +245,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       {key:"hard_disk_type",label:"Type",type:"radio",options:SELECT_OPTIONS.hard_disk_type,required:true},
       {key:"capacity_gb",label:"Capacity (GB)",type:"number",required:true,min:0,step:1},
       {key:"size_inches",label:"Size (inches)",type:"number",required:true,min:0,step:0.1},
-      {key:"compatible_machine_manufacturer_id",label:"Compatible manufacturer",type:"compatible_manufacturer",optional:true},
-      {key:"machine_model_id",label:"Compatible machine model",type:"compatible_machine_model",optional:true},
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",optional:true},
       {key:"software_version",label:"Software version",type:"text",optional:true},
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
@@ -259,8 +254,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     Keyboard: [
-      {key:"compatible_machine_manufacturer_id",label:"Compatible manufacturer",type:"compatible_manufacturer",required:true},
-      {key:"machine_model_id",label:"Compatible machine model",type:"compatible_machine_model",required:true},
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",required:true},
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"status_id",label:"Status",type:"status",required:true},
@@ -281,6 +275,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
 
   function currentValueValid() {
     if (!currentField || !currentField.required) return true;
+    if (currentField.type === "compatible_machine") return Boolean(form.compatible_machine_manufacturer_id && form.machine_model_id);
     const value = form[currentField.key];
     if (Array.isArray(value)) return true;
     return String(value ?? "").trim() !== "";
@@ -359,25 +354,23 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
         disabled={!form.manufacturer_id} required={field.required}/>;
     }
 
-    if (field.type === "compatible_manufacturer") return <Select
-      value={value}
-      onChange={(event) => {
-        set("compatible_machine_manufacturer_id", event.target.value);
-        set("machine_model_id", "");
-      }}
-      options={masters.equipmentManufacturers.map((x) => ({value:x.id,label:x.name}))}
-      placeholder={field.optional ? "Optional / unassigned" : "Select manufacturer"}
-      required={field.required}
-    />;
-
-    if (field.type === "compatible_machine_model") return <Select
-      value={value}
-      onChange={onChange}
-      options={compatibleMachineModels.map((x) => ({value:x.id,label:x.name}))}
-      placeholder={form.compatible_machine_manufacturer_id ? "Select machine model" : (field.optional ? "Optional / unassigned" : "Select manufacturer first")}
-      disabled={!form.compatible_machine_manufacturer_id}
-      required={field.required}
-    />;
+    if (field.type === "compatible_machine") return (
+      <div className="redesign-compatible-machine-grid">
+        <Select value={form.compatible_machine_manufacturer_id}
+          onChange={(event) => {
+            set("compatible_machine_manufacturer_id", event.target.value);
+            set("machine_model_id", "");
+          }}
+          options={masters.equipmentManufacturers.map((x) => ({value:x.id,label:x.name}))}
+          placeholder={field.optional ? "Optional / unassigned" : "Select manufacturer"}
+          required={field.required} />
+        <Select value={form.machine_model_id} onChange={onChange}
+          options={compatibleMachineModels.map((x) => ({value:x.id,label:x.name}))}
+          placeholder={form.compatible_machine_manufacturer_id ? "Select machine model" : (field.optional ? "Optional / unassigned" : "Select manufacturer first")}
+          disabled={!form.compatible_machine_manufacturer_id}
+          required={field.required} />
+      </div>
+    );
 
     if (field.type === "probe_model") return <Select value={value} onChange={onChange}
       options={masters.probeModels.map((x) => ({value:x.id,label:x.name}))}
@@ -390,8 +383,20 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
     if (field.type === "board_type") return <Select value={value} onChange={onChange}
       options={masters.boardTypes.map((x) => ({value:x.id,label:x.name}))} required />;
 
-    if (field.type === "location") return <Select value={value} onChange={onChange}
-      options={masters.locations.map((x) => ({value:x.id,label:x.name}))} placeholder="Not set" />;
+    if (field.type === "location") return (
+      <div className="redesign-radio-group redesign-location-radio-group">
+        <label className={value === "" ? "redesign-radio-option selected" : "redesign-radio-option"}>
+          <input type="radio" name="location" value="" checked={value === ""} onChange={onChange} />
+          <span>Not set</span>
+        </label>
+        {masters.locations.map((location) => (
+          <label key={location.id} className={value === location.id ? "redesign-radio-option selected" : "redesign-radio-option"}>
+            <input type="radio" name="location" value={location.id} checked={value === location.id} onChange={onChange} />
+            <span>{location.name}</span>
+          </label>
+        ))}
+      </div>
+    );
 
     if (field.type === "status") return <Select value={value} onChange={onChange}
       options={masters.statuses.map((x) => ({value:x.id,label:x.name}))} required />;
@@ -638,11 +643,11 @@ export function RedesignedGlobalStock({ supabase, canEdit }) {
       const list = activeType === "Machine" ? masters.machineModels : masters.probeModels;
       return list.find(x=>x.id===d.model_id)?.name || "—";
     }
-    if (key==="compatible_manufacturer") {
+    if (key==="compatible_machine") {
       const model = masters.machineModels.find(x=>x.id===d.compatible_machine_model_id);
-      return masters.equipmentManufacturers.find(x=>x.id===model?.manufacturer_id)?.name || "—";
+      const manufacturer = masters.equipmentManufacturers.find(x=>x.id===model?.manufacturer_id)?.name;
+      return manufacturer && model?.name ? manufacturer + " — " + model.name : model?.name || manufacturer || "—";
     }
-    if (key==="machine_model") return masters.machineModels.find(x=>x.id===d.compatible_machine_model_id)?.name || "—";
     if (key==="probe_type") return masters.probeTypes.find(x=>x.id===d.probe_type_id)?.name || "—";
     if (key==="board_type") return masters.boardTypes.find(x=>x.id===d.board_type_id)?.name || "—";
     if (key==="functions") return Array.isArray(d.functions)?d.functions.join(", "):"—";
@@ -650,7 +655,7 @@ export function RedesignedGlobalStock({ supabase, canEdit }) {
     if (key==="connectors") return d.connector_count ?? "—";
     if (key==="manufacturer_year") return d.manufacturer_year ?? "—";
     if (key==="year") return d.year ?? "—";
-    if (key==="monitor_size") return d.monitor_size ?? d.size ?? "—";
+    if (key==="monitor_size") return d.monitor_size == null && d.size == null ? "—" : (d.monitor_size ?? d.size) + String.fromCharCode(34);
     if (key==="software_version") return d.software_version || "—";
     if (key==="repaired") return d.repaired == null ? "—" : d.repaired ? "Yes":"No";
     if (key==="emi_type") return d.filter_type || "—";
