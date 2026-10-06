@@ -595,3 +595,46 @@ button { cursor: pointer; }
   .redesign-checks { grid-template-columns: 1fr; }
   .redesign-progress-meta { flex-direction: column; gap: 4px; }
 }
+
+
+/* Add Item radio selectors */
+.redesign-radio-group {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.redesign-radio-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 10px 13px;
+  border: 1px solid #26384e;
+  border-radius: 10px;
+  color: #b8c8da;
+  background: #081522;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.redesign-radio-option:hover {
+  border-color: #3b82f6;
+  color: #fff;
+  background: #102238;
+}
+.redesign-radio-option.selected {
+  border-color: #3b82f6;
+  color: #fff;
+  background: #173b70;
+  box-shadow: 0 0 0 1px rgba(59,130,246,.14);
+}
+.redesign-radio-option input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin: 0;
+  accent-color: #2563eb;
+}
+@media (max-width: 600px) {
+  .redesign-radio-group { grid-template-columns: 1fr; }
+}
