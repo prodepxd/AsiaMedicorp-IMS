@@ -46,7 +46,7 @@ const FIELD_LABELS = {
 };
 
 const MASTER_GROUPS = [
-  { key: "equipment_manufacturers", label: "Manufacturer List 1", table: "equipment_manufacturers" },
+  { key: "equipment_manufacturers", label: "Equipment Manufacturers", table: "equipment_manufacturers" },
   { key: "machine_models", label: "Machine Models", table: "machine_models", manufacturer: true },
   { key: "probe_types", label: "Probe Types", table: "probe_types" },
   { key: "probe_models", label: "Probe Models", table: "probe_models", manufacturer: true },
@@ -132,7 +132,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState(initialType ? 1 : 0);
+  const [step, setStep] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -268,7 +268,6 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
     setType(nextType);
     setForm(emptyForm());
     setError("");
-    setStep(1);
   }
 
   function currentValueValid() {
@@ -427,17 +426,25 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       <div className="redesign-type-picker">{ITEM_TYPES.map((itemType) =>
         <button key={itemType} type="button"
           className={itemType === type ? "redesign-type-option selected" : "redesign-type-option"}
-          onClick={() => selectType(itemType)}>{itemType}</button>
+          onClick={() => selectType(itemType)}>
+          <span className="redesign-type-check">{itemType === type ? "✓" : ""}</span>
+          <span>{itemType}</span>
+        </button>
       )}</div>
     </div>{error && <div className="error-message">{error}</div>}
-      <div className="modal-actions"><div/><div className="modal-actions-right"><button type="button" className="secondary-button" onClick={onClose}>Cancel</button></div></div>
+      <div className="modal-actions"><div/>
+        <div className="modal-actions-right">
+          <button type="button" className="secondary-button" onClick={onClose}>Cancel</button>
+          <button type="button" className="primary-button" onClick={nextStep} disabled={!type}>Next</button>
+        </div>
+      </div>
     </div> : <div className="redesign-form">
       <div className="redesign-form-section"><h3>{currentField.label}{currentField.required ? " *" : ""}</h3>
         <div className="redesign-grid"><Field label={currentField.label} required={currentField.required}>{fieldControl(currentField)}</Field></div>
       </div>
       {error && <div className="error-message">{error}</div>}
       <div className="modal-actions"><div>
-        <button type="button" className="secondary-button" onClick={() => setStep(0)}>Change item type</button>
+        <button type="button" className="secondary-button" onClick={() => setStep(0)}>Back to item type</button>
       </div><div className="modal-actions-right">
         <button type="button" className="secondary-button" onClick={step === 1 ? onClose : previousStep}>{step === 1 ? "Cancel" : "Back"}</button>
         {!isLastStep
