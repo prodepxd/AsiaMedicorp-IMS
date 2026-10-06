@@ -17,6 +17,13 @@ drop table if exists item_types cascade;
 drop table if exists models cascade;
 drop table if exists manufacturers cascade;
 
+drop table if exists machine_models cascade;
+drop table if exists probe_models cascade;
+drop table if exists board_types cascade;
+drop table if exists probe_types cascade;
+drop table if exists hard_disk_manufacturers cascade;
+drop table if exists equipment_manufacturers cascade;
+
 create table equipment_manufacturers(
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
