@@ -132,7 +132,6 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [referenceCounts, setReferenceCounts] = useState({});
   const [step, setStep] = useState(initialType ? 1 : 0);
 
   useEffect(() => {
@@ -566,6 +565,7 @@ export function RedesignedMasterData({ supabase, canEdit }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [referenceCounts, setReferenceCounts] = useState({});
 
   async function load() {
     setLoading(true); setError("");
