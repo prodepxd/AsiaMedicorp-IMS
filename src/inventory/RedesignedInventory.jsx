@@ -288,6 +288,16 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
 
   async function nextStep() {
     setError("");
+
+    if (step === 0) {
+      if (!type) {
+        setError("Please select an item type.");
+        return;
+      }
+      setStep(1);
+      return;
+    }
+
     if (!currentValueValid()) {
       setError(currentField.label + " is required.");
       return;
