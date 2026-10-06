@@ -693,6 +693,7 @@ export function RedesignedMasterData({ supabase, canEdit }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [referenceCounts, setReferenceCounts] = useState({});
+  const [referenceCheckErrors, setReferenceCheckErrors] = useState({});
 
   async function load() {
     setLoading(true); setError("");
@@ -734,6 +735,7 @@ export function RedesignedMasterData({ supabase, canEdit }) {
 
     const dependencies = referenceMap[active.table] || [];
     const counts = {};
+    const checkErrors = {};
     await Promise.all(loadedRows.map(async (row) => {
       if (!dependencies.length) {
         counts[row.id] = false;
@@ -744,9 +746,16 @@ export function RedesignedMasterData({ supabase, canEdit }) {
           supabase.from(table).select("id", { count: "exact", head: true }).eq(column, row.id)
         )
       );
+      const failed = results.some((r) => r.error);
+      if (failed) {
+        checkErrors[row.id] = true;
+        counts[row.id] = true;
+        return;
+      }
       counts[row.id] = results.some((r) => (r.count || 0) > 0);
     }));
     setReferenceCounts(counts);
+    setReferenceCheckErrors(checkErrors);
     setLoading(false);
   }
 
@@ -769,10 +778,63 @@ export function RedesignedMasterData({ supabase, canEdit }) {
   }
 
   async function remove(row) {
+    if (referenceCheckErrors[row.id]) {
+      setError("We could not verify whether this record is referenced. Delete has been disabled for safety.");
+      return;
+    }
     if (referenceCounts[row.id]) return;
     if (!window.confirm('Delete "'+row.name+'"? This cannot be undone.')) return;
+
+    const dependencies = ({
+      equipment_manufacturers: [
+        ["machine_models", "manufacturer_id"],
+        ["machine_details", "manufacturer_id"],
+        ["probe_details", "manufacturer_id"],
+      ],
+      machine_models: [
+        ["machine_details", "model_id"],
+        ["board_details", "compatible_machine_model_id"],
+        ["psu_details", "compatible_machine_model_id"],
+        ["monitor_details", "compatible_machine_model_id"],
+        ["hard_disk_details", "compatible_machine_model_id"],
+        ["keyboard_details", "compatible_machine_model_id"],
+      ],
+      probe_types: [["probe_details", "probe_type_id"]],
+      probe_models: [["probe_details", "model_id"]],
+      hard_disk_manufacturers: [["hard_disk_details", "manufacturer_id"]],
+      board_types: [["board_details", "board_type_id"]],
+      locations: [["items", "current_location_id"]],
+      statuses: [["items", "status_id"]],
+      quality_statuses: [["items", "quality_status_id"]],
+      transit_statuses: [["transit_events", "status_id"]],
+      suppliers: [["purchases", "supplier_id"]],
+      customers: [["sales", "customer_id"]],
+    })[active.table] || [];
+
+    const checks = await Promise.all(
+      dependencies.map(([table, column]) =>
+        supabase.from(table).select("id", { count: "exact", head: true }).eq(column, row.id)
+      )
+    );
+
+    if (checks.some((r) => r.error)) {
+      setError("We could not verify whether this record is referenced. Delete has been cancelled for safety.");
+      return;
+    }
+
+    if (checks.some((r) => (r.count || 0) > 0)) {
+      setError("This record is referenced by existing data and cannot be deleted.");
+      await load();
+      return;
+    }
+
     const result = await supabase.from(active.table).delete().eq("id",row.id);
-    if (result.error) setError(result.error.message); else await load();
+    if (result.error) {
+      setError(result.error.message);
+      await load();
+    } else {
+      await load();
+    }
   }
 
   return (
@@ -786,8 +848,12 @@ export function RedesignedMasterData({ supabase, canEdit }) {
         <div className="master-table-wrap"><table className="master-table"><thead><tr><th>Name</th>{active.manufacturer&&<th>Manufacturer</th>}<th>Active</th><th>Action</th></tr></thead><tbody>{!loading&&rows.length===0&&<tr><td colSpan={active.manufacturer?4:3} className="empty-cell">No records found.</td></tr>}{rows.map(row=><tr key={row.id}><td><strong>{row.name}</strong></td>{active.manufacturer&&<td>{refs.find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}<td>{row.is_active===false?"Inactive":"Active"}</td><td><div className="row-actions"><button className="table-button" onClick={()=>begin(row)} disabled={!canEdit}>Edit</button><button
   className={referenceCounts[row.id] ? "table-button delete-button delete-disabled" : "table-button delete-button"}
   onClick={()=>remove(row)}
-  disabled={!canEdit || referenceCounts[row.id]}
-  title={referenceCounts[row.id] ? "Cannot delete: this record is referenced by existing data." : "Delete"}
+  disabled={!canEdit || referenceCounts[row.id] || referenceCheckErrors[row.id]}
+  title={referenceCheckErrors[row.id]
+    ? "Cannot delete: reference check failed."
+    : referenceCounts[row.id]
+      ? "Cannot delete: this record is referenced by existing data."
+      : "Delete"}
 >
   Delete
 </button></div></td></tr>)}</tbody></table></div>
