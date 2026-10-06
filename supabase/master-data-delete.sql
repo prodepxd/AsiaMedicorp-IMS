@@ -1,6 +1,7 @@
 -- Asia Medicorp IMS
--- Safe master-data deletion support.
+-- Safe master-data deletion support for the current Asia Medicorp IMS schema.
 -- Run this entire script in Supabase SQL Editor whenever this function is updated.
+-- The function counts live foreign-key references from every current master category.
 
 create or replace function public.master_record_usage(
   p_table_name text,
@@ -22,9 +23,12 @@ begin
   end if;
 
   if p_table_name not in (
-    'item_types',
-    'manufacturers',
-    'models',
+    'equipment_manufacturers',
+    'machine_models',
+    'probe_types',
+    'probe_models',
+    'hard_disk_manufacturers',
+    'board_types',
     'locations',
     'statuses',
     'quality_statuses',
@@ -65,19 +69,10 @@ begin
     usage_count := usage_count + coalesce(ref_count, 0);
   end loop;
 
-  -- models are also referenced by items through the composite
-  -- (model_id, manufacturer_id) -> models(id, manufacturer_id) FK.
-  -- The generic loop above intentionally excludes composite FKs, so
-  -- count item.model_id explicitly to prevent an in-use model from
-  -- appearing deletable.
-  if p_table_name = 'models' then
-    select count(*)
-      into ref_count
-      from public.items
-     where model_id = p_record_id;
+  -- All current master-data relationships are single-column foreign keys,
+  -- so the catalog-driven scan above covers the redesigned inventory schema.
+  -- If a future composite FK is introduced, it must be added explicitly here.
 
-    usage_count := usage_count + coalesce(ref_count, 0);
-  end if;
 
   return usage_count;
 end;
