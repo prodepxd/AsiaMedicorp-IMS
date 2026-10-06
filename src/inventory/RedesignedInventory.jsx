@@ -503,7 +503,9 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     }
 
     setSaving(false);
-    onSaved();e } from "react";
+    onSaved();
+  }
+
 
 const ITEM_TYPES = [
   "Machine",
