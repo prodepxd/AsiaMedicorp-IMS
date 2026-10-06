@@ -49,7 +49,7 @@ const MASTER_GROUPS = [
   { key: "equipment_manufacturers", label: "Equipment Manufacturers", table: "equipment_manufacturers" },
   { key: "machine_models", label: "Machine Models", table: "machine_models", manufacturer: true },
   { key: "probe_types", label: "Probe Types", table: "probe_types" },
-  { key: "probe_models", label: "Probe Models", table: "probe_models", manufacturer: true },
+  { key: "probe_models", label: "Probe Models", table: "probe_models" },
   { key: "hard_disk_manufacturers", label: "Hard Disk Manufacturers", table: "hard_disk_manufacturers" },
   { key: "board_types", label: "Board Types", table: "board_types" },
   { key: "locations", label: "Locations", table: "locations" },
@@ -319,9 +319,9 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
     }
 
     if (field.type === "probe_model") return <Select value={value} onChange={onChange}
-      options={probeModels.map((x) => ({value:x.id,label:x.name}))}
-      placeholder={form.manufacturer_id ? "Select model" : "Select manufacturer first"}
-      disabled={!form.manufacturer_id} required />;
+      options={masters.probeModels.map((x) => ({value:x.id,label:x.name}))}
+      placeholder="Select model"
+      required />;
 
     if (field.type === "probe_type") return <Select value={value} onChange={onChange}
       options={masters.probeTypes.map((x) => ({value:x.id,label:x.name}))} required />;
@@ -468,16 +468,24 @@ export function RedesignedGlobalStock({ supabase, canEdit }) {
   const [showAdd, setShowAdd] = useState(false);
 
   async function loadMasters() {
-    const [s,q,l,em,hm] = await Promise.all([
+    const [s,q,l,em,hm,mm,pm,pt,bt] = await Promise.all([
       supabase.from("statuses").select("id,name").eq("is_active",true).order("name"),
       supabase.from("quality_statuses").select("id,name").eq("is_active",true).order("name"),
       supabase.from("locations").select("id,name").eq("is_active",true).order("name"),
       supabase.from("equipment_manufacturers").select("id,name").order("name"),
       supabase.from("hard_disk_manufacturers").select("id,name").order("name"),
+      supabase.from("machine_models").select("id,name").order("name"),
+      supabase.from("probe_models").select("id,name").order("name"),
+      supabase.from("probe_types").select("id,name").order("name"),
+      supabase.from("board_types").select("id,name").order("name"),
     ]);
-    const bad = [s,q,l,em,hm].find(x=>x.error);
+    const bad = [s,q,l,em,hm,mm,pm,pt,bt].find(x=>x.error);
     if (bad) { setError(bad.error.message); return; }
-    setMasters({statuses:s.data||[],qualities:q.data||[],locations:l.data||[],equipmentManufacturers:em.data||[],hardDiskManufacturers:hm.data||[]});
+    setMasters({
+      statuses:s.data||[], qualities:q.data||[], locations:l.data||[],
+      equipmentManufacturers:em.data||[], hardDiskManufacturers:hm.data||[],
+      machineModels:mm.data||[], probeModels:pm.data||[], probeTypes:pt.data||[], boardTypes:bt.data||[],
+    });
   }
 
   async function loadItems() {
@@ -524,12 +532,12 @@ export function RedesignedGlobalStock({ supabase, canEdit }) {
     const d=item.detail||{};
     if (key==="manufacturer") return manufacturerName(item);
     if (key==="model") {
-      const list = activeType==="Machine" ? [] : [];
-      return d.model_id || "—";
+      const list = activeType === "Machine" ? masters.machineModels : masters.probeModels;
+      return list.find(x=>x.id===d.model_id)?.name || "—";
     }
-    if (key==="machine_model") return d.compatible_machine_model_id || "—";
-    if (key==="probe_type") return d.probe_type_id || "—";
-    if (key==="board_type") return d.board_type_id || "—";
+    if (key==="machine_model") return masters.machineModels.find(x=>x.id===d.compatible_machine_model_id)?.name || "—";
+    if (key==="probe_type") return masters.probeTypes.find(x=>x.id===d.probe_type_id)?.name || "—";
+    if (key==="board_type") return masters.boardTypes.find(x=>x.id===d.board_type_id)?.name || "—";
     if (key==="functions") return Array.isArray(d.functions)?d.functions.join(", "):"—";
     if (key==="portable") return d.portable == null ? "—" : d.portable ? "Yes":"No";
     if (key==="connectors") return d.connector_count ?? "—";
@@ -589,7 +597,6 @@ export function RedesignedMasterData({ supabase, canEdit }) {
     const referenceMap = {
       equipment_manufacturers: [
         ["machine_models", "manufacturer_id"],
-        ["probe_models", "manufacturer_id"],
         ["machine_details", "manufacturer_id"],
         ["probe_details", "manufacturer_id"],
       ],
