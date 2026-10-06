@@ -244,7 +244,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       {key:"manufacturer_id",label:"Manufacturer",type:"hard_disk_manufacturer",required:true},
       {key:"hard_disk_type",label:"Type",type:"radio",options:SELECT_OPTIONS.hard_disk_type,required:true},
       {key:"capacity_gb",label:"Capacity (GB)",type:"number",required:true,min:0,step:1},
-      {key:"size_inches",label:"Size (inches)",type:"number",required:true,min:0,step:0.1},
+      {key:"size_inches",label:"Size (inches)",type:"radio",options:["2.5","3.5"],required:true},
       {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",optional:true},
       {key:"software_version",label:"Software version",type:"text",optional:true},
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
@@ -554,7 +554,6 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       <div className="modal-actions"><div>
         <button type="button" className="cancel-button" onClick={onClose}>Cancel</button>
       </div><div className="modal-actions-right">
-        <button type="button" className="secondary-button" onClick={() => setStep(0)}>Back to item type</button>
         {step > 1 && <button type="button" className="secondary-button" onClick={previousStep}>Back</button>}
         {!isLastStep
           ? <button type="button" className="primary-button" onClick={nextStep}>Next</button>
@@ -660,7 +659,7 @@ export function RedesignedGlobalStock({ supabase, canEdit }) {
     if (key==="software_version") return d.software_version || "—";
     if (key==="repaired") return d.repaired == null ? "—" : d.repaired ? "Yes":"No";
     if (key==="emi_type") return d.filter_type || "—";
-    if (key==="capacity_gb") return d.capacity_gb ?? "—";
+    if (key==="capacity_gb") return d.capacity_gb == null ? "—" : d.capacity_gb + " GB";
     if (key==="size_inches") return d.size_inches ?? "—";
     if (key==="hard_disk_type") return d.disk_type || "—";
     if (key==="part_number") return d.part_number || "—";
