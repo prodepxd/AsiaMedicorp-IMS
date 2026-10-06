@@ -409,7 +409,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
         {field.options.map((option) => (
           <label key={option} className={value === option ? "redesign-radio-option selected" : "redesign-radio-option"}>
             <input type="radio" name={field.key} value={option} checked={value === option} onChange={onChange} />
-            <span>{option}</span>
+            <span>{field.key === "monitor_size" ? option + String.fromCharCode(34) : option}</span>
           </label>
         ))}
       </div>
