@@ -109,7 +109,7 @@ export default function App() {
       </header>
       {error && <div className="error-message">{error}</div>}
       {active==="Global Stock" && <RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} />}
-      {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} />}
+      {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} />}
       {active!=="Global Stock" && active!=="Admin / Master Data" && <section className="content-card"><div className="section-heading">
         <div><p className="section-kicker">{active.toUpperCase()}</p><h2>Module ready</h2><p>Authentication and role access are connected. This module will be built on the live IMS database next.</p></div>
       </div></section>}
