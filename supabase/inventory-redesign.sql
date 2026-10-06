@@ -112,7 +112,7 @@ create table probe_details(
 
 create table board_details(
   item_id uuid primary key references items(id) on delete cascade,
-  compatible_machine_model_id uuid not null references machine_models(id),
+  compatible_compatible_machine_model_id uuid not null references machine_models(id),
   board_type_id uuid not null references board_types(id),
   part_number text not null,
   version_number text not null,
@@ -142,7 +142,7 @@ create table hard_disk_details(
   capacity_gb numeric not null check(capacity_gb>0),
   size_inches numeric not null check(size_inches>0),
   disk_type text not null check(disk_type in('IDE','SATA','SSD')),
-  compatible_machine_model_id uuid references machine_models(id),
+  compatible_compatible_machine_model_id uuid references machine_models(id),
   software_version text
 );
 
@@ -276,4 +276,50 @@ begin
   end loop;
 end $$;
 
+
+create unique index if not exists items_serial_number_unique on items(lower(serial_number)) where serial_number is not null;
+create index if not exists items_type_idx on items(item_type);
+create index if not exists items_status_idx on items(status_id);
+create index if not exists items_quality_idx on items(quality_status_id);
+create index if not exists items_location_idx on items(current_location_id);
+create index if not exists machine_details_manufacturer_idx on machine_details(manufacturer_id);
+create index if not exists machine_details_model_idx on machine_details(model_id);
+create index if not exists probe_details_manufacturer_idx on probe_details(manufacturer_id);
+create index if not exists probe_details_model_idx on probe_details(model_id);
+create index if not exists probe_details_type_idx on probe_details(probe_type_id);
+create index if not exists board_details_machine_model_idx on board_details(compatible_machine_model_id);
+create index if not exists board_details_type_idx on board_details(board_type_id);
+create index if not exists psu_details_machine_model_idx on psu_details(compatible_machine_model_id);
+create index if not exists monitor_details_machine_model_idx on monitor_details(compatible_machine_model_id);
+create index if not exists hard_disk_details_manufacturer_idx on hard_disk_details(manufacturer_id);
+create index if not exists hard_disk_details_machine_model_idx on hard_disk_details(compatible_machine_model_id);
+create index if not exists keyboard_details_machine_model_idx on keyboard_details(compatible_machine_model_id);
+create index if not exists item_photos_item_idx on item_photos(item_id);
+create index if not exists purchase_items_purchase_idx on purchase_items(purchase_id);
+create index if not exists purchase_items_item_idx on purchase_items(item_id);
+create index if not exists sale_items_sale_idx on sale_items(sale_id);
+create index if not exists sale_items_item_idx on sale_items(item_id);
+create index if not exists shipment_items_shipment_idx on shipment_items(shipment_id);
+create index if not exists shipment_items_item_idx on shipment_items(item_id);
+
+do $
+declare t text;
+begin
+  foreach t in array array['equipment_manufacturers','hard_disk_manufacturers','machine_models','probe_types','probe_models','board_types','items','item_photos'] loop
+    execute format('drop trigger if exists %I_updated_at on %I',t,t);
+    execute format('create trigger %I_updated_at before update on %I for each row execute function public.set_updated_at()',t,t);
+  end loop;
+end $;
+
+do $
+declare t text;
+begin
+  foreach t in array array['purchase_items','sale_items','shipment_items','item_photos'] loop
+    execute format('alter table %I enable row level security',t);
+    execute format('create policy "%s_read" on %I for select to authenticated using(true)',t,t);
+    execute format('create policy "%s_insert" on %I for insert to authenticated with check(public.current_user_role() in (''admin'',''manager''))',t,t);
+    execute format('create policy "%s_update" on %I for update to authenticated using(public.current_user_role() in (''admin'',''manager'')) with check(public.current_user_role() in (''admin'',''manager''))',t,t);
+    execute format('create policy "%s_delete" on %I for delete to authenticated using(public.current_user_role()=''admin'')',t,t);
+  end loop;
+end $;
 commit;
