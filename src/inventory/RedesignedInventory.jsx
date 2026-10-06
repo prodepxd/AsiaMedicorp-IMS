@@ -123,7 +123,7 @@ function Select({ value, onChange, options, placeholder = "Select", disabled = f
   );
 }
 
-function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
+function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSaved }) {
   const [type, setType] = useState(initialType || "");
   const [masters, setMasters] = useState({
     equipmentManufacturers: [], hardDiskManufacturers: [], machineModels: [],
@@ -133,7 +133,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(editItem ? 1 : 0);
 
   useEffect(() => {
     let alive = true;
@@ -162,12 +162,17 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       });
       const stock = values[7].find((x) => x.name === "In Stock");
       const good = values[8].find((x) => x.name === "Good");
-      setForm((current) => ({ ...current, status_id: stock?.id || "", quality_status_id: good?.id || "" }));
-      setLoading(false);
-    }
+      if (editItem) {
+        const d = editItem.detail || {};
+        const compatibleModel = values[2].find((m) => m.id === d.compatible_machine_model_id);
+        setForm({...emptyForm(),serial_number:editItem.serial_number||"",status_id:editItem.status_id||"",quality_status_id:editItem.quality_status_id||"",current_location_id:editItem.current_location_id||"",quality_note:editItem.quality_note||"",manufacturer_id:d.manufacturer_id||"",model_id:d.model_id||"",manufacturer_year:d.manufacturer_year??"",monitor_size:d.monitor_size??d.size??"",software_version:d.software_version||"",functions:Array.isArray(d.functions)?d.functions:[],portable:d.portable==null?"":d.portable?"Yes":"No",connectors:d.connector_count??"",compatible_machine_manufacturer_id:compatibleModel?.manufacturer_id||"",probe_type_id:d.probe_type_id||"",year:d.year??"",machine_model_id:d.compatible_machine_model_id||"",board_type_id:d.board_type_id||"",part_number:d.part_number||"",version_number:d.version_number||"",repaired:d.repaired==null?"":d.repaired?"Yes":"No",video_input:d.video_input||"",emi_type:d.filter_type||"",capacity_gb:d.capacity_gb??"",size_inches:d.size_inches??"",hard_disk_type:d.disk_type||""});
+      } else {
+        setForm((current) => ({ ...current, status_id: stock?.id || "", quality_status_id: good?.id || "" }));
+      }
+      setLoading(false);    }
     load();
     return () => { alive = false; };
-  }, [supabase]);
+  }, [supabase, editItem]);
 
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const machineModels = masters.machineModels.filter((m) => !form.manufacturer_id || m.manufacturer_id === form.manufacturer_id);
@@ -297,7 +302,6 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       setError(currentField.label + " is required.");
       return;
     }
-
     if (currentField.key === "serial_number" && String(form.serial_number || "").trim()) {
       const serial = String(form.serial_number).trim();
       const { data: existingItems, error: duplicateCheckError } = await supabase
@@ -312,7 +316,512 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
 
       const normalizedSerial = serial.toLowerCase();
       const duplicate = (existingItems || []).some(
-        (item) => String(item.serial_number || "").trim().toLowerCase() === normalizedSerial
+        (item) => item.id !== editItem?.id && String(item.serial_number || "").trim().toLowerCase() === normalizedSerial
+      );
+
+      if (duplicate) {
+        setError("This serial number is already in use. Please enter a different serial number.");
+        return;
+      }
+    }
+
+    setStep((value) => Math.min(value + 1, totalSteps - 1));
+  }
+
+  function previousStep() {
+    setError("");
+    setStep((value) => Math.max(1, value - 1));
+  }
+
+  function fieldControl(field) {
+    const value = form[field.key] ?? "";
+    const onChange = (event) => set(field.key, event.target.value);
+
+    if (field.type === "functions") {
+      return <div className="redesign-checks">{["4D","Cardiac","Elastography"].map((name) =>
+        <label key={name}><input type="checkbox" checked={form.functions.includes(name)}
+          onChange={(event) => set("functions", event.target.checked ? [...form.functions, name] : form.functions.filter((item) => item !== name))}/>{name}</label>
+      )}</div>;
+    }
+
+    if (field.type === "manufacturer") return <Select value={value}
+      onChange={(event) => { set("manufacturer_id", event.target.value); set("model_id", ""); }}
+      options={masters.equipmentManufacturers.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "hard_disk_manufacturer") return <Select value={value} onChange={onChange}
+      options={masters.hardDiskManufacturers.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "machine_model") {
+      const options = machineModels.map((x) => ({value:x.id,label:x.name}));
+      return <Select value={value} onChange={onChange} options={options}
+        placeholder={form.manufacturer_id ? "Select model" : "Select manufacturer first"}
+        disabled={!form.manufacturer_id} required={field.required}/>;
+    }
+
+    if (field.type === "compatible_machine") return (
+      <div className="redesign-compatible-machine-grid">
+        <Select value={form.compatible_machine_manufacturer_id}
+          onChange={(event) => {
+            set("compatible_machine_manufacturer_id", event.target.value);
+            set("machine_model_id", "");
+          }}
+          options={masters.equipmentManufacturers.map((x) => ({value:x.id,label:x.name}))}
+          placeholder={field.optional ? "Optional / unassigned" : "Select manufacturer"}
+          required={field.required} />
+        <Select value={form.machine_model_id} onChange={(event) => set("machine_model_id", event.target.value)}
+          options={compatibleMachineModels.map((x) => ({value:x.id,label:x.name}))}
+          placeholder={form.compatible_machine_manufacturer_id ? "Select machine model" : (field.optional ? "Optional / unassigned" : "Select manufacturer first")}
+          disabled={!form.compatible_machine_manufacturer_id}
+          required={field.required} />
+      </div>
+    );
+
+    if (field.type === "probe_model") return <Select value={value} onChange={onChange}
+      options={masters.probeModels.map((x) => ({value:x.id,label:x.name}))}
+      placeholder="Select model"
+      required />;
+
+    if (field.type === "probe_type") return <Select value={value} onChange={onChange}
+      options={masters.probeTypes.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "board_type") return <Select value={value} onChange={onChange}
+      options={masters.boardTypes.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "location") return (
+      <div className="redesign-radio-group redesign-location-radio-group">
+        <label className={value === "" ? "redesign-radio-option selected" : "redesign-radio-option"}>
+          <input type="radio" name="location" value="" checked={value === ""} onChange={onChange} />
+          <span>Not set</span>
+        </label>
+        {masters.locations.map((location) => (
+          <label key={location.id} className={value === location.id ? "redesign-radio-option selected" : "redesign-radio-option"}>
+            <input type="radio" name="location" value={location.id} checked={value === location.id} onChange={onChange} />
+            <span>{location.name}</span>
+          </label>
+        ))}
+      </div>
+    );
+
+    if (field.type === "status") return <Select value={value} onChange={onChange}
+      options={masters.statuses.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "quality") return <Select value={value} onChange={onChange}
+      options={masters.qualities.map((x) => ({value:x.id,label:x.name}))} required />;
+
+    if (field.type === "radio") return (
+      <div className="redesign-radio-group">
+        {field.options.map((option) => (
+          <label key={option} className={value === option ? "redesign-radio-option selected" : "redesign-radio-option"}>
+            <input type="radio" name={field.key} value={option} checked={value === option} onChange={onChange} />
+            <span>{field.key === "monitor_size" ? option + String.fromCharCode(34) : option}</span>
+          </label>
+        ))}
+      </div>
+    );
+
+    if (field.type === "location") return (
+      <div className="redesign-radio-group">
+        {masters.locations.map((location) => (
+          <label key={location.id} className={value === location.id ? "redesign-radio-option selected" : "redesign-radio-option"}>
+            <input type="radio" name="current_location_id" value={location.id} checked={value === location.id} onChange={onChange} />
+            <span>{location.name}</span>
+          </label>
+        ))}
+        <label className={value === "" ? "redesign-radio-option selected" : "redesign-radio-option"}>
+          <input type="radio" name="current_location_id" value="" checked={value === ""} onChange={onChange} />
+          <span>Not set</span>
+        </label>
+      </div>
+    );
+
+    if (field.type === "select") return <Select value={value} onChange={onChange}
+      options={field.options} required={field.required} />;
+
+    return <input type={field.type === "number" ? "number" : "text"} min={field.min} max={field.max}
+      step={field.step} value={value} onChange={onChange} autoFocus />;
+  }
+
+  async function save() {
+    setSaving(true);
+    setError("");
+
+    const common = {
+      serial_number: form.serial_number.trim() || null,
+      item_type: type,
+      status_id: form.status_id,
+      quality_status_id: form.quality_status_id,
+      quality_note: form.quality_note.trim() || null,
+      current_location_id: form.current_location_id || null,
+    };
+
+    let details;
+    if (type === "Machine") details = {
+      manufacturer_id: form.manufacturer_id, model_id: form.model_id,
+      manufacturer_year: Number(form.manufacturer_year), monitor_size: Number(form.monitor_size),
+      software_version: form.software_version.trim(), functions: form.functions,
+      portable: form.portable === "Yes", connector_count: Number(form.connectors),
+    };
+    if (type === "Probe") details = {
+      manufacturer_id: form.manufacturer_id, model_id: form.model_id,
+      probe_type_id: form.probe_type_id, year: form.year ? Number(form.year) : null,
+    };
+    if (type === "Board") details = {
+      compatible_machine_model_id: form.machine_model_id, board_type_id: form.board_type_id,
+      part_number: form.part_number.trim(), version_number: form.version_number.trim(),
+      repaired: form.repaired === "Yes",
+    };
+    if (type === "PSU") details = { compatible_machine_model_id: form.machine_model_id };
+    if (type === "Monitor") details = {
+      compatible_machine_model_id: form.machine_model_id, size: Number(form.monitor_size),
+      video_input: form.video_input,
+    };
+    if (type === "EMI Filter") details = { filter_type: form.emi_type };
+    if (type === "Hard Disk") details = {
+      manufacturer_id: form.manufacturer_id, capacity_gb: Number(form.capacity_gb),
+      size_inches: Number(form.size_inches), disk_type: form.hard_disk_type,
+      compatible_machine_model_id: form.machine_model_id || null,
+      software_version: form.software_version.trim() || null,
+    };
+    if (type === "Keyboard") details = { compatible_machine_model_id: form.machine_model_id };
+
+    const table = {
+      Machine:"machine_details", Probe:"probe_details", Board:"board_details", PSU:"psu_details",
+      Monitor:"monitor_details", "EMI Filter":"emi_filter_details", "Hard Disk":"hard_disk_details",
+      Keyboard:"keyboard_details",
+    }[type];
+
+    if (editItem) {
+      const { error: itemError } = await supabase.from("items").update(common).eq("id", editItem.id);
+      if (itemError) { setError(itemError.code === "23505" ? "This serial number is already in use. Please enter a different serial number." : "We could not update this item. Please try again."); setSaving(false); return; }
+      const { error: detailError } = await supabase.from(table).update(details).eq("item_id", editItem.id);
+      if (detailError) { setError(detailError.message); setSaving(false); return; }
+    } else {
+      const { data: item, error: itemError } = await supabase.from("items").insert(common).select("id").single();
+      if (itemError) { const duplicateSerial=itemError.code==="23505"&&/serial_number/i.test(itemError.message||""); setError(duplicateSerial?"This serial number is already in use. Please enter a different serial number.":"We could not add this item. Please try again."); setSaving(false); return; }
+      const { error: detailError } = await supabase.from(table).insert({item_id:item.id,...details});
+      if (detailError) { await supabase.from("items").delete().eq("id",item.id); setError(detailError.message); setSaving(false); return; }
+    }
+
+    setSaving(false);
+    onSaved();e } from "react";
+
+const ITEM_TYPES = [
+  "Machine",
+  "Probe",
+  "Board",
+  "PSU",
+  "Monitor",
+  "EMI Filter",
+  "Hard Disk",
+  "Keyboard",
+];
+
+const TYPE_CONFIG = {
+  Machine: ["manufacturer", "model", "manufacturer_year", "monitor_size", "software_version", "functions", "portable", "connectors"],
+  Probe: ["manufacturer", "model", "probe_type", "year"],
+  Board: ["compatible_machine", "board_type", "part_number", "version_number", "repaired"],
+  PSU: ["compatible_machine"],
+  Monitor: ["compatible_machine", "monitor_size", "video_input"],
+  "EMI Filter": ["emi_type"],
+  "Hard Disk": ["manufacturer", "capacity_gb", "size_inches", "hard_disk_type", "compatible_machine", "software_version"],
+  Keyboard: ["compatible_machine"],
+};
+
+const FIELD_LABELS = {
+  manufacturer: "Manufacturer",
+  model: "Model",
+  manufacturer_year: "Manufacturer year",
+  monitor_size: "Monitor size",
+  software_version: "Software version",
+  functions: "Functions",
+  portable: "Portable",
+  connectors: "Number of connectors",
+  probe_type: "Probe type",
+  year: "Year",
+  compatible_machine: "Compatible machine",
+  board_type: "Board type",
+  part_number: "Part number",
+  version_number: "Version number",
+  repaired: "Repaired",
+  video_input: "Video input",
+  emi_type: "Filter type",
+  capacity_gb: "Capacity (GB)",
+  size_inches: "Size (inches)",
+  hard_disk_type: "Hard disk type",
+};
+
+const MASTER_GROUPS = [
+  { key: "equipment_manufacturers", label: "Equipment Manufacturers", table: "equipment_manufacturers" },
+  { key: "machine_models", label: "Machine Models", table: "machine_models", manufacturer: true },
+  { key: "probe_types", label: "Probe Types", table: "probe_types" },
+  { key: "probe_models", label: "Probe Models", table: "probe_models" },
+  { key: "hard_disk_manufacturers", label: "Hard Disk Manufacturers", table: "hard_disk_manufacturers" },
+  { key: "board_types", label: "Board Types", table: "board_types" },
+  { key: "locations", label: "Locations", table: "locations" },
+  { key: "statuses", label: "Statuses", table: "statuses" },
+  { key: "quality_statuses", label: "Quality Statuses", table: "quality_statuses" },
+  { key: "transit_statuses", label: "Transit Statuses", table: "transit_statuses" },
+  { key: "suppliers", label: "Suppliers", table: "suppliers" },
+  { key: "customers", label: "Customers", table: "customers" },
+];
+
+const SELECT_OPTIONS = {
+  monitor_size: ["15", "17", "19", "21", "23"],
+  portable: ["Yes", "No"],
+  connectors: ["1", "2", "3", "4", "5"],
+  video_input: ["VGA", "HDMI"],
+  repaired: ["Yes", "No"],
+  emi_type: ["Wired", "Board"],
+  hard_disk_type: ["IDE", "SATA", "SSD"],
+};
+
+function emptyForm() {
+  return {
+    serial_number: "",
+    status_id: "",
+    quality_status_id: "",
+    current_location_id: "",
+    quality_note: "",
+    manufacturer_id: "",
+    model_id: "",
+    manufacturer_year: "",
+    monitor_size: "",
+    software_version: "",
+    functions: [],
+    portable: "",
+    connectors: "",
+    compatible_machine_manufacturer_id: "",
+    probe_type_id: "",
+    year: "",
+    machine_model_id: "",
+    board_type_id: "",
+    part_number: "",
+    version_number: "",
+    repaired: "",
+    video_input: "",
+    emi_type: "",
+    capacity_gb: "",
+    size_inches: "",
+    hard_disk_type: "",
+  };
+}
+
+function Field({ label, children, required = false }) {
+  return (
+    <label className="redesign-field">
+      <span>{label}{required ? " *" : ""}</span>
+      {children}
+    </label>
+  );
+}
+
+function Select({ value, onChange, options, placeholder = "Select", disabled = false, required = false }) {
+  return (
+    <select value={value || ""} onChange={onChange} disabled={disabled} required={required}>
+      <option value="">{placeholder}</option>
+      {options.map((option) => (
+        <option key={option.value ?? option} value={option.value ?? option}>
+          {option.label ?? option}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSaved }) {
+  const [type, setType] = useState(initialType || "");
+  const [masters, setMasters] = useState({
+    equipmentManufacturers: [], hardDiskManufacturers: [], machineModels: [],
+    probeModels: [], probeTypes: [], boardTypes: [], locations: [], statuses: [], qualities: [],
+  });
+  const [form, setForm] = useState(emptyForm());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [step, setStep] = useState(editItem ? 1 : 0);
+
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      setLoading(true);
+      const requests = [
+        supabase.from("equipment_manufacturers").select("id,name").order("name"),
+        supabase.from("hard_disk_manufacturers").select("id,name").order("name"),
+        supabase.from("machine_models").select("id,name,manufacturer_id").order("name"),
+        supabase.from("probe_models").select("id,name").order("name"),
+        supabase.from("probe_types").select("id,name").order("name"),
+        supabase.from("board_types").select("id,name").order("name"),
+        supabase.from("locations").select("id,name").eq("is_active", true).order("name"),
+        supabase.from("statuses").select("id,name").eq("is_active", true).order("name"),
+        supabase.from("quality_statuses").select("id,name").eq("is_active", true).order("name"),
+      ];
+      const results = await Promise.all(requests);
+      const failed = results.find((r) => r.error);
+      if (!alive) return;
+      if (failed) { setError(failed.error.message); setLoading(false); return; }
+      const values = results.map((r) => r.data || []);
+      setMasters({
+        equipmentManufacturers: values[0], hardDiskManufacturers: values[1],
+        machineModels: values[2], probeModels: values[3], probeTypes: values[4],
+        boardTypes: values[5], locations: values[6], statuses: values[7], qualities: values[8],
+      });
+      const stock = values[7].find((x) => x.name === "In Stock");
+      const good = values[8].find((x) => x.name === "Good");
+      if (editItem) {
+        const d = editItem.detail || {};
+        const compatibleModel = values[2].find((m) => m.id === d.compatible_machine_model_id);
+        setForm({...emptyForm(),serial_number:editItem.serial_number||"",status_id:editItem.status_id||"",quality_status_id:editItem.quality_status_id||"",current_location_id:editItem.current_location_id||"",quality_note:editItem.quality_note||"",manufacturer_id:d.manufacturer_id||"",model_id:d.model_id||"",manufacturer_year:d.manufacturer_year??"",monitor_size:d.monitor_size??d.size??"",software_version:d.software_version||"",functions:Array.isArray(d.functions)?d.functions:[],portable:d.portable==null?"":d.portable?"Yes":"No",connectors:d.connector_count??"",compatible_machine_manufacturer_id:compatibleModel?.manufacturer_id||"",probe_type_id:d.probe_type_id||"",year:d.year??"",machine_model_id:d.compatible_machine_model_id||"",board_type_id:d.board_type_id||"",part_number:d.part_number||"",version_number:d.version_number||"",repaired:d.repaired==null?"":d.repaired?"Yes":"No",video_input:d.video_input||"",emi_type:d.filter_type||"",capacity_gb:d.capacity_gb??"",size_inches:d.size_inches??"",hard_disk_type:d.disk_type||""});
+      } else {
+        setForm((current) => ({ ...current, status_id: stock?.id || "", quality_status_id: good?.id || "" }));
+      }
+      setLoading(false);    }
+    load();
+    return () => { alive = false; };
+  }, [supabase, editItem]);
+
+  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const machineModels = masters.machineModels.filter((m) => !form.manufacturer_id || m.manufacturer_id === form.manufacturer_id);
+  const compatibleMachineModels = masters.machineModels.filter((m) =>
+    !form.compatible_machine_manufacturer_id || m.manufacturer_id === form.compatible_machine_manufacturer_id
+  );
+
+  const stepsForType = {
+    Machine: [
+      {key:"manufacturer_id",label:"Manufacturer",type:"manufacturer",required:true},
+      {key:"model_id",label:"Model",type:"machine_model",required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"manufacturer_year",label:"Manufacturer year",type:"number",required:true,min:1900,max:2100},
+      {key:"functions",label:"Functions",type:"functions",optional:true},
+      {key:"connectors",label:"Number of connectors",type:"radio",options:SELECT_OPTIONS.connectors,required:true},
+      {key:"monitor_size",label:"Monitor size",type:"radio",options:SELECT_OPTIONS.monitor_size,required:true},
+      {key:"software_version",label:"Software version",type:"text",required:true},
+      {key:"portable",label:"Portable",type:"radio",options:SELECT_OPTIONS.portable,required:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+    ],
+    Probe: [
+      {key:"manufacturer_id",label:"Manufacturer",type:"manufacturer",required:true},
+      {key:"probe_type_id",label:"Probe type",type:"probe_type",required:true},
+      {key:"model_id",label:"Model",type:"probe_model",required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"year",label:"Year",type:"number",optional:true,min:1900,max:2100},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+    ],
+    Board: [
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",required:true},
+      {key:"board_type_id",label:"Board type",type:"board_type",required:true},
+      {key:"part_number",label:"Part number",type:"text",required:true},
+      {key:"version_number",label:"Version number",type:"text",required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"repaired",label:"Repaired",type:"select",options:SELECT_OPTIONS.repaired,required:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+    ],
+    PSU: [
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+    ],
+    Monitor: [
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",required:true},
+      {key:"monitor_size",label:"Size",type:"radio",options:SELECT_OPTIONS.monitor_size,required:true},
+      {key:"video_input",label:"Video input",type:"radio",options:SELECT_OPTIONS.video_input,required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+    ],
+    "EMI Filter": [
+      {key:"emi_type",label:"Type",type:"radio",options:SELECT_OPTIONS.emi_type,required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+    ],
+    "Hard Disk": [
+      {key:"manufacturer_id",label:"Manufacturer",type:"hard_disk_manufacturer",required:true},
+      {key:"hard_disk_type",label:"Type",type:"radio",options:SELECT_OPTIONS.hard_disk_type,required:true},
+      {key:"capacity_gb",label:"Capacity (GB)",type:"number",required:true,min:0,step:1},
+      {key:"size_inches",label:"Size (inches)",type:"radio",options:["2.5","3.5"],required:true},
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",optional:true},
+      {key:"software_version",label:"Software version",type:"text",optional:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+    ],
+    Keyboard: [
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+    ],
+  };
+
+  const steps = type ? stepsForType[type] || [] : [];
+  const currentField = step > 0 ? steps[step - 1] : null;
+  const totalSteps = steps.length + 1;
+
+  function selectType(nextType) {
+    setType(nextType);
+    setForm(emptyForm());
+    setError("");
+  }
+
+  function currentValueValid() {
+    if (!currentField || !currentField.required) return true;
+    if (currentField.type === "compatible_machine") return Boolean(form.compatible_machine_manufacturer_id && form.machine_model_id);
+    const value = form[currentField.key];
+    if (Array.isArray(value)) return true;
+    return String(value ?? "").trim() !== "";
+  }
+
+  async function nextStep() {
+    setError("");
+
+    if (step === 0) {
+      if (!type) {
+        setError("Please select an item type.");
+        return;
+      }
+      setStep(1);
+      return;
+    }
+
+    if (!currentValueValid()) {
+      setError(currentField.label + " is required.");
+      return;
+    }
+    if (currentField.key === "serial_number" && String(form.serial_number || "").trim()) {
+      const serial = String(form.serial_number).trim();
+      const { data: existingItems, error: duplicateCheckError } = await supabase
+        .from("items")
+        .select("id,serial_number")
+        .not("serial_number", "is", null);
+
+      if (duplicateCheckError) {
+        setError("We could not verify this serial number. Please try again.");
+        return;
+      }
+
+      const normalizedSerial = serial.toLowerCase();
+      const duplicate = (existingItems || []).some(
+        (item) => item.id !== editItem?.id && String(item.serial_number || "").trim().toLowerCase() === normalizedSerial
       );
 
       if (duplicate) {
@@ -515,9 +1024,9 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
 
   return <div className="modal-backdrop"><div className="modal-card redesign-modal">
     <div className="modal-header redesign-modal-header"><div>
-      <p className="section-kicker">ADD INVENTORY</p>
-      <h2>{isTypeStep ? "Select item type" : "Add " + type}</h2>
-      <p>{isTypeStep ? "Choose the item type first. Only its relevant characteristics will be shown." : "Enter the item details one characteristic at a time."}</p>
+      <p className="section-kicker">{editItem ? "EDIT INVENTORY" : "ADD INVENTORY"}</p>
+      <h2>{isTypeStep ? "Select item type" : (editItem ? "Edit " : "Add ") + type}</h2>
+      <p>{isTypeStep ? "Choose the item type first. Only its relevant characteristics will be shown." : "{editItem ? "Update the item details one characteristic at a time." : "Enter the item details one characteristic at a time."}"}</p>
     </div><button className="modal-close" onClick={onClose}>×</button></div>
     {!isTypeStep && <div className="redesign-progress">
       <div className="redesign-progress-meta"><span>Step {step} of {steps.length}</span><strong>{currentField.label}</strong></div>
@@ -560,13 +1069,26 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
           : <button type="button" className="primary-button" onClick={async () => {
               if (!currentValueValid()) { setError(currentField.label + " is required."); return; }
               await save();
-            }} disabled={saving}>{saving ? "Adding..." : "Add item"}</button>}
+            }} disabled={saving}>{saving ? (editItem ? "Saving..." : "Adding...") : (editItem ? "Save changes" : "Add item")}</button>}
       </div></div>
     </div>}
   </div></div>;
 }
 
-export function RedesignedGlobalStock({ supabase, canEdit }) {
+export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDeleted }) {
+  const [item,setItem]=useState(null),[masters,setMasters]=useState({statuses:[],qualities:[],locations:[],equipmentManufacturers:[],hardDiskManufacturers:[],machineModels:[],probeModels:[],probeTypes:[],boardTypes:[]}),[loading,setLoading]=useState(true),[error,setError]=useState(""),[editing,setEditing]=useState(false),[deleting,setDeleting]=useState(false);
+  const detailTable=(t)=>({Machine:"machine_details",Probe:"probe_details",Board:"board_details",PSU:"psu_details",Monitor:"monitor_details","EMI Filter":"emi_filter_details","Hard Disk":"hard_disk_details",Keyboard:"keyboard_details"})[t];
+  async function load(){setLoading(true);setError("");const {data:row,error:e}=await supabase.from("items").select("*").eq("id",itemId).single();if(e){setError(e.message);setLoading(false);return;}const {data:detail,error:de}=await supabase.from(detailTable(row.item_type)).select("*").eq("item_id",itemId).single();if(de){setError(de.message);setLoading(false);return;}const [s,q,l,em,hm,mm,pm,pt,bt]=await Promise.all([supabase.from("statuses").select("id,name").order("name"),supabase.from("quality_statuses").select("id,name").order("name"),supabase.from("locations").select("id,name").order("name"),supabase.from("equipment_manufacturers").select("id,name").order("name"),supabase.from("hard_disk_manufacturers").select("id,name").order("name"),supabase.from("machine_models").select("id,name,manufacturer_id").order("name"),supabase.from("probe_models").select("id,name").order("name"),supabase.from("probe_types").select("id,name").order("name"),supabase.from("board_types").select("id,name").order("name")]);const bad=[s,q,l,em,hm,mm,pm,pt,bt].find(r=>r.error);if(bad){setError(bad.error.message);setLoading(false);return;}setMasters({statuses:s.data||[],qualities:q.data||[],locations:l.data||[],equipmentManufacturers:em.data||[],hardDiskManufacturers:hm.data||[],machineModels:mm.data||[],probeModels:pm.data||[],probeTypes:pt.data||[],boardTypes:bt.data||[]});setItem({...row,detail:detail||{}});setLoading(false);}
+  useEffect(()=>{load();},[itemId]);
+  const name=(list,id)=>list.find(x=>x.id===id)?.name||"—"; const compatible=(id)=>{const m=masters.machineModels.find(x=>x.id===id),man=masters.equipmentManufacturers.find(x=>x.id===m?.manufacturer_id);return m&&man?man.name+" "+m.name:m?.name||"—";};
+  function fields(){const d=item.detail||{},b=[["Serial number",item.serial_number||"—"],["Status",name(masters.statuses,item.status_id)],["Quality",name(masters.qualities,item.quality_status_id)],["Location",name(masters.locations,item.current_location_id)]],s={Machine:[["Manufacturer",name(masters.equipmentManufacturers,d.manufacturer_id)],["Model",name(masters.machineModels,d.model_id)],["Manufacturer year",d.manufacturer_year??"—"],["Functions",Array.isArray(d.functions)&&d.functions.length?d.functions.join(", "):"—"],["Number of connectors",d.connector_count??"—"],["Monitor size",d.monitor_size==null?"—":d.monitor_size+'"'],["Software version",d.software_version||"—"],["Portable",d.portable==null?"—":d.portable?"Yes":"No"]],Probe:[["Manufacturer",name(masters.equipmentManufacturers,d.manufacturer_id)],["Probe type",name(masters.probeTypes,d.probe_type_id)],["Model",name(masters.probeModels,d.model_id)],["Year",d.year??"—"]],Board:[["Compatible machine",compatible(d.compatible_machine_model_id)],["Board type",name(masters.boardTypes,d.board_type_id)],["Part number",d.part_number||"—"],["Version number",d.version_number||"—"],["Repaired",d.repaired==null?"—":d.repaired?"Yes":"No"]],PSU:[["Compatible machine",compatible(d.compatible_machine_model_id)]],Monitor:[["Compatible machine",compatible(d.compatible_machine_model_id)],["Size",d.size==null?"—":d.size+'"'],["Video input",d.video_input||"—"]],"EMI Filter":[["Type",d.filter_type||"—"]],"Hard Disk":[["Manufacturer",name(masters.hardDiskManufacturers,d.manufacturer_id)],["Type",d.disk_type||"—"],["Capacity",d.capacity_gb==null?"—":d.capacity_gb+" GB"],["Size",d.size_inches==null?"—":d.size_inches+" inches"],["Compatible machine",d.compatible_machine_model_id?compatible(d.compatible_machine_model_id):"—"],["Software version",d.software_version||"—"]],Keyboard:[["Compatible machine",compatible(d.compatible_machine_model_id)]]};return [...(s[item.item_type]||[]),...b];}
+  async function remove(){if(!canEdit||deleting||!window.confirm("Delete this item? This cannot be undone."))return;setDeleting(true);setError("");const t=detailTable(item.item_type),dr=await supabase.from(t).delete().eq("item_id",item.id);if(dr.error){setError(dr.error.message);setDeleting(false);return;}const ir=await supabase.from("items").delete().eq("id",item.id);if(ir.error){setError(ir.error.message);setDeleting(false);return;}onDeleted();}
+  if(loading)return <section className="content-card item-page-shell"><div className="modal-loading">Loading item...</div></section>;
+  if(!item)return <section className="content-card item-page-shell"><div className="error-message">{error||"Item not found."}</div><div className="modal-actions"><button className="secondary-button" onClick={onBack}>Back to Global Stock</button></div></section>;
+  return <section className="content-card item-page-shell"><div className="item-detail-card item-page-card"><div className="item-detail-header"><div><p className="section-kicker">{item.item_type.toUpperCase()}</p><h2>{item.serial_number||"Item details"}</h2><p>Inventory item · {item.item_type}</p></div><div className="item-detail-actions"><button className="secondary-button" onClick={onBack}>Back to Global Stock</button>{canEdit&&<button className="primary-button" onClick={()=>setEditing(true)}>Edit</button>}{canEdit&&<button className="cancel-button" onClick={remove} disabled={deleting}>{deleting?"Deleting...":"Delete"}</button>}</div></div><div className="item-detail-body"><div className="item-photo-placeholder"><div><span className="photo-placeholder-icon">▧</span><strong>Item photo</strong><span>Photo support will be added later.</span></div></div><div className="item-detail-grid">{fields().map(([l,v])=><div className="item-detail-field" key={l}><span>{l}</span><strong>{v}</strong></div>)}</div><div className="item-detail-notes"><div><span>Quality note</span><p>{item.quality_note||"No quality note."}</p></div></div>{error&&<div className="error-message">{error}</div>}</div></div>{editing&&<ItemForm supabase={supabase} type={item.item_type} editItem={item} onClose={()=>setEditing(false)} onSaved={async()=>{setEditing(false);await load();}}/>}</section>;
+}
+
+export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   const [activeType, setActiveType] = useState("Machine");
   const [items, setItems] = useState([]);
   const [masters, setMasters] = useState({ statuses: [], qualities: [], locations: [], equipmentManufacturers: [], hardDiskManufacturers: [] });
@@ -597,8 +1119,7 @@ export function RedesignedGlobalStock({ supabase, canEdit }) {
   }
 
   async function loadItems() {
-    setLoading(true); setError("");
-    const { data, error: itemError } = await supabase.from("items").select("*").eq("item_type", activeType).order("created_at",{ascending:false});
+    setLoading(true); setError("");    const { data, error: itemError } = await supabase.from("items").select("*").eq("item_type", activeType).order("created_at",{ascending:false});
     if (itemError) { setError(itemError.message); setItems([]); setLoading(false); return; }
     const rows = data || [];
     const ids = rows.map(x=>x.id);
@@ -676,7 +1197,7 @@ export function RedesignedGlobalStock({ supabase, canEdit }) {
       {error && <div className="error-message">{error}</div>}
       <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>Serial number</th>{columns.map(c=><th key={c}>{FIELD_LABELS[c]}</th>)}<th>Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
         {!loading && filtered.length===0 && <tr><td colSpan={columns.length+4} className="empty-cell">{items.length?"No matching items.":"No items of this type yet."}</td></tr>}
-        {filtered.map(item=><tr key={item.id}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{masters.statuses.find(x=>x.id===item.status_id)?.name||"—"}</td><td>{masters.qualities.find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{masters.locations.find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
+        {filtered.map(item=><tr key={item.id} className="stock-row-clickable" onClick={()=>onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{masters.statuses.find(x=>x.id===item.status_id)?.name||"—"}</td><td>{masters.qualities.find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{masters.locations.find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
       </tbody></table></div>
       {showAdd && <ItemForm supabase={supabase} type={activeType} onClose={()=>setShowAdd(false)} onSaved={async()=>{setShowAdd(false);await loadItems();}} />}
     </section>
