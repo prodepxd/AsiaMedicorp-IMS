@@ -215,7 +215,7 @@ function ItemForm({ supabase, type, onClose, onSaved }) {
       software_version: form.software_version.trim() || null,
       functions: form.functions,
       portable: form.portable === "Yes" ? true : form.portable === "No" ? false : null,
-      number_of_connectors: form.connectors ? Number(form.connectors) : null,
+      connector_count: form.connectors ? Number(form.connectors) : null,
     };
     if (type === "Probe") details = {
       manufacturer_id: form.manufacturer_id,
@@ -224,15 +224,15 @@ function ItemForm({ supabase, type, onClose, onSaved }) {
       year: form.year ? Number(form.year) : null,
     };
     if (type === "Board") details = {
-      machine_model_id: form.machine_model_id,
+      compatible_machine_model_id: form.machine_model_id,
       board_type_id: form.board_type_id,
       part_number: form.part_number.trim() || null,
       version_number: form.version_number.trim() || null,
       repaired: form.repaired === "Yes" ? true : form.repaired === "No" ? false : null,
     };
-    if (type === "PSU") details = { machine_model_id: form.machine_model_id };
+    if (type === "PSU") details = { compatible_machine_model_id: form.machine_model_id };
     if (type === "Monitor") details = {
-      machine_model_id: form.machine_model_id,
+      compatible_machine_model_id: form.machine_model_id,
       size: form.monitor_size ? Number(form.monitor_size) : null,
       video_input: form.video_input || null,
     };
@@ -242,10 +242,10 @@ function ItemForm({ supabase, type, onClose, onSaved }) {
       capacity_gb: form.capacity_gb ? Number(form.capacity_gb) : null,
       size_inches: form.size_inches ? Number(form.size_inches) : null,
       disk_type: form.hard_disk_type,
-      machine_model_id: form.machine_model_id || null,
+      compatible_compatible_machine_model_id: form.machine_model_id || null,
       software_version: form.software_version.trim() || null,
     };
-    if (type === "Keyboard") details = { machine_model_id: form.machine_model_id };
+    if (type === "Keyboard") details = { compatible_machine_model_id: form.machine_model_id };
 
     if (!details) {
       setError("Unable to prepare item details.");
@@ -438,7 +438,7 @@ export function RedesignedGlobalStock({ supabase, canEdit }) {
     if (key==="board_type") return d.board_type_id || "—";
     if (key==="functions") return Array.isArray(d.functions)?d.functions.join(", "):"—";
     if (key==="portable") return d.portable == null ? "—" : d.portable ? "Yes":"No";
-    if (key==="connectors") return d.number_of_connectors ?? "—";
+    if (key==="connectors") return d.connector_count ?? "—";
     if (key==="manufacturer_year") return d.manufacturer_year ?? "—";
     if (key==="year") return d.year ?? "—";
     if (key==="monitor_size") return d.monitor_size ?? d.size ?? "—";
