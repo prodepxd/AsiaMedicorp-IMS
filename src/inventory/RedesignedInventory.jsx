@@ -697,6 +697,8 @@ export function RedesignedMasterData({ supabase, canEdit }) {
 
   async function load() {
     setLoading(true); setError("");
+    setReferenceCounts({});
+    setReferenceCheckErrors({});
     const select = active.manufacturer ? "id,name,manufacturer_id,is_active" : "id,name,is_active";
     const result = await supabase.from(active.table).select(select).order("name");
     if (result.error) { setError(result.error.message); setRows([]); setLoading(false); return; }
