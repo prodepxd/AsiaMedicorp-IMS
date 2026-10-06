@@ -174,89 +174,89 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
 
   const stepsForType = {
     Machine: [
-      {key:"serial_number",label:"Serial number",type:"text",optional:true},
-      {key:"current_location_id",label:"Location",type:"location",optional:true},
-      {key:"status_id",label:"Status",type:"status",required:true},
-      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
-      {key:"quality_note",label:"Quality note",type:"text",optional:true},
       {key:"manufacturer_id",label:"Manufacturer",type:"manufacturer",required:true},
       {key:"model_id",label:"Model",type:"machine_model",required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"manufacturer_year",label:"Manufacturer year",type:"number",required:true,min:1900,max:2100},
+      {key:"functions",label:"Functions",type:"functions",optional:true},
+      {key:"connectors",label:"Number of connectors",type:"select",options:SELECT_OPTIONS.connectors,required:true},
       {key:"monitor_size",label:"Monitor size",type:"select",options:SELECT_OPTIONS.monitor_size,required:true},
       {key:"software_version",label:"Software version",type:"text",required:true},
-      {key:"functions",label:"Functions",type:"functions",optional:true},
       {key:"portable",label:"Portable",type:"select",options:SELECT_OPTIONS.portable,required:true},
-      {key:"connectors",label:"Number of connectors",type:"select",options:SELECT_OPTIONS.connectors,required:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     Probe: [
+      {key:"manufacturer_id",label:"Manufacturer",type:"manufacturer",required:true},
+      {key:"probe_type_id",label:"Probe type",type:"probe_type",required:true},
+      {key:"model_id",label:"Model",type:"probe_model",required:true},
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"year",label:"Year",type:"number",optional:true,min:1900,max:2100},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"status_id",label:"Status",type:"status",required:true},
       {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
-      {key:"manufacturer_id",label:"Manufacturer",type:"manufacturer",required:true},
-      {key:"model_id",label:"Model",type:"probe_model",required:true},
-      {key:"probe_type_id",label:"Probe type",type:"probe_type",required:true},
-      {key:"year",label:"Year",type:"number",optional:true,min:1900,max:2100},
     ],
     Board: [
-      {key:"serial_number",label:"Serial number",type:"text",optional:true},
-      {key:"current_location_id",label:"Location",type:"location",optional:true},
-      {key:"status_id",label:"Status",type:"status",required:true},
-      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
-      {key:"quality_note",label:"Quality note",type:"text",optional:true},
       {key:"machine_model_id",label:"Works with which machine",type:"machine_model",required:true},
       {key:"board_type_id",label:"Board type",type:"board_type",required:true},
       {key:"part_number",label:"Part number",type:"text",required:true},
       {key:"version_number",label:"Version number",type:"text",required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"repaired",label:"Repaired",type:"select",options:SELECT_OPTIONS.repaired,required:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     PSU: [
+      {key:"machine_model_id",label:"Works with which machine",type:"machine_model",required:true},
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"status_id",label:"Status",type:"status",required:true},
       {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
-      {key:"machine_model_id",label:"Works with which machine",type:"machine_model",required:true},
     ],
     Monitor: [
-      {key:"serial_number",label:"Serial number",type:"text",optional:true},
-      {key:"current_location_id",label:"Location",type:"location",optional:true},
-      {key:"status_id",label:"Status",type:"status",required:true},
-      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
-      {key:"quality_note",label:"Quality note",type:"text",optional:true},
       {key:"machine_model_id",label:"Works with which machine",type:"machine_model",required:true},
       {key:"monitor_size",label:"Size",type:"select",options:SELECT_OPTIONS.monitor_size,required:true},
       {key:"video_input",label:"Video input",type:"select",options:SELECT_OPTIONS.video_input,required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     "EMI Filter": [
+      {key:"emi_type",label:"Type",type:"select",options:SELECT_OPTIONS.emi_type,required:true},
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"status_id",label:"Status",type:"status",required:true},
       {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
-      {key:"emi_type",label:"Type",type:"select",options:SELECT_OPTIONS.emi_type,required:true},
     ],
     "Hard Disk": [
-      {key:"serial_number",label:"Serial number",type:"text",optional:true},
-      {key:"current_location_id",label:"Location",type:"location",optional:true},
-      {key:"status_id",label:"Status",type:"status",required:true},
-      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
-      {key:"quality_note",label:"Quality note",type:"text",optional:true},
       {key:"manufacturer_id",label:"Manufacturer",type:"hard_disk_manufacturer",required:true},
+      {key:"hard_disk_type",label:"Type",type:"select",options:SELECT_OPTIONS.hard_disk_type,required:true},
       {key:"capacity_gb",label:"Capacity (GB)",type:"number",required:true,min:0,step:1},
       {key:"size_inches",label:"Size (inches)",type:"number",required:true,min:0,step:0.1},
-      {key:"hard_disk_type",label:"Type",type:"select",options:SELECT_OPTIONS.hard_disk_type,required:true},
       {key:"machine_model_id",label:"Works with which machine",type:"machine_model",optional:true},
       {key:"software_version",label:"Software version",type:"text",optional:true},
-    ],
-    Keyboard: [
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"status_id",label:"Status",type:"status",required:true},
       {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
+    ],
+    Keyboard: [
       {key:"machine_model_id",label:"Works with which machine",type:"machine_model",required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"status_id",label:"Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
   };
 
@@ -415,11 +415,15 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
   const isLastStep = type && step === steps.length;
 
   return <div className="modal-backdrop"><div className="modal-card redesign-modal">
-    <div className="modal-header"><div>
+    <div className="modal-header redesign-modal-header"><div>
       <p className="section-kicker">ADD INVENTORY</p>
       <h2>{isTypeStep ? "Select item type" : "Add " + type}</h2>
-      <p>{isTypeStep ? "Choose the item type first. Only its relevant characteristics will be shown." : "Step " + step + " of " + steps.length + ". Enter one characteristic at a time."}</p>
+      <p>{isTypeStep ? "Choose the item type first. Only its relevant characteristics will be shown." : "Enter the item details one characteristic at a time."}</p>
     </div><button className="modal-close" onClick={onClose}>×</button></div>
+    {!isTypeStep && <div className="redesign-progress">
+      <div className="redesign-progress-meta"><span>Step {step} of {steps.length}</span><strong>{currentField.label}</strong></div>
+      <div className="redesign-progress-track"><span style={{width: ((step / steps.length) * 100) + "%"}} /></div>
+    </div>}
 
     {isTypeStep ? <div className="redesign-form"><div className="redesign-form-section">
       <h3>Step 1 · Item type</h3>
@@ -439,7 +443,12 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
         </div>
       </div>
     </div> : <div className="redesign-form">
-      <div className="redesign-form-section"><h3>{currentField.label}{currentField.required ? " *" : ""}</h3>
+      <div className="redesign-form-section">
+        <div className="redesign-field-intro">
+          <span className="redesign-field-step">CURRENT CHARACTERISTIC</span>
+          <h3>{currentField.label}{currentField.required ? <span className="required-mark"> *</span> : <span className="optional-mark"> · Optional</span>}</h3>
+          <p>{currentField.required ? "This information is required to add the item." : "You can leave this blank if the information is not currently available."}</p>
+        </div>
         <div className="redesign-grid"><Field label={currentField.label} required={currentField.required}>{fieldControl(currentField)}</Field></div>
       </div>
       {error && <div className="error-message">{error}</div>}
