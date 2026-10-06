@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
-import { RedesignedGlobalStock, RedesignedMasterData } from "./inventory/RedesignedInventory";
+import { RedesignedGlobalStock, RedesignedMasterData, RedesignedItemView } from "./inventory/RedesignedInventory";
 
 const navItems = [
   { label: "Global Stock", icon: "▦" },
@@ -44,6 +44,7 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("Global Stock");
+  const [selectedItemId, setSelectedItemId] = useState(null);
   const [error, setError] = useState("");
 
   const loadProfile = useCallback(async (userId) => {
@@ -78,7 +79,7 @@ export default function App() {
 
   async function signOut() {
     await supabase.auth.signOut();
-    setSession(null); setProfile(null); setActive("Global Stock");
+    setSession(null); setProfile(null); setActive("Global Stock"); setSelectedItemId(null);
   }
 
   if (!supabaseConfigured) return <main className="login-shell"><section className="login-card">
@@ -99,7 +100,7 @@ export default function App() {
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark">AM</div><div><strong>ASIA MEDICORP</strong><span>Inventory Management</span></div></div>
       <nav className="nav"><p className="nav-title">WORKSPACE</p>
-        {visibleNav.map(item=><button key={item.label} className={active===item.label?"nav-item active":"nav-item"} onClick={()=>setActive(item.label)}><span>{item.icon}</span>{item.label}</button>)}
+        {visibleNav.map(item=><button key={item.label} className={active===item.label?"nav-item active":"nav-item"} onClick={()=>{setActive(item.label);setSelectedItemId(null);}}><span>{item.icon}</span>{item.label}</button>)}
       </nav>
       <div className="sidebar-footer"><div className="secure-badge">● Secure workspace</div><span>{profile.role.toUpperCase()} access</span></div>
     </aside>
@@ -108,7 +109,8 @@ export default function App() {
         <div className="user-area"><div><strong>{profile.full_name || session.user.email}</strong><span>{profile.role}</span></div><button className="signout-button" onClick={signOut}>Sign out</button></div>
       </header>
       {error && <div className="error-message">{error}</div>}
-      {active==="Global Stock" && <RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} />}
+      {active==="Global Stock" && !selectedItemId && <RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} onItemClick={setSelectedItemId} />}
+      {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} onBack={()=>setSelectedItemId(null)} onDeleted={()=>setSelectedItemId(null)} />}
       {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} />}
       {active!=="Global Stock" && active!=="Admin / Master Data" && <section className="content-card"><div className="section-heading">
         <div><p className="section-kicker">{active.toUpperCase()}</p><h2>Module ready</h2><p>Authentication and role access are connected. This module will be built on the live IMS database next.</p></div>
