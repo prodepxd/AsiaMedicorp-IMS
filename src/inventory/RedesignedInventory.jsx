@@ -364,7 +364,7 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
           options={masters.equipmentManufacturers.map((x) => ({value:x.id,label:x.name}))}
           placeholder={field.optional ? "Optional / unassigned" : "Select manufacturer"}
           required={field.required} />
-        <Select value={form.machine_model_id} onChange={onChange}
+        <Select value={form.machine_model_id} onChange={(event) => set("machine_model_id", event.target.value)}
           options={compatibleMachineModels.map((x) => ({value:x.id,label:x.name}))}
           placeholder={form.compatible_machine_manufacturer_id ? "Select machine model" : (field.optional ? "Optional / unassigned" : "Select manufacturer first")}
           disabled={!form.compatible_machine_manufacturer_id}
@@ -552,9 +552,10 @@ function ItemForm({ supabase, type: initialType, onClose, onSaved }) {
       </div>
       {error && <div className="error-message">{error}</div>}
       <div className="modal-actions"><div>
-        <button type="button" className="secondary-button" onClick={() => setStep(0)}>Back to item type</button>
+        <button type="button" className="cancel-button" onClick={onClose}>Cancel</button>
       </div><div className="modal-actions-right">
-        <button type="button" className="secondary-button" onClick={step === 1 ? onClose : previousStep}>{step === 1 ? "Cancel" : "Back"}</button>
+        <button type="button" className="secondary-button" onClick={() => setStep(0)}>Back to item type</button>
+        {step > 1 && <button type="button" className="secondary-button" onClick={previousStep}>Back</button>}
         {!isLastStep
           ? <button type="button" className="primary-button" onClick={nextStep}>Next</button>
           : <button type="button" className="primary-button" onClick={async () => {
@@ -646,7 +647,7 @@ export function RedesignedGlobalStock({ supabase, canEdit }) {
     if (key==="compatible_machine") {
       const model = masters.machineModels.find(x=>x.id===d.compatible_machine_model_id);
       const manufacturer = masters.equipmentManufacturers.find(x=>x.id===model?.manufacturer_id)?.name;
-      return manufacturer && model?.name ? manufacturer + " — " + model.name : model?.name || manufacturer || "—";
+      return manufacturer && model?.name ? manufacturer + " " + model.name : model?.name || manufacturer || "—";
     }
     if (key==="probe_type") return masters.probeTypes.find(x=>x.id===d.probe_type_id)?.name || "—";
     if (key==="board_type") return masters.boardTypes.find(x=>x.id===d.board_type_id)?.name || "—";
