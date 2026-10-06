@@ -433,7 +433,7 @@ export function RedesignedGlobalStock({ supabase, canEdit }) {
       const list = activeType==="Machine" ? [] : [];
       return d.model_id || "—";
     }
-    if (key==="machine_model") return d.machine_model_id || "—";
+    if (key==="machine_model") return d.compatible_machine_model_id || "—";
     if (key==="probe_type") return d.probe_type_id || "—";
     if (key==="board_type") return d.board_type_id || "—";
     if (key==="functions") return Array.isArray(d.functions)?d.functions.join(", "):"—";
