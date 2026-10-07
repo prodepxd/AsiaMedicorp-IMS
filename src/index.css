@@ -761,3 +761,95 @@ button { cursor: pointer; }
 .machine-component-open strong { color: #e5edf7; font-size: .78rem; }
 .machine-component-open span { color: #71859d; font-size: .68rem; }
 .machine-component-open:hover strong { color: #60a5fa; }
+
+
+/* Inline Item View characteristic editing */
+.item-detail-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.item-inline-edit-button, .inline-edit-button {
+  flex: 0 0 auto;
+  border: 1px solid #29405b;
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #8fb9e8;
+  background: #102238;
+  font-size: .62rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.inline-edit-button:hover:not(:disabled) {
+  color: #fff;
+  border-color: #3b82f6;
+  background: #173b70;
+}
+.inline-edit-button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.item-inline-editor {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+.item-inline-editor input,
+.item-inline-editor select,
+.item-inline-editor textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 10px;
+  border: 1px solid #2a3d54;
+  border-radius: 8px;
+  outline: none;
+  color: #dbe7f5;
+  background: #081522;
+  font: inherit;
+  font-size: .75rem;
+  box-sizing: border-box;
+}
+.item-inline-editor textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+.item-inline-editor input:focus,
+.item-inline-editor select:focus,
+.item-inline-editor textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+}
+.item-inline-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+.item-inline-compatible {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.item-inline-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.item-inline-checks label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border: 1px solid #26384e;
+  border-radius: 8px;
+  color: #b8c8da;
+  background: #081522;
+  font-size: .68rem;
+}
+.item-inline-checks input {
+  width: 15px;
+  min-height: 15px;
+}
+@media (max-width: 600px) {
+  .item-inline-compatible { grid-template-columns: 1fr; }
+}
