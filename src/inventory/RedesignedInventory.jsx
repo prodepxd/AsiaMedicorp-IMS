@@ -639,7 +639,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
   </div></div>;
 }
 
-export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDeleted, onItemClick }) {
+export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBack, onDeleted, onItemClick }) {
   const [item, setItem] = useState(null);
   const [masters, setMasters] = useState({
     statuses: [], qualities: [], locations: [], equipmentManufacturers: [],
@@ -1193,7 +1193,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
   }
 
   async function remove() {
-    if (!canEdit || deleting) return;
+    if (!canDelete || deleting) return;
     if (!window.confirm("Delete this item? This cannot be undone.")) return;
     setDeleting(true);
     setError("");
@@ -1236,7 +1236,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
           </div>
           <div className="item-detail-actions">
             <button className="secondary-button" onClick={onBack}>Back to Global Stock</button>
-            {canEdit && <button className="cancel-button" onClick={remove} disabled={deleting}>{deleting ? "Deleting..." : "Delete"}</button>}
+            {canDelete && <button className="cancel-button" onClick={remove} disabled={deleting}>{deleting ? "Deleting..." : "Delete"}</button>}
           </div>
         </div>
         <div className="item-detail-body">
