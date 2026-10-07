@@ -1465,6 +1465,8 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
   const [rows, setRows] = useState([]);
   const [refs, setRefs] = useState([]);
   const [form, setForm] = useState({name:"",manufacturer_id:"",probe_type_id:"",compatible_machine_model_ids:[]});
+  const [compatibilityManufacturerId, setCompatibilityManufacturerId] = useState("");
+  const [compatibilitySearch, setCompatibilitySearch] = useState("");
   const [editing, setEditing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1556,6 +1558,12 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
         ? (refs.compatibilities || []).filter((x) => x.probe_model_id === row.id).map((x) => x.machine_model_id)
         : [],
     });
+    const assignedMachineModelIds = row
+      ? (refs.compatibilities || []).filter((x) => x.probe_model_id === row.id).map((x) => x.machine_model_id)
+      : [];
+    const firstAssignedModel = (refs.machineModels || []).find((x) => assignedMachineModelIds.includes(x.id));
+    setCompatibilityManufacturerId(firstAssignedModel?.manufacturer_id || "");
+    setCompatibilitySearch("");
     setError("");
   }
 
@@ -1651,6 +1659,8 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
     setSaving(false);
     setEditing(null);
     setForm({name:"",manufacturer_id:"",probe_type_id:"",compatible_machine_model_ids:[]});
+    setCompatibilityManufacturerId("");
+    setCompatibilitySearch("");
     await load();
   }
 
@@ -1696,30 +1706,99 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
           <div className="master-form-field"><label>Name</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} autoFocus /></div>
           {active.manufacturer && <div className="master-form-field"><label>Manufacturer</label><Select value={form.manufacturer_id} onChange={e=>setForm({...form,manufacturer_id:e.target.value})} options={activeOrCurrent(active.probeType ? refs.manufacturers : refs, form.manufacturer_id).map(x=>({value:x.id,label:x.name}))} required /></div>}
           {active.probeType && <div className="master-form-field"><label>Probe Type</label><Select value={form.probe_type_id} onChange={e=>setForm({...form,probe_type_id:e.target.value})} options={activeOrCurrent(active.manufacturer ? refs.probeTypes : refs, form.probe_type_id).map(x=>({value:x.id,label:x.name}))} placeholder="Select probe type" required /></div>}
-          {active.key === "probe_models" && <div className="master-form-field">
-            <label>Compatible Machine Models {editing === "new" || (form.compatible_machine_model_ids || []).length > 0 ? "*" : "(existing records may be assigned later)"}</label>
-            <div className="master-compatibility-picker">
-              {activeOrCurrent(refs.machineModels || [], form.compatible_machine_model_ids || []).map((machineModel) => {
-                const selected = (form.compatible_machine_model_ids || []).includes(machineModel.id);
-                const manufacturer = (refs.manufacturers || []).find((x) => x.id === machineModel.manufacturer_id);
-                return <label key={machineModel.id} className={selected ? "master-compatibility-option selected" : "master-compatibility-option"}>
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    disabled={!selected && (form.compatible_machine_model_ids || []).length >= 8}
-                    onChange={(e) => setForm((current) => ({
-                      ...current,
-                      compatible_machine_model_ids: e.target.checked
-                        ? [...(current.compatible_machine_model_ids || []), machineModel.id]
-                        : (current.compatible_machine_model_ids || []).filter((id) => id !== machineModel.id),
-                    }))}
-                  />
-                  <span>{manufacturer ? manufacturer.name + " " : ""}{machineModel.name}{machineModel.is_active === false ? " (Inactive)" : ""}</span>
-                </label>;
-              })}
+          {active.key === "probe_models" && <div className="master-form-field master-compatibility-field">
+            <div className="master-compatibility-heading">
+              <div>
+                <label>Compatible Machine Models {editing === "new" ? "*" : "(existing records may be assigned later)"}</label>
+                <small className="master-form-hint">Choose a manufacturer first, then select compatible models. Selected models are kept even when you change the filter.</small>
+              </div>
+              <span className="master-compatibility-count">{(form.compatible_machine_model_ids || []).length} / 8 selected</span>
             </div>
-            <small className="master-form-hint">Select 1–8 compatible Machine Models. Only active Machine Models can be newly assigned.</small>
-          </div>}
+
+            <div className="master-compatibility-controls">
+              <div className="master-compatibility-filter">
+                <label>Manufacturer</label>
+                <Select
+                  value={compatibilityManufacturerId}
+                  onChange={(e) => {
+                    setCompatibilityManufacturerId(e.target.value);
+                    setCompatibilitySearch("");
+                  }}
+                  options={activeOrCurrent(refs.manufacturers || [], compatibilityManufacturerId).map((x) => ({value:x.id,label:x.name}))}
+                  placeholder="Select manufacturer first"
+                />
+              </div>
+              <div className="master-compatibility-filter">
+                <label>Search machine models</label>
+                <input
+                  value={compatibilitySearch}
+                  onChange={(e) => setCompatibilitySearch(e.target.value)}
+                  placeholder={compatibilityManufacturerId ? "Search models..." : "Select a manufacturer first"}
+                  disabled={!compatibilityManufacturerId}
+                />
+              </div>
+            </div>
+
+            <div className="master-compatibility-layout">
+              <div className="master-compatibility-available">
+                <div className="master-compatibility-section-title">Available Machine Models</div>
+                <div className="master-compatibility-list">
+                  {!compatibilityManufacturerId && <div className="master-compatibility-empty">Select a manufacturer to view its machine models.</div>}
+                  {compatibilityManufacturerId && (() => {
+                    const search = compatibilitySearch.trim().toLowerCase();
+                    const models = activeOrCurrent(refs.machineModels || [], form.compatible_machine_model_ids || [])
+                      .filter((model) => model.manufacturer_id === compatibilityManufacturerId)
+                      .filter((model) => !search || model.name.toLowerCase().includes(search));
+                    return models.length ? models.map((machineModel) => {
+                      const selected = (form.compatible_machine_model_ids || []).includes(machineModel.id);
+                      return <label key={machineModel.id} className={selected ? "master-compatibility-option selected" : "master-compatibility-option"}>
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          disabled={!selected && (form.compatible_machine_model_ids || []).length >= 8}
+                          onChange={(e) => setForm((current) => ({
+                            ...current,
+                            compatible_machine_model_ids: e.target.checked
+                              ? [...(current.compatible_machine_model_ids || []), machineModel.id]
+                              : (current.compatible_machine_model_ids || []).filter((id) => id !== machineModel.id),
+                          }))}
+                        />
+                        <span className="master-compatibility-model-name">{machineModel.name}</span>
+                        {machineModel.is_active === false && <span className="master-compatibility-inactive">Inactive</span>}
+                      </label>;
+                    }) : <div className="master-compatibility-empty">No machine models match this manufacturer and search.</div>;
+                  })()}
+                </div>
+              </div>
+
+              <div className="master-compatibility-selected">
+                <div className="master-compatibility-section-title">Selected Machine Models</div>
+                <div className="master-selected-model-list">
+                  {(form.compatible_machine_model_ids || []).length === 0 && <div className="master-compatibility-empty">No compatible machine models selected.</div>}
+                  {(form.compatible_machine_model_ids || []).map((modelId) => {
+                    const machineModel = (refs.machineModels || []).find((x) => x.id === modelId);
+                    const manufacturer = machineModel ? (refs.manufacturers || []).find((x) => x.id === machineModel.manufacturer_id) : null;
+                    if (!machineModel) return null;
+                    return <div key={modelId} className="master-selected-model">
+                      <div>
+                        <strong>{machineModel.name}</strong>
+                        <span>{manufacturer?.name || "Manufacturer unavailable"}{machineModel.is_active === false ? " · Inactive" : ""}</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="master-selected-model-remove"
+                        onClick={() => setForm((current) => ({
+                          ...current,
+                          compatible_machine_model_ids: (current.compatible_machine_model_ids || []).filter((id) => id !== modelId),
+                        }))}
+                        aria-label={"Remove " + machineModel.name}
+                      >×</button>
+                    </div>;
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
           <div className="master-form-actions"><button type="button" className="secondary-button" onClick={()=>setEditing(null)}>Cancel</button><button className="primary-button" disabled={saving}>{saving?"Saving...":"Save"}</button></div>
         </form>}
         {error&&<div className="error-message master-error">{error}</div>}
