@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 const ITEM_TYPES = [
   "Machine",
@@ -1700,17 +1700,9 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
     await load();
   }
 
-  return (
-    <section className="master-card redesign-master">
-      <div className="master-header">
-        <div><p className="section-kicker">ADMINISTRATION</p><h2>Master Data</h2><p>Item types are fixed. Manage only the reusable reference data required by the IMS.</p></div>
-      </div>
-      <div className="master-content">
-        <div className="master-content-title">
-          <div><strong>{active.label}</strong><span>{rows.length} record{rows.length===1?"":"s"}</span></div>
-          <button className="primary-button" onClick={()=>begin()} disabled={!canEdit}>+ Add</button>
-        </div>
-        {editing && <form className="master-edit-form" onSubmit={save}>
+  function renderEditorForm() {
+    return (
+      <form className="master-edit-form" onSubmit={save}>
           <div className="master-form-field"><label>Name</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} autoFocus /></div>
           {active.manufacturer && <div className="master-form-field"><label>Manufacturer</label><Select value={form.manufacturer_id} onChange={e=>setForm({...form,manufacturer_id:e.target.value})} options={activeOrCurrent(active.probeType ? refs.manufacturers : refs, form.manufacturer_id).map(x=>({value:x.id,label:x.name}))} required /></div>}
           {active.probeType && <div className="master-form-field"><label>Probe Type</label><Select value={form.probe_type_id} onChange={e=>setForm({...form,probe_type_id:e.target.value})} options={activeOrCurrent(active.manufacturer ? refs.probeTypes : refs, form.probe_type_id).map(x=>({value:x.id,label:x.name}))} placeholder="Select probe type" required /></div>}
@@ -1797,13 +1789,27 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
           </div>}
           <div className="master-form-actions"><button type="button" className="secondary-button" onClick={()=>setEditing(null)}>Cancel</button><button className="primary-button" disabled={saving}>{saving?"Saving...":"Save"}</button></div>
         </form>}
+    );
+  }
+
+  return (
+    <section className="master-card redesign-master">
+      <div className="master-header">
+        <div><p className="section-kicker">ADMINISTRATION</p><h2>Master Data</h2><p>Item types are fixed. Manage only the reusable reference data required by the IMS.</p></div>
+      </div>
+      <div className="master-content">
+        <div className="master-content-title">
+          <div><strong>{active.label}</strong><span>{rows.length} record{rows.length===1?"":"s"}</span></div>
+          <button className="primary-button" onClick={()=>begin()} disabled={!canEdit}>+ Add</button>
+        </div>
+        {editing === "new" && renderEditorForm()}
         {error&&<div className="error-message master-error">{error}</div>}
         <div className="master-table-wrap">
           <table className="master-table">
             <thead><tr><th>Name</th>{active.manufacturer&&<th>Manufacturer</th>}{active.probeType&&<th>Probe Type</th>}{active.key === "probe_models"&&<th>Compatible Machine Models</th>}<th>Active</th><th>Action</th></tr></thead>
             <tbody>
               {!loading&&rows.length===0&&<tr><td colSpan={(active.manufacturer?1:0)+(active.probeType?1:0)+(active.key==="probe_models"?1:0)+3} className="empty-cell">No records found.</td></tr>}
-              {rows.map(row=><tr key={row.id}>
+              {rows.map(row=><Fragment key={row.id}><tr>
                 <td><strong>{row.name}</strong></td>
                 {active.manufacturer&&<td>{(active.probeType ? refs.manufacturers : refs).find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}
                 {active.probeType&&<td>{(active.manufacturer ? refs.probeTypes : refs).find(x=>x.id===row.probe_type_id)?.name||"—"}</td>}
@@ -1814,7 +1820,7 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
                       const model = (refs.machineModels || []).find((x) => x.id === id);
                       const manufacturer = model ? (refs.manufacturers || []).find((x) => x.id === model.manufacturer_id) : null;
                       return model ? (manufacturer ? manufacturer.name + " " : "") + model.name : null;
-                    }).filter(Boolean);
+                    }).filter(Boolean).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
                     return names.length ? names.join(", ") : "Not assigned";
                   })()}
                 </td>}
@@ -1830,7 +1836,9 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
                   </button>
                 </td>
                 <td><div className="row-actions"><button className="table-button" onClick={()=>begin(row)} disabled={!canEdit}>Edit</button><button className="table-button delete-button" onClick={()=>remove(row)} disabled={!canEdit} title={canEdit?"Delete":"Only admins can delete master data"}>Delete</button></div></td>
-              </tr>)}
+               </tr>
+              {editing === row.id && <tr className="master-inline-editor-row"><td colSpan={(active.manufacturer?1:0)+(active.probeType?1:0)+(active.key==="probe_models"?1:0)+3}>{renderEditorForm()}</td></tr>}
+            </React.Fragment>)}
             </tbody>
           </table>
         </div>
