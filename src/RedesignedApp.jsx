@@ -1,6 +1,37 @@
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
 import { RedesignedGlobalStock, RedesignedMasterData, RedesignedItemView, MASTER_GROUPS } from "./inventory/RedesignedInventory";
+
+class WorkspaceErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, message: "" };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, message: error?.message || "An unexpected error occurred." };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("IMS workspace error:", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <section className="content-card">
+        <div className="section-heading">
+          <div>
+            <p className="section-kicker">WORKSPACE ERROR</p>
+            <h2>The workspace hit an unexpected error</h2>
+            <p>{this.state.message}</p>
+            <button className="primary-button" onClick={() => this.setState({ hasError: false, message: "" })}>Try again</button>
+          </div>
+        </div>
+      </section>;
+    }
+    return this.props.children;
+  }
+}
 
 const navItems = [
   { label: "Global Stock", icon: "▦" },
@@ -138,9 +169,11 @@ export default function App() {
         <div className="user-area"><div><strong>{profile.full_name || session.user.email}</strong><span>{profile.role}</span></div><button className="signout-button" onClick={signOut}>Sign out</button></div>
       </header>
       {error && <div className="error-message">{error}</div>}
-      {active==="Global Stock" && !selectedItemId && <RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} onItemClick={setSelectedItemId} />}
-      {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onBack={()=>setSelectedItemId(null)} onDeleted={()=>setSelectedItemId(null)} onItemClick={setSelectedItemId} />}
-      {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} activeKey={masterCategory} onActiveChange={setMasterCategory} />}
+      <WorkspaceErrorBoundary key={active + ":" + (selectedItemId || "")}>
+        {active==="Global Stock" && !selectedItemId && <RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} onItemClick={setSelectedItemId} />}
+        {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onBack={()=>setSelectedItemId(null)} onDeleted={()=>setSelectedItemId(null)} onItemClick={setSelectedItemId} />}
+        {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} activeKey={masterCategory} onActiveChange={setMasterCategory} />}
+      </WorkspaceErrorBoundary>
       {active!=="Global Stock" && active!=="Admin / Master Data" && <section className="content-card"><div className="section-heading">
         <div><p className="section-kicker">{active.toUpperCase()}</p><h2>Module ready</h2><p>Authentication and role access are connected. This module will be built on the live IMS database next.</p></div>
       </div></section>}
