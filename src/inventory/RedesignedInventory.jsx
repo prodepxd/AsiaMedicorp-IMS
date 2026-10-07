@@ -278,7 +278,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       {key:"manufacturer_id",label:"Manufacturer",type:"hard_disk_manufacturer",required:true},
       {key:"hard_disk_type",label:"Type",type:"radio",options:SELECT_OPTIONS.hard_disk_type,required:true},
       {key:"capacity_gb",label:"Capacity (GB)",type:"number",required:true,min:0,step:1},
-      {key:"size_inches",label:"Size (inches)",type:"radio",options:["2.5","3.5"],required:true},
+      {key:"size_inches",label:"Size (inches)",type:"radio",options:['2.5"','3.5"'],required:true},
       {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",optional:true},
       {key:"software_version",label:"Software version",type:"text",optional:true},
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
@@ -1012,7 +1012,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
     if (field === "repaired") return editSelect(SELECT_OPTIONS.repaired, field, "Select");
     if (field === "filter_type") return editSelect(SELECT_OPTIONS.emi_type, field, "Select");
     if (field === "disk_type") return editSelect(SELECT_OPTIONS.hard_disk_type, field, "Select");
-    if (field === "size_inches") return editSelect(["2.5", "3.5"], field, "Select size");
+    if (field === "size_inches") return editSelect(['2.5"', '3.5"'], field, "Select size");
     const numeric = ["manufacturer_year", "year", "capacity_gb"].includes(field);
     return (
       <input
@@ -1083,7 +1083,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
         payload[map[field] || field] = ["portable","repaired"].includes(field)
           ? value === "Yes"
           : ["manufacturer_year","year","connector_count","monitor_size","capacity_gb","size_inches"].includes(field)
-            ? (value === "" ? null : Number(value))
+            ? (value === "" ? null : Number(String(value).replace(/"/g, "")))
             : value;
       }
     }
@@ -1145,7 +1145,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
         {key:"manufacturer_id",label:"Manufacturer",value:name(masters.hardDiskManufacturers,d.manufacturer_id)},
         {key:"disk_type",label:"Type",value:d.disk_type || "—"},
         {key:"capacity_gb",label:"Capacity",value:d.capacity_gb == null ? "—" : d.capacity_gb + " GB"},
-        {key:"size_inches",label:"Size",value:d.size_inches == null ? "—" : d.size_inches + " inches"},
+        {key:"size_inches",label:"Size",value:d.size_inches == null ? "—" : d.size_inches + String.fromCharCode(34)},
         {key:"compatible_machine",label:"Compatible machine",value:d.compatible_machine_model_id ? compatibleName(d.compatible_machine_model_id) : "—"},
         {key:"software_version",label:"Software version",value:d.software_version || "—"},
       ],
@@ -1404,7 +1404,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
     if (key==="repaired") return d.repaired == null ? "—" : d.repaired ? "Yes":"No";
     if (key==="emi_type") return d.filter_type || "—";
     if (key==="capacity_gb") return d.capacity_gb == null ? "—" : d.capacity_gb + " GB";
-    if (key==="size_inches") return d.size_inches ?? "—";
+    if (key==="size_inches") return d.size_inches == null ? "—" : d.size_inches + String.fromCharCode(34);
     if (key==="hard_disk_type") return d.disk_type || "—";
     if (key==="part_number") return d.part_number || "—";
     if (key==="version_number") return d.version_number || "—";
