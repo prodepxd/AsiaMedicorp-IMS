@@ -1041,3 +1041,73 @@ button { cursor: pointer; }
 
 /* Installed components cannot be deleted from Global Stock. */
 .item-delete-button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+
+/* Transit module */
+.transit-page { overflow: hidden; }
+.transit-header { align-items: flex-start; }
+.transit-header-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.transit-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 24px 18px;
+}
+.transit-summary > div {
+  display: grid;
+  gap: 5px;
+  padding: 14px 16px;
+  border: 1px solid #1b2a3d;
+  border-radius: 11px;
+  background: #0a1726;
+}
+.transit-summary span { color: #61758c; font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; }
+.transit-summary strong { color: #dbe7f5; font-size: 1.05rem; }
+.transit-filters { grid-template-columns: minmax(220px, 1.6fr) minmax(170px, 1fr) minmax(170px, 1fr); }
+.transit-table-wrap { border-top: 1px solid #172638; }
+.transit-table th, .transit-table td { vertical-align: middle; }
+.transit-table td:last-child { white-space: nowrap; }
+.transit-modal { width: min(720px, 100%); }
+.transit-form { display: grid; gap: 18px; padding: 24px 28px 28px; }
+.transit-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.transit-wide { grid-column: 1 / -1; }
+.transit-form textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 11px 13px;
+  border: 1px solid #2a3d54;
+  border-radius: 10px;
+  outline: none;
+  resize: vertical;
+  color: #dbe7f5;
+  background: #081522;
+  font: inherit;
+  box-sizing: border-box;
+}
+.transit-form textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+}
+.transit-form em {
+  color: #627a93;
+  font-size: .68rem;
+  font-style: normal;
+  font-weight: 500;
+}
+.transit-form-hint {
+  color: #61758c;
+  font-size: .66rem;
+  line-height: 1.4;
+}
+@media (max-width: 760px) {
+  .transit-summary { grid-template-columns: 1fr; padding-left: 16px; padding-right: 16px; }
+  .transit-header-actions { justify-content: flex-start; }
+  .transit-form-grid { grid-template-columns: 1fr; }
+  .transit-wide { grid-column: auto; }
+  .transit-form { padding: 18px 16px 20px; }
+  .transit-filters { grid-template-columns: 1fr; }
+}
