@@ -396,7 +396,7 @@ button { cursor: pointer; }
   overflow: hidden;
 }
 .item-detail-field { padding: 16px; background: #0a1726; }
-.item-detail-field span, .item-detail-notes span {
+.item-detail-field-head > span, .item-detail-notes .item-detail-field-head > span {
   display: block;
   color: #61758c;
   font-size: .66rem;
