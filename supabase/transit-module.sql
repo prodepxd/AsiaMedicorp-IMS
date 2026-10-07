@@ -31,6 +31,7 @@ create table if not exists public.transit_items (
   id uuid primary key default gen_random_uuid(),
   transit_id uuid not null references public.transits(id) on delete cascade,
   item_id uuid not null references public.items(id) on delete restrict,
+  transit_status_id uuid references public.transit_statuses(id) on delete restrict,
   created_at timestamptz not null default now(),
   unique (transit_id, item_id)
 );
@@ -39,73 +40,15 @@ create index if not exists transits_created_at_idx on public.transits(created_at
 create index if not exists transits_progress_idx on public.transits(progress);
 create index if not exists transit_items_transit_idx on public.transit_items(transit_id);
 create index if not exists transit_items_item_idx on public.transit_items(item_id);
+create index if not exists transit_items_status_idx on public.transit_items(transit_status_id);
 
 drop trigger if exists transits_updated_at on public.transits;
 create trigger transits_updated_at
 before update on public.transits
 for each row execute function public.set_updated_at();
 
--- Keep the existing installed-component protection compatible with Transit.
--- A component remains In Machine for normal machine/component operations, but
--- Transit may move it to In Transit / At Location when it belongs to a
--- Transit containing its parent machine.
-create or replace function public.prevent_invalid_installed_component_status()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  old_status text;
-  new_status text;
-  attached boolean;
-  allowed_transit_move boolean := false;
-begin
-  if old.item_type not in ('Probe','Board','PSU','Monitor','Hard Disk','Keyboard') then
-    return new;
-  end if;
-
-  select s.name into old_status
-  from public.inventory_statuses s
-  where s.id = old.inventory_status_id;
-
-  select s.name into new_status
-  from public.inventory_statuses s
-  where s.id = new.inventory_status_id;
-
-  select exists (
-    select 1 from public.machine_components mc where mc.component_item_id = old.id
-  ) into attached;
-
-  if attached and old_status = 'In Machine' and new_status is distinct from 'In Machine' then
-    select exists (
-      select 1
-      from public.transit_items child_ti
-      join public.machine_components mc
-        on mc.component_item_id = child_ti.item_id
-      join public.transit_items machine_ti
-        on machine_ti.transit_id = child_ti.transit_id
-       and machine_ti.item_id = mc.machine_item_id
-      join public.transits t
-        on t.id = child_ti.transit_id
-      where child_ti.item_id = old.id
-        and t.progress in ('Moving','Completed')
-        and new_status in ('In Transit','At Location')
-    ) into allowed_transit_move;
-
-    if not allowed_transit_move then
-      raise exception 'Remove the component from its machine before changing its status';
-    end if;
-  end if;
-
-  return new;
-end;
-$$;
-
-revoke all on function public.prevent_invalid_installed_component_status() from public;
-grant execute on function public.prevent_invalid_installed_component_status() to authenticated;
-
--- New Transit records always begin in Stand-By, regardless of a client payload.
+-- New Transit records always begin in Stand-By. Stand-By intentionally has
+-- no item Transit Status; the item status changes when the Transit moves.
 create or replace function public.force_transit_standby()
 returns trigger
 language plpgsql
@@ -116,7 +59,6 @@ begin
   if tg_op = 'INSERT' then
     new.progress := 'Stand-By';
   end if;
-
   return new;
 end;
 $$;
@@ -126,8 +68,8 @@ create trigger transits_force_standby
 before insert on public.transits
 for each row execute function public.force_transit_standby();
 
--- Validate Transit item membership and automatically add installed machine
--- components whenever a Machine is added.
+-- Validate Transit item membership and permit an installed component only when
+-- its parent Machine is already part of the same Transit.
 create or replace function public.validate_transit_item()
 returns trigger
 language plpgsql
@@ -136,7 +78,6 @@ set search_path = public
 as $$
 declare
   transit_progress text;
-  item_type text;
   inventory_status text;
   parent_machine_id uuid;
   parent_in_same_transit boolean := false;
@@ -153,14 +94,14 @@ begin
     raise exception 'Completed transits cannot have items added';
   end if;
 
-  select i.item_type, s.name
-    into item_type, inventory_status
+  select s.name
+    into inventory_status
   from public.items i
   left join public.inventory_statuses s on s.id = i.inventory_status_id
   where i.id = new.item_id;
 
-  if item_type is null then
-    raise exception 'Inventory item does not exist';
+  if inventory_status is null then
+    raise exception 'Inventory item does not exist or has no Inventory Status';
   end if;
 
   if inventory_status in ('Idle','In Repair','SOLD') then
@@ -194,6 +135,7 @@ create trigger transit_items_validate
 before insert on public.transit_items
 for each row execute function public.validate_transit_item();
 
+-- Selecting a Machine automatically adds every currently installed component.
 create or replace function public.add_machine_components_to_transit()
 returns trigger
 language plpgsql
@@ -208,7 +150,6 @@ begin
     where mc.machine_item_id = new.item_id
     on conflict (transit_id, item_id) do nothing;
   end if;
-
   return new;
 end;
 $$;
@@ -218,9 +159,8 @@ create trigger transit_items_add_machine_components
 after insert on public.transit_items
 for each row execute function public.add_machine_components_to_transit();
 
--- A component auto-added with its Machine may not be removed independently.
--- Removing the Machine cascades its transit-added children in the application;
--- this trigger blocks direct child deletion while the parent remains included.
+-- An installed component auto-added by a Machine can only be removed after
+-- its parent Machine has been removed from the same Transit.
 create or replace function public.prevent_transit_child_removal()
 returns trigger
 language plpgsql
@@ -258,7 +198,9 @@ create trigger transit_items_prevent_child_removal
 before delete on public.transit_items
 for each row execute function public.prevent_transit_child_removal();
 
--- Apply movement statuses and destination location to every item in a Transit.
+-- Moving changes every included item to Transit Status "In Transit".
+-- Completing changes every included item to "At Location" and updates the
+-- current inventory location to the Transit destination.
 create or replace function public.apply_transit_progress()
 returns trigger
 language plpgsql
@@ -266,53 +208,58 @@ security definer
 set search_path = public
 as $$
 declare
-  in_transit_id uuid;
-  at_location_id uuid;
+  transit_status_id uuid;
 begin
   if new.progress = old.progress then
     return new;
   end if;
 
   if new.progress = 'Moving' then
-    select id into in_transit_id
-    from public.inventory_statuses
+    select id into transit_status_id
+    from public.transit_statuses
     where name = 'In Transit' and is_active = true
     order by id
     limit 1;
 
-    if in_transit_id is null then
-      raise exception 'Inventory Status "In Transit" was not found';
+    if transit_status_id is null then
+      raise exception 'Transit Status "In Transit" was not found';
     end if;
 
-    update public.items i
-    set inventory_status_id = in_transit_id,
-        updated_at = now()
-    where i.id in (
-      select ti.item_id from public.transit_items ti where ti.transit_id = new.id
-    );
+    update public.transit_items
+    set transit_status_id = apply_transit_progress.transit_status_id
+    where transit_id = new.id;
 
   elsif new.progress = 'Completed' then
-    select id into at_location_id
-    from public.inventory_statuses
+    select id into transit_status_id
+    from public.transit_statuses
     where name = 'At Location' and is_active = true
     order by id
     limit 1;
 
-    if at_location_id is null then
-      raise exception 'Inventory Status "At Location" was not found';
+    if transit_status_id is null then
+      raise exception 'Transit Status "At Location" was not found';
     end if;
 
     if new.receiver is null or btrim(new.receiver) = '' or new.receive_at is null then
       raise exception 'Receiver and receive date/time are required before completing a Transit';
     end if;
 
+    update public.transit_items
+    set transit_status_id = apply_transit_progress.transit_status_id
+    where transit_id = new.id;
+
     update public.items i
-    set inventory_status_id = at_location_id,
-        current_location_id = new.to_location_id,
+    set current_location_id = new.to_location_id,
         updated_at = now()
     where i.id in (
-      select ti.item_id from public.transit_items ti where ti.transit_id = new.id
+      select ti.item_id
+      from public.transit_items ti
+      where ti.transit_id = new.id
     );
+  elsif new.progress = 'Stand-By' then
+    update public.transit_items
+    set transit_status_id = null
+    where transit_id = new.id;
   end if;
 
   return new;
