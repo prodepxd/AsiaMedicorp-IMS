@@ -337,6 +337,38 @@ button { cursor: pointer; }
   padding: 10px 11px; color: #dbe7f5; background: #081522;
 }
 .master-form-field input:focus, .master-form-field select:focus { border-color: #3b82f6; }
+.master-compatibility-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid #26384e;
+  border-radius: 8px;
+  background: #081522;
+}
+.master-compatibility-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #8fa3b8;
+  background: #0b1928;
+  font-size: .7rem;
+  cursor: pointer;
+}
+.master-compatibility-option.selected {
+  color: #dbe7f5;
+  border-color: #31577f;
+  background: #10243a;
+}
+.master-compatibility-option input { width: auto; flex: 0 0 auto; }
+.master-compatibility-option span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.master-form-hint { color: #61758c; font-size: .66rem; line-height: 1.4; }
 .master-form-actions { display: flex; gap: 8px; }
 .master-error { margin: 16px 24px 0; }
 .master-table-wrap { overflow-x: auto; }
