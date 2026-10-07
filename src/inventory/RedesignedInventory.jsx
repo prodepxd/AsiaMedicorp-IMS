@@ -72,7 +72,7 @@ function emptyForm() {
   return {
     serial_number: "",
     inventory_status_id: "",
-    quality_inventory_status_id: "",
+    quality_status_id: "",
     current_location_id: "",
     quality_note: "",
     manufacturer_id: "",
@@ -168,7 +168,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
         boardTypes: editItem ? activeOrCurrent(values[5], d.board_type_id) : activeOrCurrent(values[5]),
         locations: editItem ? activeOrCurrent(values[6], editItem.current_location_id) : activeOrCurrent(values[6]),
         statuses: editItem ? activeOrCurrent(values[7], editItem.inventory_status_id) : activeOrCurrent(values[7]),
-        qualities: editItem ? activeOrCurrent(values[8], editItem.quality_inventory_status_id) : activeOrCurrent(values[8]),
+        qualities: editItem ? activeOrCurrent(values[8], editItem.quality_status_id) : activeOrCurrent(values[8]),
       });
       const stock = values[7].find((x) => x.name === "In Stock" && x.is_active !== false);
       const good = values[8].find((x) => x.name === "Good" && x.is_active !== false);
@@ -179,7 +179,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
           ...emptyForm(),
           serial_number: editItem.serial_number || "",
           inventory_status_id: editItem.inventory_status_id || "",
-          quality_inventory_status_id: editItem.quality_inventory_status_id || "",
+          quality_status_id: editItem.quality_status_id || "",
           current_location_id: editItem.current_location_id || "",
           quality_note: editItem.quality_note || "",
           manufacturer_id: d.manufacturer_id || "",
@@ -205,7 +205,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
           hard_disk_type: d.disk_type || "",
         });
       } else {
-        setForm((current) => ({ ...current, inventory_status_id: stock?.id || "", quality_inventory_status_id: good?.id || "" }));
+        setForm((current) => ({ ...current, inventory_status_id: stock?.id || "", quality_status_id: good?.id || "" }));
       }
       setLoading(false);
     }
@@ -232,7 +232,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       {key:"portable",label:"Portable",type:"radio",options:SELECT_OPTIONS.portable,required:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
-      {key:"quality_inventory_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     Probe: [
@@ -243,7 +243,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       {key:"year",label:"Year",type:"number",optional:true,min:1900,max:2100},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
-      {key:"quality_inventory_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     Board: [
@@ -255,7 +255,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       {key:"repaired",label:"Repaired",type:"select",options:SELECT_OPTIONS.repaired,required:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
-      {key:"quality_inventory_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     PSU: [
@@ -263,7 +263,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
-      {key:"quality_inventory_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     Monitor: [
@@ -273,7 +273,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
-      {key:"quality_inventory_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     "EMI Filter": [
@@ -281,7 +281,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
-      {key:"quality_inventory_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     "Hard Disk": [
@@ -294,7 +294,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
-      {key:"quality_inventory_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
     Keyboard: [
@@ -302,7 +302,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",optional:true},
       {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
-      {key:"quality_inventory_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
   };
@@ -497,7 +497,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       serial_number: form.serial_number.trim() || null,
       item_type: type,
       inventory_status_id: form.inventory_status_id,
-      quality_inventory_status_id: form.quality_inventory_status_id,
+      quality_status_id: form.quality_status_id,
       quality_note: form.quality_note.trim() || null,
       current_location_id: form.current_location_id || null,
     };
@@ -872,7 +872,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
     const current = {
       serial_number: item.serial_number || "",
       inventory_status_id: item.inventory_status_id || "",
-      quality_inventory_status_id: item.quality_inventory_status_id || "",
+      quality_status_id: item.quality_status_id || "",
       current_location_id: item.current_location_id || "",
       quality_note: item.quality_note || "",
       manufacturer_id: d.manufacturer_id || "",
@@ -1025,7 +1025,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       field,
       "Select inventory status"
     );
-    if (field === "quality_inventory_status_id") return editSelect(
+    if (field === "quality_status_id") return editSelect(
       activeOrCurrent(masters.qualities, value).map((x) => ({ value: x.id, label: x.name })),
       field,
       "Select quality"
@@ -1060,7 +1060,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
     setError("");
     const field = editingField;
     const value = editValue(field);
-    const requiredFields = ["manufacturer_id", "model_id", "manufacturer_year", "connector_count", "monitor_size", "software_version", "portable", "inventory_status_id", "quality_inventory_status_id", "probe_type_id", "board_type_id", "part_number", "version_number", "repaired", "video_input", "filter_type", "disk_type", "capacity_gb", "size_inches"];
+    const requiredFields = ["manufacturer_id", "model_id", "manufacturer_year", "connector_count", "monitor_size", "software_version", "portable", "inventory_status_id", "quality_status_id", "probe_type_id", "board_type_id", "part_number", "version_number", "repaired", "video_input", "filter_type", "disk_type", "capacity_gb", "size_inches"];
     if (requiredFields.includes(field) && (Array.isArray(value) ? value.length === 0 : String(value ?? "").trim() === "")) {
       setError("This characteristic is required.");
       setSavingField(false);
@@ -1083,7 +1083,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
 
     let table = "items";
     let payload = {};
-    if (["serial_number","inventory_status_id","quality_inventory_status_id","current_location_id","quality_note"].includes(field)) {
+    if (["serial_number","inventory_status_id","quality_status_id","current_location_id","quality_note"].includes(field)) {
       payload[field] = field === "serial_number" ? (String(value).trim() || null) : (value || null);
     } else {
       table = detailTable(item.item_type);
@@ -1138,7 +1138,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       { key:"serial_number", label:"Serial number", value:item.serial_number || "—" },
       { key:"inventory_status_id", label:"Inventory Status", value:statusValue, readOnly:Boolean(parentMachine) },
       ...(parentMachine ? [{ key:"parent_machine", label:"Parent machine", value:<button type="button" className="inline-machine-link" onClick={() => onItemClick?.(parentMachine.id)}>{parentMachine.serial_number || "Machine"}</button>, readOnly:true }] : []),
-      { key:"quality_inventory_status_id", label:"Quality", value:name(masters.qualities, item.quality_inventory_status_id) },
+      { key:"quality_status_id", label:"Quality", value:name(masters.qualities, item.quality_status_id) },
       { key:"current_location_id", label:"Location", value:name(masters.locations, item.current_location_id) },
     ];
     const specific = {
@@ -1449,9 +1449,9 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
       <div className="redesign-tabs">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{setActiveType(type);setSearch("");}}>{type}</button>)}</div>
       <div className="redesign-toolbar"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={"Search "+activeType+"..."} /><button className="secondary-button" onClick={loadItems}>Refresh</button></div>
       {error && <div className="error-message">{error}</div>}
-      <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>Serial number</th>{columns.map(c=><th key={c}>{FIELD_LABELS[c]}</th>)}<th>Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
+      <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>Serial number</th>{columns.map(c=><th key={c}>{FIELD_LABELS[c]}</th>)}<th>Inventory Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
         {!loading && filtered.length===0 && <tr><td colSpan={columns.length+4} className="empty-cell">{items.length?"No matching items.":"No items of this type yet."}</td></tr>}
-        {filtered.map(item=><tr key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{masters.inventoryStatuses.find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{masters.qualities.find(x=>x.id===item.quality_inventory_status_id)?.name||"—"}</td><td>{masters.locations.find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
+        {filtered.map(item=><tr key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{masters.inventoryStatuses.find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{masters.qualities.find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{masters.locations.find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
       </tbody></table></div>
       {showAdd && <ItemForm supabase={supabase} type={activeType} onClose={()=>setShowAdd(false)} onSaved={async()=>{setShowAdd(false);await loadItems();}} />}
     </section>
