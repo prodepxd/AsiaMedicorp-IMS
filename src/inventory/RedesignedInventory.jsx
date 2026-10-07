@@ -1464,7 +1464,7 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
   const [active, setActive] = useState(() => MASTER_GROUPS.find((group) => group.key === activeKey) || MASTER_GROUPS[0]);
   const [rows, setRows] = useState([]);
   const [refs, setRefs] = useState([]);
-  const [form, setForm] = useState({name:"",manufacturer_id:"",probe_type_id:""});
+  const [form, setForm] = useState({name:"",manufacturer_id:"",probe_type_id:"",compatible_machine_model_ids:[]});
   const [editing, setEditing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1489,7 +1489,22 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
     }
     setRows(result.data || []);
 
-    if (active.manufacturer && active.probeType) {
+    if (active.key === "probe_models") {
+      const [manufacturerResult, probeTypeResult, machineModelResult, compatibilityResult] = await Promise.all([
+        supabase.from("equipment_manufacturers").select("id,name,is_active").order("name"),
+        supabase.from("probe_types").select("id,name,is_active").order("name"),
+        supabase.from("machine_models").select("id,name,manufacturer_id,is_active").order("name"),
+        supabase.from("probe_model_machine_models").select("probe_model_id,machine_model_id"),
+      ]);
+      const failedRef = [manufacturerResult, probeTypeResult, machineModelResult, compatibilityResult].find((r) => r.error);
+      if (failedRef) setError(failedRef.error.message);
+      else setRefs({
+        manufacturers: manufacturerResult.data || [],
+        probeTypes: probeTypeResult.data || [],
+        machineModels: machineModelResult.data || [],
+        compatibilities: compatibilityResult.data || [],
+      });
+    } else if (active.manufacturer && active.probeType) {
       const [manufacturerResult, probeTypeResult] = await Promise.all([
         supabase.from("equipment_manufacturers").select("id,name,is_active").order("name"),
         supabase.from("probe_types").select("id,name,is_active").order("name"),
@@ -1537,6 +1552,9 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
       name: row?.name || "",
       manufacturer_id: row?.manufacturer_id || "",
       probe_type_id: row?.probe_type_id || "",
+      compatible_machine_model_ids: row
+        ? (refs.compatibilities || []).filter((x) => x.probe_model_id === row.id).map((x) => x.machine_model_id)
+        : [],
     });
     setError("");
   }
@@ -1560,14 +1578,31 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
       setSaving(false);
       return;
     }
+    if (active.key === "probe_models") {
+      const selectedCompatibility = form.compatible_machine_model_ids || [];
+      const existingCompatibilityCount = editing === "new"
+        ? 0
+        : (refs.compatibilities || []).filter((x) => x.probe_model_id === editing).length;
+      if (selectedCompatibility.length > 8) {
+        setError("A Probe Model can support a maximum of 8 Machine Models.");
+        setSaving(false);
+        return;
+      }
+      if (selectedCompatibility.length === 0 && (editing === "new" || existingCompatibilityCount > 0)) {
+        setError("At least 1 compatible Machine Model is required.");
+        setSaving(false);
+        return;
+      }
+    }
 
     const payload = {
       name: form.name.trim(),
       ...(active.manufacturer ? {manufacturer_id: form.manufacturer_id} : {}),
       ...(active.probeType ? {probe_type_id: form.probe_type_id} : {}),
     };
+    let savedId = editing;
     const result = editing === "new"
-      ? await supabase.from(active.table).insert(payload)
+      ? await supabase.from(active.table).insert(payload).select("id").single()
       : await supabase.from(active.table).update(payload).eq("id", editing);
 
     if (result.error) {
@@ -1575,9 +1610,47 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
       setSaving(false);
       return;
     }
+
+    if (active.key === "probe_models") {
+      savedId = editing === "new" ? result.data?.id : editing;
+      const selectedCompatibility = form.compatible_machine_model_ids || [];
+      const existingCompatibility = (refs.compatibilities || [])
+        .filter((x) => x.probe_model_id === savedId)
+        .map((x) => x.machine_model_id);
+      const additions = selectedCompatibility.filter((id) => !existingCompatibility.includes(id));
+      const removals = existingCompatibility.filter((id) => !selectedCompatibility.includes(id));
+
+      if (additions.length) {
+        const compatibilityInsert = await supabase.from("probe_model_machine_models").insert(
+          additions.map((machineModelId) => ({
+            probe_model_id: savedId,
+            machine_model_id: machineModelId,
+          }))
+        );
+        if (compatibilityInsert.error) {
+          if (editing === "new") await supabase.from("probe_models").delete().eq("id", savedId);
+          setError(compatibilityInsert.error.message);
+          setSaving(false);
+          return;
+        }
+      }
+
+      if (removals.length) {
+        const compatibilityDelete = await supabase.from("probe_model_machine_models")
+          .delete()
+          .eq("probe_model_id", savedId)
+          .in("machine_model_id", removals);
+        if (compatibilityDelete.error) {
+          setError(compatibilityDelete.error.message);
+          setSaving(false);
+          return;
+        }
+      }
+    }
+
     setSaving(false);
     setEditing(null);
-    setForm({name:"",manufacturer_id:"",probe_type_id:""});
+    setForm({name:"",manufacturer_id:"",probe_type_id:"",compatible_machine_model_ids:[]});
     await load();
   }
 
@@ -1623,18 +1696,53 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
           <div className="master-form-field"><label>Name</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} autoFocus /></div>
           {active.manufacturer && <div className="master-form-field"><label>Manufacturer</label><Select value={form.manufacturer_id} onChange={e=>setForm({...form,manufacturer_id:e.target.value})} options={activeOrCurrent(active.probeType ? refs.manufacturers : refs, form.manufacturer_id).map(x=>({value:x.id,label:x.name}))} required /></div>}
           {active.probeType && <div className="master-form-field"><label>Probe Type</label><Select value={form.probe_type_id} onChange={e=>setForm({...form,probe_type_id:e.target.value})} options={activeOrCurrent(active.manufacturer ? refs.probeTypes : refs, form.probe_type_id).map(x=>({value:x.id,label:x.name}))} placeholder="Select probe type" required /></div>}
+          {active.key === "probe_models" && <div className="master-form-field">
+            <label>Compatible Machine Models {editing === "new" || (form.compatible_machine_model_ids || []).length > 0 ? "*" : "(existing records may be assigned later)"}</label>
+            <div className="master-compatibility-picker">
+              {activeOrCurrent(refs.machineModels || [], form.compatible_machine_model_ids || []).map((machineModel) => {
+                const selected = (form.compatible_machine_model_ids || []).includes(machineModel.id);
+                const manufacturer = (refs.manufacturers || []).find((x) => x.id === machineModel.manufacturer_id);
+                return <label key={machineModel.id} className={selected ? "master-compatibility-option selected" : "master-compatibility-option"}>
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    disabled={!selected && (form.compatible_machine_model_ids || []).length >= 8}
+                    onChange={(e) => setForm((current) => ({
+                      ...current,
+                      compatible_machine_model_ids: e.target.checked
+                        ? [...(current.compatible_machine_model_ids || []), machineModel.id]
+                        : (current.compatible_machine_model_ids || []).filter((id) => id !== machineModel.id),
+                    }))}
+                  />
+                  <span>{manufacturer ? manufacturer.name + " " : ""}{machineModel.name}{machineModel.is_active === false ? " (Inactive)" : ""}</span>
+                </label>;
+              })}
+            </div>
+            <small className="master-form-hint">Select 1–8 compatible Machine Models. Only active Machine Models can be newly assigned.</small>
+          </div>}
           <div className="master-form-actions"><button type="button" className="secondary-button" onClick={()=>setEditing(null)}>Cancel</button><button className="primary-button" disabled={saving}>{saving?"Saving...":"Save"}</button></div>
         </form>}
         {error&&<div className="error-message master-error">{error}</div>}
         <div className="master-table-wrap">
           <table className="master-table">
-            <thead><tr><th>Name</th>{active.manufacturer&&<th>Manufacturer</th>}{active.probeType&&<th>Probe Type</th>}<th>Active</th><th>Action</th></tr></thead>
+            <thead><tr><th>Name</th>{active.manufacturer&&<th>Manufacturer</th>}{active.probeType&&<th>Probe Type</th>}{active.key === "probe_models"&&<th>Compatible Machine Models</th>}<th>Active</th><th>Action</th></tr></thead>
             <tbody>
               {!loading&&rows.length===0&&<tr><td colSpan={active.manufacturer||active.probeType?4:3} className="empty-cell">No records found.</td></tr>}
               {rows.map(row=><tr key={row.id}>
                 <td><strong>{row.name}</strong></td>
                 {active.manufacturer&&<td>{(active.probeType ? refs.manufacturers : refs).find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}
                 {active.probeType&&<td>{(active.manufacturer ? refs.probeTypes : refs).find(x=>x.id===row.probe_type_id)?.name||"—"}</td>}
+                {active.key === "probe_models" && <td>
+                  {(() => {
+                    const compatibleIds = (refs.compatibilities || []).filter((x) => x.probe_model_id === row.id).map((x) => x.machine_model_id);
+                    const names = compatibleIds.map((id) => {
+                      const model = (refs.machineModels || []).find((x) => x.id === id);
+                      const manufacturer = model ? (refs.manufacturers || []).find((x) => x.id === model.manufacturer_id) : null;
+                      return model ? (manufacturer ? manufacturer.name + " " : "") + model.name : null;
+                    }).filter(Boolean);
+                    return names.length ? names.join(", ") : "Not assigned";
+                  })()}
+                </td>}
                 <td>
                   <button
                     type="button"
