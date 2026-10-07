@@ -371,7 +371,7 @@ export function ItemTransitHistory({ supabase, itemId }) {
 
       const itemsResult = await supabase
         .from("transit_items")
-        .select("transit_id,transit_status_id")
+        .select("transit_id,transit_status_id,transit_statuses(name)")
         .eq("item_id", itemId);
 
       if (!alive) return;
@@ -381,7 +381,7 @@ export function ItemTransitHistory({ supabase, itemId }) {
         return;
       }
 
-      const statusByTransit = Object.fromEntries((itemsResult.data || []).map((row) => [row.transit_id, row.transit_status_id]));
+      const statusByTransit = Object.fromEntries((itemsResult.data || []).map((row) => [row.transit_id, row.transit_statuses?.name || "—"]));
       const transitIds = (itemsResult.data || []).map((row) => row.transit_id);
       if (transitIds.length === 0) {
         setTransits([]);
