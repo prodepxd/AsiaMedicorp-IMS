@@ -49,7 +49,7 @@ const MASTER_GROUPS = [
   { key: "equipment_manufacturers", label: "Equipment Manufacturers", table: "equipment_manufacturers" },
   { key: "machine_models", label: "Machine Models", table: "machine_models", manufacturer: true },
   { key: "probe_types", label: "Probe Types", table: "probe_types" },
-  { key: "probe_models", label: "Probe Models", table: "probe_models", probeType: true },
+  { key: "probe_models", label: "Probe Models", table: "probe_models", manufacturer: true, probeType: true },
   { key: "hard_disk_manufacturers", label: "Hard Disk Manufacturers", table: "hard_disk_manufacturers" },
   { key: "board_types", label: "Board Types", table: "board_types" },
   { key: "locations", label: "Locations", table: "locations" },
@@ -143,7 +143,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
         supabase.from("equipment_manufacturers").select("id,name").order("name"),
         supabase.from("hard_disk_manufacturers").select("id,name").order("name"),
         supabase.from("machine_models").select("id,name,manufacturer_id").order("name"),
-        supabase.from("probe_models").select("id,name,probe_type_id").order("name"),
+        supabase.from("probe_models").select("id,name,manufacturer_id,probe_type_id").order("name"),
         supabase.from("probe_types").select("id,name").order("name"),
         supabase.from("board_types").select("id,name").order("name"),
         supabase.from("locations").select("id,name").eq("is_active", true).order("name"),
@@ -407,11 +407,14 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     );
 
     if (field.type === "probe_model") {
-      const probeModels = masters.probeModels.filter((x) => !form.probe_type_id || x.probe_type_id === form.probe_type_id);
+      const probeModels = masters.probeModels.filter((x) =>
+        (!form.probe_type_id || x.probe_type_id === form.probe_type_id) &&
+        (!form.manufacturer_id || x.manufacturer_id === form.manufacturer_id)
+      );
       return <Select value={value} onChange={onChange}
         options={probeModels.map((x) => ({value:x.id,label:x.name}))}
-        placeholder={form.probe_type_id ? "Select model" : "Select probe type first"}
-        disabled={!form.probe_type_id}
+        placeholder={!form.manufacturer_id ? "Select manufacturer first" : !form.probe_type_id ? "Select probe type first" : "Select model"}
+        disabled={!form.manufacturer_id || !form.probe_type_id}
         required />;
     }
 
@@ -1440,11 +1443,13 @@ export function RedesignedMasterData({ supabase, canEdit }) {
   async function load() {
     setLoading(true);
     setError("");
-    const select = active.manufacturer
-      ? "id,name,manufacturer_id,is_active"
-      : active.probeType
-        ? "id,name,probe_type_id,is_active"
-        : "id,name,is_active";
+    const select = active.manufacturer && active.probeType
+      ? "id,name,manufacturer_id,probe_type_id,is_active"
+      : active.manufacturer
+        ? "id,name,manufacturer_id,is_active"
+        : active.probeType
+          ? "id,name,probe_type_id,is_active"
+          : "id,name,is_active";
     const result = await supabase.from(active.table).select(select).order("name");
     if (result.error) {
       setError(result.error.message);
@@ -1454,7 +1459,15 @@ export function RedesignedMasterData({ supabase, canEdit }) {
     }
     setRows(result.data || []);
 
-    if (active.manufacturer) {
+    if (active.manufacturer && active.probeType) {
+      const [manufacturerResult, probeTypeResult] = await Promise.all([
+        supabase.from("equipment_manufacturers").select("id,name").order("name"),
+        supabase.from("probe_types").select("id,name").order("name"),
+      ]);
+      if (manufacturerResult.error) setError(manufacturerResult.error.message);
+      else if (probeTypeResult.error) setError(probeTypeResult.error.message);
+      else setRefs({ manufacturers: manufacturerResult.data || [], probeTypes: probeTypeResult.data || [] });
+    } else if (active.manufacturer) {
       const r = await supabase.from("equipment_manufacturers").select("id,name").order("name");
       if (r.error) setError(r.error.message);
       else setRefs(r.data || []);
@@ -1550,8 +1563,8 @@ export function RedesignedMasterData({ supabase, canEdit }) {
         </div>
         {editing && <form className="master-edit-form" onSubmit={save}>
           <div className="master-form-field"><label>Name</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} autoFocus /></div>
-          {active.manufacturer && <div className="master-form-field"><label>Manufacturer</label><Select value={form.manufacturer_id} onChange={e=>setForm({...form,manufacturer_id:e.target.value})} options={refs.map(x=>({value:x.id,label:x.name}))} required /></div>}
-          {active.probeType && <div className="master-form-field"><label>Probe Type</label><Select value={form.probe_type_id} onChange={e=>setForm({...form,probe_type_id:e.target.value})} options={refs.map(x=>({value:x.id,label:x.name}))} placeholder="Select probe type" required /></div>}
+          {active.manufacturer && <div className="master-form-field"><label>Manufacturer</label><Select value={form.manufacturer_id} onChange={e=>setForm({...form,manufacturer_id:e.target.value})} options={(active.probeType ? refs.manufacturers : refs).map(x=>({value:x.id,label:x.name}))} required /></div>}
+          {active.probeType && <div className="master-form-field"><label>Probe Type</label><Select value={form.probe_type_id} onChange={e=>setForm({...form,probe_type_id:e.target.value})} options={(active.manufacturer ? refs.probeTypes : refs).map(x=>({value:x.id,label:x.name}))} placeholder="Select probe type" required /></div>}
           <div className="master-form-actions"><button type="button" className="secondary-button" onClick={()=>setEditing(null)}>Cancel</button><button className="primary-button" disabled={saving}>{saving?"Saving...":"Save"}</button></div>
         </form>}
         {error&&<div className="error-message master-error">{error}</div>}
@@ -1562,8 +1575,8 @@ export function RedesignedMasterData({ supabase, canEdit }) {
               {!loading&&rows.length===0&&<tr><td colSpan={active.manufacturer||active.probeType?4:3} className="empty-cell">No records found.</td></tr>}
               {rows.map(row=><tr key={row.id}>
                 <td><strong>{row.name}</strong></td>
-                {active.manufacturer&&<td>{refs.find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}
-                {active.probeType&&<td>{refs.find(x=>x.id===row.probe_type_id)?.name||"—"}</td>}
+                {active.manufacturer&&<td>{(active.probeType ? refs.manufacturers : refs).find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}
+                {active.probeType&&<td>{(active.manufacturer ? refs.probeTypes : refs).find(x=>x.id===row.probe_type_id)?.name||"—"}</td>}
                 <td>{row.is_active===false?"Inactive":"Active"}</td>
                 <td><div className="row-actions"><button className="table-button" onClick={()=>begin(row)} disabled={!canEdit}>Edit</button><button className="table-button delete-button" onClick={()=>remove(row)} disabled={!canEdit} title={canEdit?"Delete":"Only admins can delete master data"}>Delete</button></div></td>
               </tr>)}
