@@ -104,11 +104,11 @@ declare
 begin
   for fk in
     select
-      parent.relname as parent_table,
+      parent_table.relname as parent_table,
       child_col.attname as child_column
     from pg_constraint c
-    join pg_class child on child.oid = c.conrelid
-    join pg_class parent on parent.oid = c.confrelid
+    join pg_class child_table on child_table.oid = c.conrelid
+    join pg_class parent_table on parent_table.oid = c.confrelid
     join pg_attribute child_col
       on child_col.attrelid = c.conrelid
      and child_col.attnum = c.conkey[1]
@@ -195,18 +195,18 @@ begin
   for child_row in
     select distinct
       child_ns.nspname as child_schema,
-      child.relname as child_table
+      child_table.relname as child_table
     from pg_constraint c
-    join pg_class child on child.oid = c.conrelid
-    join pg_class parent on parent.oid = c.confrelid
-    join pg_namespace child_ns on child_ns.oid = child.relnamespace
-    join pg_namespace parent_ns on parent_ns.oid = parent.relnamespace
+    join pg_class child_table on child_table.oid = c.conrelid
+    join pg_class parent_table on parent_table.oid = c.confrelid
+    join pg_namespace child_ns on child_ns.oid = child_table.relnamespace
+    join pg_namespace parent_ns on parent_ns.oid = parent_table.relnamespace
     where c.contype = 'f'
       and array_length(c.conkey, 1) = 1
       and array_length(c.confkey, 1) = 1
       and child_ns.nspname = 'public'
       and parent_ns.nspname = 'public'
-      and parent.relname in (
+      and parent_table.relname in (
         'equipment_manufacturers',
         'machine_models',
         'probe_types',
