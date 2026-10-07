@@ -1269,7 +1269,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
               {componentError && <div className="error-message">{componentError}</div>}
               {componentsLoading ? <div className="machine-components-empty">Loading components...</div> : (
                 <div className="machine-components-list">
-                  {componentGroups.map((group) => (
+                  {componentGroups.filter((group) => group.rows.length > 0).map((group) => (
                     <div className="machine-component-group" key={group.type}>
                       <div className="machine-component-group-header"><strong>{group.type}</strong><span>{group.rows.length}</span></div>
                       {group.rows.length ? group.rows.map((link) => (
@@ -1279,7 +1279,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
                           </button>
                           {canEdit && <button className="table-button delete-button" onClick={() => removeComponent(link)} disabled={removingComponentId === link.component_item_id}>{removingComponentId === link.component_item_id ? "Removing..." : "Remove"}</button>}
                         </div>
-                      )) : <div className="machine-component-none">None installed</div>}
+                      ))}
                     </div>
                   ))}
                 </div>
