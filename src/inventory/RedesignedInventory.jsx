@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 const ITEM_TYPES = [
   "Machine",
@@ -167,10 +167,10 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
         probeTypes: editItem ? activeOrCurrent(values[4], d.probe_type_id) : activeOrCurrent(values[4]),
         boardTypes: editItem ? activeOrCurrent(values[5], d.board_type_id) : activeOrCurrent(values[5]),
         locations: editItem ? activeOrCurrent(values[6], editItem.current_location_id) : activeOrCurrent(values[6]),
-        statuses: editItem ? activeOrCurrent(values[7], editItem.inventory_status_id) : activeOrCurrent(values[7]),
+        inventoryStatuses: editItem ? activeOrCurrent(values[7], editItem.inventory_status_id) : activeOrCurrent(values[7]),
         qualities: editItem ? activeOrCurrent(values[8], editItem.quality_status_id) : activeOrCurrent(values[8]),
       });
-      const stock = values[7].find((x) => x.name === "In Stock" && x.is_active !== false);
+      const stock = values[7].find((x) => x.name === "Idle" && x.is_active !== false) || values[7].find((x) => x.is_active !== false);
       const good = values[8].find((x) => x.name === "Good" && x.is_active !== false);
       if (editItem) {
         const d = editItem.detail || {};
@@ -492,6 +492,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
   async function save() {
     setSaving(true);
     setError("");
+    try {
 
     const common = {
       serial_number: form.serial_number.trim() || null,
@@ -591,7 +592,16 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     }
 
     setSaving(false);
-    onSaved();
+    try {
+      await onSaved();
+    } catch (callbackError) {
+      setError(callbackError?.message || "The item was added, but the stock list could not be refreshed. Please refresh the page.");
+    }
+    return;
+    } catch (saveError) {
+      setError(saveError?.message || "We could not save this item. Please try again.");
+      setSaving(false);
+    }
   }
 
   if (loading) return <div className="modal-backdrop"><div className="modal-card redesign-modal"><div className="modal-loading">Loading master data...</div></div></div>;
@@ -1453,7 +1463,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
         {!loading && filtered.length===0 && <tr><td colSpan={columns.length+4} className="empty-cell">{items.length?"No matching items.":"No items of this type yet."}</td></tr>}
         {filtered.map(item=><tr key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{masters.inventoryStatuses.find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{masters.qualities.find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{masters.locations.find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
       </tbody></table></div>
-      {showAdd && <ItemForm supabase={supabase} type={activeType} onClose={()=>setShowAdd(false)} onSaved={async()=>{setShowAdd(false);await loadItems();}} />}
+      {showAdd && <ItemForm supabase={supabase} type={activeType} onClose={()=>setShowAdd(false)} onSaved={async()=>{await loadItems();setShowAdd(false);}} />}
     </section>
   );
 }
