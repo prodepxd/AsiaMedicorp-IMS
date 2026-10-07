@@ -1272,7 +1272,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
                   {componentGroups.filter((group) => group.rows.length > 0).map((group) => (
                     <div className="machine-component-group" key={group.type}>
                       <div className="machine-component-group-header"><strong>{group.type}</strong><span>{group.rows.length}</span></div>
-                      {group.rows.length ? group.rows.map((link) => (
+                      {group.rows.map((link) => (
                         <div className="machine-component-row" key={link.id}>
                           <button type="button" className="machine-component-open" onClick={() => onItemClick?.(link.component_item_id)}>
                             <strong>{link.item?.serial_number || "No serial number"}</strong><span>{componentDisplay(link)}</span>
