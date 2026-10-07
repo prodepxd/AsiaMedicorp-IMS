@@ -156,13 +156,20 @@ function TransitForm({
         const existing = new Set(existingRows.map((row) => row.item_id));
         const removedRows = existingRows.filter((row) => !desired.has(row.item_id));
 
-        // Remove children first when their parent machine is also being removed.
+        // Remove a parent Machine before its auto-added children so the
+        // database guard permits those child rows to disappear with the parent.
+        const removedParentRows = removedRows.filter((row) =>
+          machineComponents.some((mc) => mc.machine_item_id === row.item_id && !desired.has(row.item_id))
+        );
         const removedChildRows = removedRows.filter((row) =>
           machineComponents.some((mc) => mc.component_item_id === row.item_id && !desired.has(mc.machine_item_id))
         );
-        const removedOtherRows = removedRows.filter((row) => !removedChildRows.some((child) => child.id === row.id));
+        const removedOtherRows = removedRows.filter((row) =>
+          !removedParentRows.some((parent) => parent.id === row.id)
+          && !removedChildRows.some((child) => child.id === row.id)
+        );
 
-        for (const row of [...removedChildRows, ...removedOtherRows]) {
+        for (const row of [...removedParentRows, ...removedOtherRows, ...removedChildRows]) {
           const { error: deleteError } = await supabase.from("transit_items").delete().eq("id", row.id);
           if (deleteError) throw deleteError;
         }
@@ -509,10 +516,7 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMo
             </>
           )}
           {transit.progress === PROGRESS.moving && (
-            <>
-              <button className="secondary-button" onClick={() => onEdit?.("complete", transit)}>Complete</button>
-              <button className="primary-button" onClick={() => onEdit?.("complete", transit)}>Receive & Complete</button>
-            </>
+            <button className="primary-button" onClick={() => onEdit?.("complete", transit)}>Receive & Complete</button>
           )}
         </div>
       )}
