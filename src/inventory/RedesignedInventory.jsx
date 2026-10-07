@@ -682,6 +682,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
   const [selectedComponentId, setSelectedComponentId] = useState("");
   const [addingComponent, setAddingComponent] = useState(false);
   const [removingComponentId, setRemovingComponentId] = useState("");
+  const loadRequestRef = useRef(0);
 
   const detailTable = (type) => ({
     Machine:"machine_details",
@@ -697,9 +698,11 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
   const componentTypes = ["Probe", "Board", "PSU", "Monitor", "Hard Disk", "Keyboard"];
 
   async function load() {
+    const requestId = ++loadRequestRef.current;
     setLoading(true);
     setError("");
     const { data: row, error: itemError } = await supabase.from("items").select("*").eq("id", itemId).single();
+    if (requestId !== loadRequestRef.current) return;
     if (itemError) {
       setError(itemError.message);
       setLoading(false);
@@ -712,6 +715,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       return;
     }
     const { data: detail, error: detailError } = await supabase.from(table).select("*").eq("item_id", itemId).single();
+    if (requestId !== loadRequestRef.current) return;
     if (detailError) {
       setError(detailError.message);
       setLoading(false);
@@ -728,12 +732,14 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       supabase.from("probe_types").select("id,name,is_active").order("name"),
       supabase.from("board_types").select("id,name,is_active").order("name"),
     ]);
+    if (requestId !== loadRequestRef.current) return;
     const bad = [s,q,l,em,hm,mm,pm,pt,bt].find((result) => result.error);
     if (bad) {
       setError(bad.error.message);
       setLoading(false);
       return;
     }
+    if (requestId !== loadRequestRef.current) return;
     setMasters({
       inventoryStatuses:s.data||[],
       qualities:q.data||[],
@@ -745,6 +751,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       probeTypes:pt.data||[],
       boardTypes:bt.data||[],
     });
+    if (requestId !== loadRequestRef.current) return;
     setItem({...row, detail:detail||{}});
     if (row.item_type !== "Machine") {
       const { data: relationship } = await supabase
@@ -752,19 +759,23 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
         .select("machine_item_id")
         .eq("component_item_id", row.id)
         .maybeSingle();
+      if (requestId !== loadRequestRef.current) return;
       if (relationship?.machine_item_id) {
         const { data: machine } = await supabase
           .from("items")
           .select("id,serial_number")
           .eq("id", relationship.machine_item_id)
           .maybeSingle();
+        if (requestId !== loadRequestRef.current) return;
         setParentMachine(machine || null);
       } else {
+        if (requestId !== loadRequestRef.current) return;
         setParentMachine(null);
       }
     } else {
       setParentMachine(null);
     }
+    if (requestId !== loadRequestRef.current) return;
     setLoading(false);
   }
 
