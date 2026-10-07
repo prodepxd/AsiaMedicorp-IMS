@@ -45,7 +45,7 @@ const FIELD_LABELS = {
   hard_disk_type: "Hard disk type",
 };
 
-const MASTER_GROUPS = [
+export const MASTER_GROUPS = [
   { key: "equipment_manufacturers", label: "Equipment Manufacturers", table: "equipment_manufacturers" },
   { key: "machine_models", label: "Machine Models", table: "machine_models", manufacturer: true },
   { key: "probe_types", label: "Probe Types", table: "probe_types" },
@@ -1430,8 +1430,8 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   );
 }
 
-export function RedesignedMasterData({ supabase, canEdit }) {
-  const [active, setActive] = useState(MASTER_GROUPS[0]);
+export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveChange }) {
+  const [active, setActive] = useState(() => MASTER_GROUPS.find((group) => group.key === activeKey) || MASTER_GROUPS[0]);
   const [rows, setRows] = useState([]);
   const [refs, setRefs] = useState([]);
   const [form, setForm] = useState({name:"",manufacturer_id:"",probe_type_id:""});
@@ -1481,7 +1481,25 @@ export function RedesignedMasterData({ supabase, canEdit }) {
     setLoading(false);
   }
 
+  useEffect(() => {
+    const next = MASTER_GROUPS.find((group) => group.key === activeKey);
+    if (next && next.key !== active.key) {
+      setActive(next);
+      setRefs(next.manufacturer && next.probeType ? {manufacturers:[],probeTypes:[]} : []);
+      setEditing(null);
+      setError("");
+    }
+  }, [activeKey]);
+
   useEffect(() => { load(); }, [active.table]);
+
+  function chooseCategory(group) {
+    setActive(group);
+    setRefs(group.manufacturer && group.probeType ? {manufacturers:[],probeTypes:[]} : []);
+    setEditing(null);
+    setError("");
+    onActiveChange?.(group.key);
+  }
 
   function begin(row=null) {
     setEditing(row ? row.id : "new");
@@ -1533,6 +1551,19 @@ export function RedesignedMasterData({ supabase, canEdit }) {
     await load();
   }
 
+  async function toggleActive(row) {
+    if (!canEdit) return;
+    setError("");
+    const result = await supabase.from(active.table)
+      .update({ is_active: row.is_active === false })
+      .eq("id", row.id);
+    if (result.error) {
+      setError(result.error.message || "We could not change the active status. Please try again.");
+      return;
+    }
+    await load();
+  }
+
   async function remove(row) {
     if (!canEdit) return;
     if (!window.confirm('Delete "' + row.name + '"? This cannot be undone.')) return;
@@ -1552,9 +1583,6 @@ export function RedesignedMasterData({ supabase, canEdit }) {
     <section className="master-card redesign-master">
       <div className="master-header">
         <div><p className="section-kicker">ADMINISTRATION</p><h2>Master Data</h2><p>Item types are fixed. Manage only the reusable reference data required by the IMS.</p></div>
-      </div>
-      <div className="master-tabs redesign-master-tabs">
-        {MASTER_GROUPS.map(g => <button key={g.key} className={g.key===active.key?"master-tab active":"master-tab"} onClick={()=>{setActive(g);setRefs(g.manufacturer && g.probeType ? {manufacturers:[],probeTypes:[]} : []);setEditing(null);setError("");}}>{g.label}</button>)}
       </div>
       <div className="master-content">
         <div className="master-content-title">
@@ -1577,7 +1605,17 @@ export function RedesignedMasterData({ supabase, canEdit }) {
                 <td><strong>{row.name}</strong></td>
                 {active.manufacturer&&<td>{(active.probeType ? refs.manufacturers : refs).find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}
                 {active.probeType&&<td>{(active.manufacturer ? refs.probeTypes : refs).find(x=>x.id===row.probe_type_id)?.name||"—"}</td>}
-                <td>{row.is_active===false?"Inactive":"Active"}</td>
+                <td>
+                  <button
+                    type="button"
+                    className={row.is_active === false ? "master-status-toggle inactive" : "master-status-toggle active"}
+                    onClick={() => toggleActive(row)}
+                    disabled={!canEdit}
+                    title={canEdit ? "Click to change active status" : "Only admins can change master data status"}
+                  >
+                    {row.is_active === false ? "Inactive" : "Active"}
+                  </button>
+                </td>
                 <td><div className="row-actions"><button className="table-button" onClick={()=>begin(row)} disabled={!canEdit}>Edit</button><button className="table-button delete-button" onClick={()=>remove(row)} disabled={!canEdit} title={canEdit?"Delete":"Only admins can delete master data"}>Delete</button></div></td>
               </tr>)}
             </tbody>
