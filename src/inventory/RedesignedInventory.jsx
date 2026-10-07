@@ -651,6 +651,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
   const [componentsLoading, setComponentsLoading] = useState(false);
   const [error, setError] = useState("");
   const [componentError, setComponentError] = useState("");
+  const [availableComponents, setAvailableComponents] = useState([]);
   const [deleting, setDeleting] = useState(false);
   const [showComponentPicker, setShowComponentPicker] = useState(false);
   const [componentType, setComponentType] = useState("Probe");
@@ -775,7 +776,32 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
   }
 
   useEffect(() => { load(); }, [itemId]);
+  async function loadAvailableComponents() {
+    if (!item || item.item_type !== "Machine" || !showComponentPicker) {
+      setAvailableComponents([]);
+      return;
+    }
+    const idleStatus = masters.statuses.find((x) => x.name === "Idle");
+    if (!idleStatus) {
+      setComponentError('Status "Idle" was not found in the Statuses master data.');
+      return;
+    }
+    const { data, error: availableError } = await supabase
+      .from("items")
+      .select("id,item_type,serial_number")
+      .eq("item_type", componentType)
+      .eq("status_id", idleStatus.id)
+      .order("serial_number");
+    if (availableError) {
+      setComponentError(availableError.message);
+      setAvailableComponents([]);
+      return;
+    }
+    setAvailableComponents(data || []);
+  }
+
   useEffect(() => { loadComponents(); }, [item?.id, item?.item_type]);
+  useEffect(() => { loadAvailableComponents(); }, [item?.id, item?.item_type, componentType, showComponentPicker, masters.statuses.length]);
 
   const name = (list, id) => list.find((x) => x.id === id)?.name || "—";
   const compatibleName = (id) => {
@@ -850,11 +876,6 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
       Keyboard: [["Compatible machine", compatibleName(d.compatible_machine_model_id)]],
     };
     return [...(specific[item.item_type] || []), ...base];
-  }
-
-  const availableComponents = [];
-  if (item?.item_type === "Machine") {
-    availableComponents.push(componentType);
   }
 
   async function addComponent() {
@@ -959,8 +980,8 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
                   </label>
                   <label className="redesign-field"><span>Global stock component</span>
                     <select value={selectedComponentId} onChange={(e) => setSelectedComponentId(e.target.value)} disabled={componentsLoading || singleAlreadyInstalled}>
-                      <option value="">{componentsLoading ? "Loading..." : singleAlreadyInstalled ? "Already installed" : "Select component"}</option>
-                      {availableComponents.length > 0 && null}
+                      <option value="">{componentsLoading ? "Loading..." : singleAlreadyInstalled ? "Already installed" : availableComponents.length ? "Select component" : "No Idle components available"}</option>
+                      {availableComponents.map((component) => <option key={component.id} value={component.id}>{component.serial_number || "No serial number"} · {component.item_type}</option>)}
                     </select>
                   </label>
                 </div>
