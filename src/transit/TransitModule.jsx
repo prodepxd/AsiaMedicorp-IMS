@@ -187,6 +187,92 @@ function TransitForm({ supabase, items, locations, statuses, editRecord, onClose
   );
 }
 
+export function ItemTransitHistory({ supabase, itemId }) {
+  const [records, setRecords] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [statuses, setStatuses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadHistory() {
+      setLoading(true);
+      setError("");
+
+      const [recordsResult, locationsResult, statusesResult] = await Promise.all([
+        supabase.from("transit_records").select("id,from_location_id,to_location_id,transit_status_id,occurred_at,notes").eq("item_id", itemId).order("occurred_at", { ascending: false }),
+        supabase.from("locations").select("id,name").order("name"),
+        supabase.from("transit_statuses").select("id,name").order("name"),
+      ]);
+
+      if (!alive) return;
+
+      const failed = [recordsResult, locationsResult, statusesResult].find((result) => result.error);
+      if (failed) {
+        setError(failed.error.message);
+        setRecords([]);
+        setLoading(false);
+        return;
+      }
+
+      setRecords(recordsResult.data || []);
+      setLocations(locationsResult.data || []);
+      setStatuses(statusesResult.data || []);
+      setLoading(false);
+    }
+
+    loadHistory();
+    return () => { alive = false; };
+  }, [supabase, itemId]);
+
+  const locationMap = useMemo(() => Object.fromEntries(locations.map((row) => [row.id, row.name])), [locations]);
+  const statusMap = useMemo(() => Object.fromEntries(statuses.map((row) => [row.id, row.name])), [statuses]);
+
+  return (
+    <div className="item-transit-history">
+      <div className="item-transit-history-header">
+        <div>
+          <p className="section-kicker">MOVEMENT HISTORY</p>
+          <h3>Transit / Movement History</h3>
+          <p>Recorded movements for this individual inventory item.</p>
+        </div>
+        {records.length > 0 && <span className="history-count">{records.length} event{records.length === 1 ? "" : "s"}</span>}
+      </div>
+
+      {loading ? (
+        <div className="history-empty">Loading movement history...</div>
+      ) : error ? (
+        <div className="error-message history-error">{error}</div>
+      ) : records.length === 0 ? (
+        <div className="history-empty">No transit history recorded for this item.</div>
+      ) : (
+        <div className="transit-history-list">
+          {records.map((record) => (
+            <div className="transit-history-row" key={record.id}>
+              <div className="transit-history-date">
+                <strong>{formatDate(record.occurred_at)}</strong>
+              </div>
+              <div className="transit-history-route">
+                <div className="transit-history-route-line">
+                  <strong>{locationMap[record.from_location_id] || "—"}</strong>
+                  <span>→</span>
+                  <strong>{locationMap[record.to_location_id] || "—"}</strong>
+                </div>
+                <div className="transit-history-meta">
+                  <span className="status-pill">{statusMap[record.transit_status_id] || "—"}</span>
+                </div>
+                {record.notes && <p>{record.notes}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TransitModule({ supabase, canEdit, canDelete, onItemClick }) {
   const [items, setItems] = useState([]);
   const [locations, setLocations] = useState([]);
