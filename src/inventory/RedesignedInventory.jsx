@@ -1838,7 +1838,7 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
                 <td><div className="row-actions"><button className="table-button" onClick={()=>begin(row)} disabled={!canEdit}>Edit</button><button className="table-button delete-button" onClick={()=>remove(row)} disabled={!canEdit} title={canEdit?"Delete":"Only admins can delete master data"}>Delete</button></div></td>
                </tr>
               {editing === row.id && <tr className="master-inline-editor-row"><td colSpan={(active.manufacturer?1:0)+(active.probeType?1:0)+(active.key==="probe_models"?1:0)+3}>{renderEditorForm()}</td></tr>}
-            </React.Fragment>)}
+            </Fragment>)}
             </tbody>
           </table>
         </div>
