@@ -1795,7 +1795,7 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
               </div>}
             </div>
           </div>
-<button type="button" className="secondary-button" onClick={()=>setEditing(null)}>Cancel</button><button className="primary-button" disabled={saving}>{saving?"Saving...":"Save"}</button></div>
+          <div className="master-form-actions"><button type="button" className="secondary-button" onClick={()=>setEditing(null)}>Cancel</button><button className="primary-button" disabled={saving}>{saving?"Saving...":"Save"}</button></div>
         </form>}
         {error&&<div className="error-message master-error">{error}</div>}
         <div className="master-table-wrap">
