@@ -201,7 +201,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
           video_input: d.video_input || "",
           emi_type: d.filter_type || "",
           capacity_gb: d.capacity_gb ?? "",
-          size_inches: d.size_inches ?? "",
+          size_inches: d.size_inches == null ? "" : (String(d.size_inches).endsWith('"') ? String(d.size_inches) : String(d.size_inches) + '"'),
           hard_disk_type: d.disk_type || "",
         });
       } else {
@@ -537,7 +537,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     if (type === "Hard Disk") details = {
       manufacturer_id: form.manufacturer_id,
       capacity_gb: Number(form.capacity_gb),
-      size_inches: Number(form.size_inches),
+      size_inches: parseFloat(form.size_inches),
       disk_type: form.hard_disk_type,
       compatible_machine_model_id: form.machine_model_id || null,
       software_version: form.software_version.trim() || null,
