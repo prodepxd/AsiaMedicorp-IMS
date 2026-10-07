@@ -107,13 +107,17 @@ begin
       parent_table.relname as parent_table,
       child_col.attname as child_column
     from pg_constraint c
-    join pg_class child_table on child_table.oid = c.conrelid
-    join pg_class parent_table on parent_table.oid = c.confrelid
+    join pg_class child_table
+      on child_table.oid = c.conrelid
+    join pg_class parent_table
+      on parent_table.oid = c.confrelid
     join pg_attribute child_col
       on child_col.attrelid = c.conrelid
      and child_col.attnum = c.conkey[1]
-    join pg_namespace child_ns on child_ns.oid = child_table.relnamespace
-    join pg_namespace parent_ns on parent_ns.oid = parent_table.relnamespace
+    join pg_namespace child_ns
+      on child_ns.oid = child_table.relnamespace
+    join pg_namespace parent_ns
+      on parent_ns.oid = parent_table.relnamespace
     where c.contype = 'f'
       and c.conrelid = tg_relid
       and array_length(c.conkey, 1) = 1
@@ -141,7 +145,6 @@ begin
       continue;
     end if;
 
-    -- An unchanged inactive reference is historical data and remains valid.
     if tg_op = 'UPDATE' then
       old_value := to_jsonb(OLD) ->> fk.child_column;
       if old_value is not distinct from new_value then
@@ -149,8 +152,8 @@ begin
       end if;
     end if;
 
-    parent_exists := false;
     active_value := null;
+    parent_exists := false;
 
     execute format(
       'select is_active from public.%I where id = $1::uuid',
@@ -167,7 +170,6 @@ begin
       into parent_exists
       using new_value;
 
-      -- Let the normal FK constraint report a missing parent.
       if not parent_exists then
         continue;
       end if;
@@ -175,7 +177,8 @@ begin
 
     if active_value is false then
       raise exception 'Inactive master data cannot be used for a new reference: %.%',
-        fk.parent_table, fk.child_column
+        fk.parent_table,
+        fk.child_column
         using errcode = '23514';
     end if;
   end loop;
@@ -187,7 +190,7 @@ $fn$;
 revoke all on function public.prevent_inactive_master_reference() from public;
 grant execute on function public.prevent_inactive_master_reference() to authenticated;
 
-do $
+do $$
 declare
   child_row record;
   trigger_name text := 'prevent_inactive_master_reference';
@@ -197,10 +200,14 @@ begin
       child_ns.nspname as child_schema,
       child_table.relname as child_table
     from pg_constraint c
-    join pg_class child_table on child_table.oid = c.conrelid
-    join pg_class parent_table on parent_table.oid = c.confrelid
-    join pg_namespace child_ns on child_ns.oid = child_table.relnamespace
-    join pg_namespace parent_ns on parent_ns.oid = parent_table.relnamespace
+    join pg_class child_table
+      on child_table.oid = c.conrelid
+    join pg_class parent_table
+      on parent_table.oid = c.confrelid
+    join pg_namespace child_ns
+      on child_ns.oid = child_table.relnamespace
+    join pg_namespace parent_ns
+      on parent_ns.oid = parent_table.relnamespace
     where c.contype = 'f'
       and array_length(c.conkey, 1) = 1
       and array_length(c.confkey, 1) = 1
@@ -238,4 +245,4 @@ begin
       child_row.child_table
     );
   end loop;
-end $;
+end $$;
