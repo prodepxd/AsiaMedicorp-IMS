@@ -60,6 +60,28 @@ button { cursor: pointer; }
 .nav-item:hover { background: #102238; color: #dbe7f5; }
 .nav-item.active { background: #17345a; color: #e8f1ff; }
 .nav-item.active span { color: #60a5fa; }
+.nav-group { display: grid; gap: 3px; }
+.nav-submenu {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 5px 20px;
+  padding: 3px 0 3px 10px;
+  border-left: 1px solid #20344b;
+}
+.nav-subitem {
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  padding: 8px 9px;
+  color: #70869f;
+  background: transparent;
+  text-align: left;
+  font-size: .68rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.nav-subitem:hover { color: #dbe7f5; background: #102238; }
+.nav-subitem.active { color: #e8f1ff; background: #17345a; }
 .sidebar-footer { margin-top: auto; padding: 16px 8px 4px; color: #52667e; font-size: .72rem; }
 .secure-badge { margin-bottom: 8px; color: #75a7d9; }
 .main-content { min-width: 0; padding: 34px 38px 48px; }
@@ -82,6 +104,7 @@ button { cursor: pointer; }
   .ims-shell { display: block; }
   .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid #1b2a3d; }
   .nav { grid-template-columns: 1fr 1fr; }
+  .nav-submenu { margin-left: 14px; }
   .main-content { padding: 24px 16px 36px; }
   .topbar { flex-direction: column; }
 }
@@ -324,8 +347,36 @@ button { cursor: pointer; }
 }
 .master-table td { padding: 13px 24px; border-top: 1px solid #172638; color: #aebed0; font-size: .76rem; }
 .master-table td strong { color: #dbe7f5; }
-.active-pill, .inactive-pill {
-  display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: .65rem;
+.master-status-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  padding: 5px 10px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: .65rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.master-status-toggle.active {
+  color: #9bc7a9;
+  border-color: #315440;
+  background: #102319;
+}
+.master-status-toggle.inactive {
+  color: #a8b2bf;
+  border-color: #394553;
+  background: #161e27;
+}
+.master-status-toggle:hover:not(:disabled) {
+  color: #fff;
+  border-color: #3b82f6;
+  background: #173b70;
+}
+.master-status-toggle:disabled {
+  opacity: .55;
+  cursor: not-allowed;
 }
 .active-pill { color: #9bc7a9; border: 1px solid #315440; background: #102319; }
 .inactive-pill { color: #a8b2bf; border: 1px solid #394553; background: #161e27; }
