@@ -47,13 +47,13 @@ begin
       child_col.attname as child_column
     from pg_constraint c
     join pg_class child_table on child_table.oid = c.conrelid
-    join pg_namespace n on n.oid = child.relnamespace
+    join pg_namespace n on n.oid = child_table.relnamespace
     join pg_class parent_table on parent_table.oid = c.confrelid
     join pg_attribute child_col
       on child_col.attrelid = c.conrelid
      and child_col.attnum = c.conkey[1]
     where c.contype = 'f'
-      and parent.relname = p_table_name
+      and parent_table.relname = p_table_name
       and array_length(c.conkey, 1) = 1
       and array_length(c.confkey, 1) = 1
       and n.nspname = 'public'
