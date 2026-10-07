@@ -887,8 +887,19 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
       capacity_gb: d.capacity_gb ?? "",
       size_inches: d.size_inches ?? "",
     };
+    const draft = { [field]: current[field] };
+    if (field === "compatible_machine") {
+      draft.compatible_machine_manufacturer_id = current.compatible_machine_manufacturer_id;
+      draft.compatible_machine_model_id = current.compatible_machine_model_id;
+    }
+    if (field === "model_id" && item.item_type === "Machine") {
+      draft.manufacturer_id = current.manufacturer_id;
+    }
+    if (field === "model_id" && item.item_type === "Probe") {
+      draft.probe_type_id = current.probe_type_id;
+    }
     setEditingField(field);
-    setEditDraft({ [field]: current[field] });
+    setEditDraft(draft);
     setError("");
   }
 
