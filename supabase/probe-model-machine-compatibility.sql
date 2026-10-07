@@ -8,7 +8,7 @@ begin;
 
 create table if not exists public.probe_model_machine_models (
   id uuid primary key default gen_random_uuid(),
-  probe_model_id uuid not null references public.probe_models(id) on delete cascade,
+  probe_model_id uuid not null references public.probe_models(id) on delete restrict,
   machine_model_id uuid not null references public.machine_models(id) on delete restrict,
   created_at timestamptz not null default now(),
   constraint probe_model_machine_models_unique unique (probe_model_id, machine_model_id)
