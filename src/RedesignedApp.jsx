@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
 import { RedesignedGlobalStock, RedesignedMasterData, RedesignedItemView, MASTER_GROUPS } from "./inventory/RedesignedInventory";
+import TransitModule from "./transit/TransitModule";
 
 class WorkspaceErrorBoundary extends React.Component {
   constructor(props) {
@@ -36,7 +37,7 @@ class WorkspaceErrorBoundary extends React.Component {
 const navItems = [
   { label: "Global Stock", icon: "▦" },
   { label: "Purchases", icon: "↘" },
-  { label: "Shipments", icon: "⇄" },
+  { label: "Transit", icon: "⇄" },
   { label: "Sales", icon: "↗" },
   { label: "Admin / Master Data", icon: "⚙", adminOnly: true },
 ];
@@ -173,8 +174,9 @@ export default function App() {
         {active==="Global Stock" && !selectedItemId && <RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} onItemClick={setSelectedItemId} />}
         {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onBack={()=>setSelectedItemId(null)} onDeleted={()=>setSelectedItemId(null)} onItemClick={setSelectedItemId} />}
         {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} activeKey={masterCategory} onActiveChange={setMasterCategory} />}
+        {active==="Transit" && <TransitModule supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onItemClick={(id) => { setActive("Global Stock"); setSelectedItemId(id); }} />}
       </WorkspaceErrorBoundary>
-      {active!=="Global Stock" && active!=="Admin / Master Data" && <section className="content-card"><div className="section-heading">
+      {active!=="Global Stock" && active!=="Admin / Master Data" && active!=="Transit" && <section className="content-card"><div className="section-heading">
         <div><p className="section-kicker">{active.toUpperCase()}</p><h2>Module ready</h2><p>Authentication and role access are connected. This module will be built on the live IMS database next.</p></div>
       </div></section>}
     </main>
