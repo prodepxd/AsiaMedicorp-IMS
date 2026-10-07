@@ -208,20 +208,20 @@ security definer
 set search_path = public
 as $$
 declare
-  transit_status_id uuid;
+  v_transit_status_id uuid;
 begin
   if new.progress = old.progress then
     return new;
   end if;
 
   if new.progress = 'Moving' then
-    select id into transit_status_id
+    select id into v_transit_status_id
     from public.transit_statuses
     where name = 'In Transit' and is_active = true
     order by id
     limit 1;
 
-    if transit_status_id is null then
+    if v_transit_status_id is null then
       raise exception 'Transit Status "In Transit" was not found';
     end if;
 
@@ -230,13 +230,13 @@ begin
     where transit_id = new.id;
 
   elsif new.progress = 'Completed' then
-    select id into transit_status_id
+    select id into v_transit_status_id
     from public.transit_statuses
     where name = 'At Location' and is_active = true
     order by id
     limit 1;
 
-    if transit_status_id is null then
+    if v_transit_status_id is null then
       raise exception 'Transit Status "At Location" was not found';
     end if;
 
