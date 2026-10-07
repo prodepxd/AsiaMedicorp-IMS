@@ -22,22 +22,8 @@ create index if not exists machine_components_component_idx
 
 -- A machine may have many probes, boards, PSUs and hard disks.
 -- A machine may have at most one monitor and at most one keyboard.
-create unique index if not exists machine_components_one_monitor_per_machine
-  on public.machine_components(machine_item_id)
-  where component_item_id in (
-    select id from public.items where item_type = 'Monitor'
-  );
-
-create unique index if not exists machine_components_one_keyboard_per_machine
-  on public.machine_components(machine_item_id)
-  where component_item_id in (
-    select id from public.items where item_type = 'Keyboard'
-  );
-
--- The partial-index expressions above cannot safely depend on another table
--- in PostgreSQL. Replace them with trigger-enforced cardinality instead.
-drop index if exists public.machine_components_one_monitor_per_machine;
-drop index if exists public.machine_components_one_keyboard_per_machine;
+-- PostgreSQL partial indexes cannot use a subquery against items, so these
+-- two cardinality rules are enforced by the validation trigger below.
 
 create or replace function public.validate_machine_component_relationship()
 returns trigger
@@ -100,7 +86,7 @@ $$;
 drop trigger if exists machine_components_validate on public.machine_components;
 
 create trigger machine_components_validate
-before insert or update on public.machine_components
+before insert on public.machine_components
 for each row
 execute function public.validate_machine_component_relationship();
 
@@ -244,13 +230,5 @@ on public.machine_components
 for delete
 to authenticated
 using (public.current_user_role() in ('admin','manager'));
-
-drop policy if exists "machine_components_update" on public.machine_components;
-create policy "machine_components_update"
-on public.machine_components
-for update
-to authenticated
-using (public.current_user_role() in ('admin','manager'))
-with check (public.current_user_role() in ('admin','manager'));
 
 commit;
