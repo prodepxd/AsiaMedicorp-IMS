@@ -731,3 +731,33 @@ button { cursor: pointer; }
   .machine-component-picker-grid { grid-template-columns: 1fr; }
   .machine-components-header { flex-direction: column; }
 }
+
+
+.inline-machine-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #60a5fa;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.inline-machine-link:hover { color: #93c5fd; }
+
+.machine-component-open {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.machine-component-open strong { color: #e5edf7; font-size: .78rem; }
+.machine-component-open span { color: #71859d; font-size: .68rem; }
+.machine-component-open:hover strong { color: #60a5fa; }
