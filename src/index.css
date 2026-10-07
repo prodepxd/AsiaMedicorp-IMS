@@ -642,3 +642,92 @@ button { cursor: pointer; }
 .redesign-compatible-machine-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.redesign-location-radio-group{grid-template-columns:repeat(3,minmax(0,1fr))}@media(max-width:600px){.redesign-compatible-machine-grid,.redesign-location-radio-group{grid-template-columns:1fr}}
 
 .cancel-button{background:#b91c1c;color:#fff;border:1px solid #dc2626;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;line-height:1.2;min-height:42px;cursor:pointer}.cancel-button:hover{background:#991b1b;border-color:#b91c1c}
+
+
+/* Machine Item View - installed components */
+.item-machine-top {
+  display: grid;
+  grid-template-columns: minmax(260px, 34%) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.machine-components-panel {
+  border: 1px solid #1b2a3d;
+  border-radius: 14px;
+  background: #0a1726;
+  padding: 18px;
+}
+.machine-components-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.machine-components-header h3 { margin: 5px 0 4px; color: #e5edf7; font-size: 1.05rem; }
+.machine-components-header p { margin: 0; color: #71859d; font-size: .72rem; }
+.machine-component-picker {
+  border: 1px solid #26384e;
+  border-radius: 12px;
+  background: #081522;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.machine-component-picker-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 12px;
+}
+.machine-component-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+.machine-components-list { display: grid; gap: 10px; }
+.machine-component-group {
+  border: 1px solid #1b2a3d;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.machine-component-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #0d1d2e;
+  color: #b8c8da;
+  font-size: .75rem;
+}
+.machine-component-group-header span {
+  min-width: 24px;
+  text-align: center;
+  color: #dbe7f5;
+  font-weight: 700;
+}
+.machine-component-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-top: 1px solid #1b2a3d;
+}
+.machine-component-row > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.machine-component-row strong { color: #e5edf7; font-size: .78rem; }
+.machine-component-row span { color: #71859d; font-size: .68rem; }
+.machine-component-none {
+  padding: 11px 12px;
+  color: #627a93;
+  font-size: .7rem;
+  border-top: 1px solid #1b2a3d;
+}
+@media (max-width: 800px) {
+  .item-machine-top { grid-template-columns: 1fr; }
+  .machine-component-picker-grid { grid-template-columns: 1fr; }
+  .machine-components-header { flex-direction: column; }
+}
