@@ -123,6 +123,11 @@ function Select({ value, onChange, options, placeholder = "Select", disabled = f
   );
 }
 
+function activeOrCurrent(list, currentIds = []) {
+  const ids = Array.isArray(currentIds) ? currentIds : [currentIds];
+  return (list || []).filter((row) => row.is_active !== false || ids.includes(row.id));
+}
+
 function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSaved }) {
   const [type, setType] = useState(initialType || "");
   const [masters, setMasters] = useState({
@@ -140,28 +145,35 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     async function load() {
       setLoading(true);
       const requests = [
-        supabase.from("equipment_manufacturers").select("id,name").order("name"),
-        supabase.from("hard_disk_manufacturers").select("id,name").order("name"),
-        supabase.from("machine_models").select("id,name,manufacturer_id").order("name"),
-        supabase.from("probe_models").select("id,name,manufacturer_id,probe_type_id").order("name"),
-        supabase.from("probe_types").select("id,name").order("name"),
-        supabase.from("board_types").select("id,name").order("name"),
-        supabase.from("locations").select("id,name").eq("is_active", true).order("name"),
-        supabase.from("statuses").select("id,name").eq("is_active", true).order("name"),
-        supabase.from("quality_statuses").select("id,name").eq("is_active", true).order("name"),
+        supabase.from("equipment_manufacturers").select("id,name,is_active").order("name"),
+        supabase.from("hard_disk_manufacturers").select("id,name,is_active").order("name"),
+        supabase.from("machine_models").select("id,name,manufacturer_id,is_active").order("name"),
+        supabase.from("probe_models").select("id,name,manufacturer_id,probe_type_id,is_active").order("name"),
+        supabase.from("probe_types").select("id,name,is_active").order("name"),
+        supabase.from("board_types").select("id,name,is_active").order("name"),
+        supabase.from("locations").select("id,name,is_active").order("name"),
+        supabase.from("statuses").select("id,name,is_active").order("name"),
+        supabase.from("quality_statuses").select("id,name,is_active").order("name"),
       ];
       const results = await Promise.all(requests);
       const failed = results.find((r) => r.error);
       if (!alive) return;
       if (failed) { setError(failed.error.message); setLoading(false); return; }
       const values = results.map((r) => r.data || []);
+      const d = editItem?.detail || {};
       setMasters({
-        equipmentManufacturers: values[0], hardDiskManufacturers: values[1],
-        machineModels: values[2], probeModels: values[3], probeTypes: values[4],
-        boardTypes: values[5], locations: values[6], statuses: values[7], qualities: values[8],
+        equipmentManufacturers: editItem ? activeOrCurrent(values[0], d.manufacturer_id) : activeOrCurrent(values[0]),
+        hardDiskManufacturers: editItem ? activeOrCurrent(values[1], d.manufacturer_id) : activeOrCurrent(values[1]),
+        machineModels: editItem ? activeOrCurrent(values[2], [d.model_id, d.compatible_machine_model_id]) : activeOrCurrent(values[2]),
+        probeModels: editItem ? activeOrCurrent(values[3], d.model_id) : activeOrCurrent(values[3]),
+        probeTypes: editItem ? activeOrCurrent(values[4], d.probe_type_id) : activeOrCurrent(values[4]),
+        boardTypes: editItem ? activeOrCurrent(values[5], d.board_type_id) : activeOrCurrent(values[5]),
+        locations: editItem ? activeOrCurrent(values[6], editItem.current_location_id) : activeOrCurrent(values[6]),
+        statuses: editItem ? activeOrCurrent(values[7], editItem.status_id) : activeOrCurrent(values[7]),
+        qualities: editItem ? activeOrCurrent(values[8], editItem.quality_status_id) : activeOrCurrent(values[8]),
       });
-      const stock = values[7].find((x) => x.name === "In Stock");
-      const good = values[8].find((x) => x.name === "Good");
+      const stock = values[7].find((x) => x.name === "In Stock" && x.is_active !== false);
+      const good = values[8].find((x) => x.name === "Good" && x.is_active !== false);
       if (editItem) {
         const d = editItem.detail || {};
         const compatibleModel = values[2].find((x) => x.id === d.compatible_machine_model_id);
@@ -698,15 +710,15 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       return;
     }
     const [s,q,l,em,hm,mm,pm,pt,bt] = await Promise.all([
-      supabase.from("statuses").select("id,name").order("name"),
-      supabase.from("quality_statuses").select("id,name").order("name"),
-      supabase.from("locations").select("id,name").order("name"),
-      supabase.from("equipment_manufacturers").select("id,name").order("name"),
-      supabase.from("hard_disk_manufacturers").select("id,name").order("name"),
-      supabase.from("machine_models").select("id,name,manufacturer_id").order("name"),
-      supabase.from("probe_models").select("id,name,probe_type_id").order("name"),
-      supabase.from("probe_types").select("id,name").order("name"),
-      supabase.from("board_types").select("id,name").order("name"),
+      supabase.from("statuses").select("id,name,is_active").order("name"),
+      supabase.from("quality_statuses").select("id,name,is_active").order("name"),
+      supabase.from("locations").select("id,name,is_active").order("name"),
+      supabase.from("equipment_manufacturers").select("id,name,is_active").order("name"),
+      supabase.from("hard_disk_manufacturers").select("id,name,is_active").order("name"),
+      supabase.from("machine_models").select("id,name,manufacturer_id,is_active").order("name"),
+      supabase.from("probe_models").select("id,name,manufacturer_id,probe_type_id,is_active").order("name"),
+      supabase.from("probe_types").select("id,name,is_active").order("name"),
+      supabase.from("board_types").select("id,name,is_active").order("name"),
     ]);
     const bad = [s,q,l,em,hm,mm,pm,pt,bt].find((result) => result.error);
     if (bad) {
@@ -958,29 +970,47 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       );
     }
     if (field === "manufacturer_id") return editSelect(
-      (item.item_type === "Hard Disk" ? masters.hardDiskManufacturers : masters.equipmentManufacturers)
+      activeOrCurrent(item.item_type === "Hard Disk" ? masters.hardDiskManufacturers : masters.equipmentManufacturers, value)
         .map((x) => ({ value: x.id, label: x.name })),
       field
     );
     if (field === "model_id") {
       const list = item.item_type === "Machine"
-        ? masters.machineModels.filter((x) => !editValue("manufacturer_id") || x.manufacturer_id === editValue("manufacturer_id"))
-        : masters.probeModels.filter((x) => !editValue("probe_type_id") || x.probe_type_id === editValue("probe_type_id"));
+        ? activeOrCurrent(
+            masters.machineModels.filter((x) => !editValue("manufacturer_id") || x.manufacturer_id === editValue("manufacturer_id")),
+            value
+          )
+        : activeOrCurrent(
+            masters.probeModels.filter((x) =>
+              (!editValue("manufacturer_id") || x.manufacturer_id === editValue("manufacturer_id")) &&
+              (!editValue("probe_type_id") || x.probe_type_id === editValue("probe_type_id"))
+            ),
+            value
+          );
       return editSelect(list.map((x) => ({ value: x.id, label: x.name })), field, "Select model");
     }
     if (field === "probe_type_id") return editSelect(
-      masters.probeTypes.map((x) => ({ value: x.id, label: x.name })),
+      activeOrCurrent(masters.probeTypes, value).map((x) => ({ value: x.id, label: x.name })),
       field,
       "Select probe type"
     );
+    if (field === "board_type_id") return editSelect(
+      activeOrCurrent(masters.boardTypes, value).map((x) => ({ value: x.id, label: x.name })),
+      field,
+      "Select board type"
+    );
     if (field === "compatible_machine") {
-      const compatibleModels = masters.machineModels.filter(
-        (x) => !editValue("compatible_machine_manufacturer_id") || x.manufacturer_id === editValue("compatible_machine_manufacturer_id")
+      const compatibleModels = activeOrCurrent(
+        masters.machineModels.filter(
+          (x) => !editValue("compatible_machine_manufacturer_id") || x.manufacturer_id === editValue("compatible_machine_manufacturer_id")
+        ),
+        editValue("compatible_machine_model_id")
       );
       return (
         <div className="item-inline-compatible">
           {editSelect(
-            masters.equipmentManufacturers.map((x) => ({ value: x.id, label: x.name })),
+            activeOrCurrent(masters.equipmentManufacturers, editValue("compatible_machine_manufacturer_id"))
+              .map((x) => ({ value: x.id, label: x.name })),
             "compatible_machine_manufacturer_id",
             "Select manufacturer"
           )}
@@ -993,19 +1023,19 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       );
     }
     if (field === "status_id") return editSelect(
-      masters.statuses.map((x) => ({ value: x.id, label: x.name })),
+      activeOrCurrent(masters.statuses, value).map((x) => ({ value: x.id, label: x.name })),
       field,
       "Select status"
     );
     if (field === "quality_status_id") return editSelect(
-      masters.qualities.map((x) => ({ value: x.id, label: x.name })),
+      activeOrCurrent(masters.qualities, value).map((x) => ({ value: x.id, label: x.name })),
       field,
       "Select quality"
     );
     if (field === "current_location_id") return (
       <select value={value} onChange={(event) => setEditDraft({ [field]: event.target.value })}>
         <option value="">Not set</option>
-        {masters.locations.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        {activeOrCurrent(masters.locations, value).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
       </select>
     );
     if (field === "monitor_size") return editSelect(SELECT_OPTIONS.monitor_size, field, "Select size");
@@ -1461,18 +1491,18 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
 
     if (active.manufacturer && active.probeType) {
       const [manufacturerResult, probeTypeResult] = await Promise.all([
-        supabase.from("equipment_manufacturers").select("id,name").order("name"),
-        supabase.from("probe_types").select("id,name").order("name"),
+        supabase.from("equipment_manufacturers").select("id,name,is_active").order("name"),
+        supabase.from("probe_types").select("id,name,is_active").order("name"),
       ]);
       if (manufacturerResult.error) setError(manufacturerResult.error.message);
       else if (probeTypeResult.error) setError(probeTypeResult.error.message);
       else setRefs({ manufacturers: manufacturerResult.data || [], probeTypes: probeTypeResult.data || [] });
     } else if (active.manufacturer) {
-      const r = await supabase.from("equipment_manufacturers").select("id,name").order("name");
+      const r = await supabase.from("equipment_manufacturers").select("id,name,is_active").order("name");
       if (r.error) setError(r.error.message);
       else setRefs(r.data || []);
     } else if (active.probeType) {
-      const r = await supabase.from("probe_types").select("id,name").order("name");
+      const r = await supabase.from("probe_types").select("id,name,is_active").order("name");
       if (r.error) setError(r.error.message);
       else setRefs(r.data || []);
     } else {
@@ -1591,8 +1621,8 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
         </div>
         {editing && <form className="master-edit-form" onSubmit={save}>
           <div className="master-form-field"><label>Name</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} autoFocus /></div>
-          {active.manufacturer && <div className="master-form-field"><label>Manufacturer</label><Select value={form.manufacturer_id} onChange={e=>setForm({...form,manufacturer_id:e.target.value})} options={(active.probeType ? refs.manufacturers : refs).map(x=>({value:x.id,label:x.name}))} required /></div>}
-          {active.probeType && <div className="master-form-field"><label>Probe Type</label><Select value={form.probe_type_id} onChange={e=>setForm({...form,probe_type_id:e.target.value})} options={(active.manufacturer ? refs.probeTypes : refs).map(x=>({value:x.id,label:x.name}))} placeholder="Select probe type" required /></div>}
+          {active.manufacturer && <div className="master-form-field"><label>Manufacturer</label><Select value={form.manufacturer_id} onChange={e=>setForm({...form,manufacturer_id:e.target.value})} options={activeOrCurrent(active.probeType ? refs.manufacturers : refs, form.manufacturer_id).map(x=>({value:x.id,label:x.name}))} required /></div>}
+          {active.probeType && <div className="master-form-field"><label>Probe Type</label><Select value={form.probe_type_id} onChange={e=>setForm({...form,probe_type_id:e.target.value})} options={activeOrCurrent(active.manufacturer ? refs.probeTypes : refs, form.probe_type_id).map(x=>({value:x.id,label:x.name}))} placeholder="Select probe type" required /></div>}
           <div className="master-form-actions"><button type="button" className="secondary-button" onClick={()=>setEditing(null)}>Cancel</button><button className="primary-button" disabled={saving}>{saving?"Saving...":"Save"}</button></div>
         </form>}
         {error&&<div className="error-message master-error">{error}</div>}
