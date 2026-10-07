@@ -68,14 +68,28 @@ as $fn$
 declare
   active_value boolean;
   assignment_count integer;
+  probe_manufacturer uuid;
+  machine_manufacturer uuid;
 begin
-  select is_active
-    into active_value
+  select manufacturer_id
+    into probe_manufacturer
+    from public.probe_models
+   where id = new.probe_model_id;
+
+  select is_active, manufacturer_id
+    into active_value, machine_manufacturer
     from public.machine_models
    where id = new.machine_model_id;
 
   if active_value is distinct from true then
     raise exception 'Only active Machine Models can be newly assigned to a Probe Model.'
+      using errcode = '23514';
+  end if;
+
+  if probe_manufacturer is null
+     or machine_manufacturer is null
+     or probe_manufacturer is distinct from machine_manufacturer then
+    raise exception 'A Probe Model can only be compatible with Machine Models from the same manufacturer.'
       using errcode = '23514';
   end if;
 
@@ -102,7 +116,77 @@ before insert or update on public.probe_model_machine_models
 for each row
 execute function public.validate_probe_model_machine_model_assignment();
 
+create or replace function public.validate_probe_model_manufacturer_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+begin
+  if new.manufacturer_id is distinct from old.manufacturer_id
+     and exists (
+       select 1
+       from public.probe_model_machine_models pmm
+       join public.machine_models mm
+         on mm.id = pmm.machine_model_id
+       where pmm.probe_model_id = new.id
+         and mm.manufacturer_id is distinct from new.manufacturer_id
+     ) then
+    raise exception 'This Probe Model has compatible Machine Models from its current manufacturer. Remove those assignments before changing the Probe Model manufacturer.'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$fn$;
+
+drop trigger if exists validate_probe_model_manufacturer_change
+  on public.probe_models;
+
+create trigger validate_probe_model_manufacturer_change
+before update of manufacturer_id on public.probe_models
+for each row
+execute function public.validate_probe_model_manufacturer_change();
+
+create or replace function public.validate_machine_model_manufacturer_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+begin
+  if new.manufacturer_id is distinct from old.manufacturer_id
+     and exists (
+       select 1
+       from public.probe_model_machine_models pmm
+       join public.probe_models pm
+         on pm.id = pmm.probe_model_id
+       where pmm.machine_model_id = new.id
+         and pm.manufacturer_id is distinct from new.manufacturer_id
+     ) then
+    raise exception 'This Machine Model is assigned to Probe Models from its current manufacturer. Remove those compatibility assignments before changing the Machine Model manufacturer.'
+      using errcode = '23514';
+  end if;
+
+  return new;
+end;
+$fn$;
+
+drop trigger if exists validate_machine_model_manufacturer_change
+  on public.machine_models;
+
+create trigger validate_machine_model_manufacturer_change
+before update of manufacturer_id on public.machine_models
+for each row
+execute function public.validate_machine_model_manufacturer_change();
+
 revoke all on function public.validate_probe_model_machine_model_assignment() from public;
 grant execute on function public.validate_probe_model_machine_model_assignment() to authenticated;
+
+revoke all on function public.validate_probe_model_manufacturer_change() from public;
+grant execute on function public.validate_probe_model_manufacturer_change() to authenticated;
+
+revoke all on function public.validate_machine_model_manufacturer_change() from public;
+grant execute on function public.validate_machine_model_manufacturer_change() to authenticated;
 
 commit;
