@@ -1727,7 +1727,7 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
           <table className="master-table">
             <thead><tr><th>Name</th>{active.manufacturer&&<th>Manufacturer</th>}{active.probeType&&<th>Probe Type</th>}{active.key === "probe_models"&&<th>Compatible Machine Models</th>}<th>Active</th><th>Action</th></tr></thead>
             <tbody>
-              {!loading&&rows.length===0&&<tr><td colSpan={active.manufacturer||active.probeType?4:3} className="empty-cell">No records found.</td></tr>}
+              {!loading&&rows.length===0&&<tr><td colSpan={(active.manufacturer?1:0)+(active.probeType?1:0)+(active.key==="probe_models"?1:0)+3} className="empty-cell">No records found.</td></tr>}
               {rows.map(row=><tr key={row.id}>
                 <td><strong>{row.name}</strong></td>
                 {active.manufacturer&&<td>{(active.probeType ? refs.manufacturers : refs).find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}
