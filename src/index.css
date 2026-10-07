@@ -469,6 +469,8 @@ button { cursor: pointer; }
 .master-compatibility-menu-footer > span { color: #61758c; font-size: .6rem; }
 
 .master-form-actions { flex: 0 0 100%; display: flex; gap: 8px; justify-content: flex-end; }
+.master-inline-editor-row > td { padding: 0; border-top: 1px solid #31577f; border-bottom: 1px solid #31577f; background: #0a1726; }
+.master-inline-editor-row .master-edit-form { border-bottom: 0; }
 .master-error { margin: 16px 24px 0; }
 .master-table-wrap { overflow-x: auto; }
 .master-table { width: 100%; border-collapse: collapse; }
