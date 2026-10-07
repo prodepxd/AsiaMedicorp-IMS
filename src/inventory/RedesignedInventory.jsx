@@ -850,64 +850,295 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
     return type || "Component";
   }
 
+  const [editingField, setEditingField] = useState(null);
+  const [editDraft, setEditDraft] = useState({});
+  const [savingField, setSavingField] = useState(false);
+
+  function beginFieldEdit(field) {
+    const d = item.detail || {};
+    const current = {
+      serial_number: item.serial_number || "",
+      status_id: item.status_id || "",
+      quality_status_id: item.quality_status_id || "",
+      current_location_id: item.current_location_id || "",
+      quality_note: item.quality_note || "",
+      manufacturer_id: d.manufacturer_id || "",
+      model_id: d.model_id || "",
+      manufacturer_year: d.manufacturer_year ?? "",
+      functions: Array.isArray(d.functions) ? d.functions : [],
+      connector_count: d.connector_count ?? "",
+      monitor_size: d.monitor_size ?? d.size ?? "",
+      software_version: d.software_version || "",
+      portable: d.portable == null ? "" : d.portable ? "Yes" : "No",
+      probe_type_id: d.probe_type_id || "",
+      year: d.year ?? "",
+      compatible_machine_manufacturer_id: (() => {
+        const model = masters.machineModels.find((x) => x.id === d.compatible_machine_model_id);
+        return model?.manufacturer_id || "";
+      })(),
+      compatible_machine_model_id: d.compatible_machine_model_id || "",
+      board_type_id: d.board_type_id || "",
+      part_number: d.part_number || "",
+      version_number: d.version_number || "",
+      repaired: d.repaired == null ? "" : d.repaired ? "Yes" : "No",
+      video_input: d.video_input || "",
+      filter_type: d.filter_type || "",
+      disk_type: d.disk_type || "",
+      capacity_gb: d.capacity_gb ?? "",
+      size_inches: d.size_inches ?? "",
+    };
+    setEditingField(field);
+    setEditDraft({ [field]: current[field] });
+    setError("");
+  }
+
+  function cancelFieldEdit() {
+    setEditingField(null);
+    setEditDraft({});
+    setError("");
+  }
+
+  function editValue(key) {
+    return editDraft[key] ?? "";
+  }
+
+  function editSelect(options, key, placeholder = "Select") {
+    return (
+      <select
+        value={editValue(key)}
+        onChange={(event) => setEditDraft((current) => ({ ...current, [key]: event.target.value }))}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option.value ?? option} value={option.value ?? option}>
+            {option.label ?? option}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  function editControl(field) {
+    const d = item.detail || {};
+    const value = editValue(field);
+    if (field === "functions") {
+      const selected = Array.isArray(value) ? value : [];
+      return (
+        <div className="item-inline-checks">
+          {["4D", "Cardiac", "Elastography"].map((option) => (
+            <label key={option}>
+              <input
+                type="checkbox"
+                checked={selected.includes(option)}
+                onChange={(event) => {
+                  const next = event.target.checked
+                    ? [...selected, option]
+                    : selected.filter((x) => x !== option);
+                  setEditDraft((current) => ({ ...current, functions: next }));
+                }}
+              />
+              {option}
+            </label>
+          ))}
+        </div>
+      );
+    }
+    if (field === "manufacturer_id") return editSelect(
+      (item.item_type === "Hard Disk" ? masters.hardDiskManufacturers : masters.equipmentManufacturers)
+        .map((x) => ({ value: x.id, label: x.name })),
+      field
+    );
+    if (field === "model_id") {
+      const list = item.item_type === "Machine"
+        ? masters.machineModels.filter((x) => !editValue("manufacturer_id") || x.manufacturer_id === editValue("manufacturer_id"))
+        : masters.probeModels.filter((x) => !editValue("probe_type_id") || x.probe_type_id === editValue("probe_type_id"));
+      return editSelect(list.map((x) => ({ value: x.id, label: x.name })), field, "Select model");
+    }
+    if (field === "probe_type_id") return editSelect(
+      masters.probeTypes.map((x) => ({ value: x.id, label: x.name })),
+      field,
+      "Select probe type"
+    );
+    if (field === "compatible_machine") {
+      const compatibleModels = masters.machineModels.filter(
+        (x) => !editValue("compatible_machine_manufacturer_id") || x.manufacturer_id === editValue("compatible_machine_manufacturer_id")
+      );
+      return (
+        <div className="item-inline-compatible">
+          {editSelect(
+            masters.equipmentManufacturers.map((x) => ({ value: x.id, label: x.name })),
+            "compatible_machine_manufacturer_id",
+            "Select manufacturer"
+          )}
+          {editSelect(
+            compatibleModels.map((x) => ({ value: x.id, label: x.name })),
+            "compatible_machine_model_id",
+            "Select machine model"
+          )}
+        </div>
+      );
+    }
+    if (field === "status_id") return editSelect(
+      masters.statuses.map((x) => ({ value: x.id, label: x.name })),
+      field,
+      "Select status"
+    );
+    if (field === "quality_status_id") return editSelect(
+      masters.qualities.map((x) => ({ value: x.id, label: x.name })),
+      field,
+      "Select quality"
+    );
+    if (field === "current_location_id") return (
+      <select value={value} onChange={(event) => setEditDraft({ [field]: event.target.value })}>
+        <option value="">Not set</option>
+        {masters.locations.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+      </select>
+    );
+    if (field === "monitor_size") return editSelect(SELECT_OPTIONS.monitor_size, field, "Select size");
+    if (field === "portable") return editSelect(SELECT_OPTIONS.portable, field, "Select");
+    if (field === "connector_count") return editSelect(SELECT_OPTIONS.connectors, field, "Select");
+    if (field === "video_input") return editSelect(SELECT_OPTIONS.video_input, field, "Select");
+    if (field === "repaired") return editSelect(SELECT_OPTIONS.repaired, field, "Select");
+    if (field === "filter_type") return editSelect(SELECT_OPTIONS.emi_type, field, "Select");
+    if (field === "disk_type") return editSelect(SELECT_OPTIONS.hard_disk_type, field, "Select");
+    if (field === "size_inches") return editSelect(["2.5", "3.5"], field, "Select size");
+    const numeric = ["manufacturer_year", "year", "capacity_gb"].includes(field);
+    return (
+      <input
+        type={numeric ? "number" : "text"}
+        value={value}
+        onChange={(event) => setEditDraft((current) => ({ ...current, [field]: event.target.value }))}
+      />
+    );
+  }
+
+  async function saveFieldEdit() {
+    if (!editingField || savingField) return;
+    setSavingField(true);
+    setError("");
+    const field = editingField;
+    const value = editValue(field);
+    const requiredFields = ["manufacturer_id", "model_id", "manufacturer_year", "connector_count", "monitor_size", "software_version", "portable", "status_id", "quality_status_id", "probe_type_id", "board_type_id", "part_number", "version_number", "repaired", "video_input", "filter_type", "disk_type", "capacity_gb", "size_inches"];
+    if (requiredFields.includes(field) && (Array.isArray(value) ? value.length === 0 : String(value ?? "").trim() === "")) {
+      setError("This characteristic is required.");
+      setSavingField(false);
+      return;
+    }
+    if (field === "serial_number" && String(value).trim()) {
+      const { data, error: checkError } = await supabase.from("items").select("id,serial_number").not("serial_number","is",null);
+      if (checkError) {
+        setError("We could not verify this serial number. Please try again.");
+        setSavingField(false);
+        return;
+      }
+      const duplicate = (data || []).some((x) => x.id !== item.id && String(x.serial_number || "").trim().toLowerCase() === String(value).trim().toLowerCase());
+      if (duplicate) {
+        setError("This serial number is already in use. Please enter a different serial number.");
+        setSavingField(false);
+        return;
+      }
+    }
+
+    let table = "items";
+    let payload = {};
+    if (["serial_number","status_id","quality_status_id","current_location_id","quality_note"].includes(field)) {
+      payload[field] = field === "serial_number" ? (String(value).trim() || null) : (value || null);
+    } else {
+      table = detailTable(item.item_type);
+      const map = {
+        manufacturer_id: "manufacturer_id",
+        model_id: "model_id",
+        manufacturer_year: "manufacturer_year",
+        functions: "functions",
+        connector_count: "connector_count",
+        monitor_size: item.item_type === "Monitor" ? "size" : "monitor_size",
+        software_version: "software_version",
+        portable: "portable",
+        probe_type_id: "probe_type_id",
+        year: "year",
+        board_type_id: "board_type_id",
+        part_number: "part_number",
+        version_number: "version_number",
+        repaired: "repaired",
+        video_input: "video_input",
+        filter_type: "filter_type",
+        disk_type: "disk_type",
+        capacity_gb: "capacity_gb",
+        size_inches: "size_inches",
+      };
+      if (field === "compatible_machine") {
+        payload = { compatible_machine_model_id: editValue("compatible_machine_model_id") || null };
+      } else {
+        payload[map[field] || field] = ["portable","repaired"].includes(field)
+          ? value === "Yes"
+          : ["manufacturer_year","year","connector_count","monitor_size","capacity_gb","size_inches"].includes(field)
+            ? (value === "" ? null : Number(value))
+            : value;
+      }
+    }
+
+    const result = await supabase.from(table).update(payload).eq(table === "items" ? "id" : "item_id", item.id);
+    if (result.error) {
+      setError(result.error.message || "We could not save this characteristic.");
+      setSavingField(false);
+      return;
+    }
+    setSavingField(false);
+    setEditingField(null);
+    setEditDraft({});
+    await load();
+    await loadComponents();
+  }
+
   function fields() {
     const d = item.detail || {};
     const base = [
-      ["Serial number", item.serial_number || "—"],
-      ["Status", statusValue],
-      ...(parentMachine ? [[
-        "Parent machine",
-        <button
-          type="button"
-          className="inline-machine-link"
-          onClick={() => onItemClick?.(parentMachine.id)}
-        >
-          {parentMachine.serial_number || "Machine"}
-        </button>,
-      ]] : []),
-      ["Quality", name(masters.qualities, item.quality_status_id)],
-      ["Location", name(masters.locations, item.current_location_id)],
+      { key:"serial_number", label:"Serial number", value:item.serial_number || "—" },
+      { key:"status_id", label:"Status", value:statusValue, readOnly:Boolean(parentMachine) },
+      ...(parentMachine ? [{ key:"parent_machine", label:"Parent machine", value:<button type="button" className="inline-machine-link" onClick={() => onItemClick?.(parentMachine.id)}>{parentMachine.serial_number || "Machine"}</button>, readOnly:true }] : []),
+      { key:"quality_status_id", label:"Quality", value:name(masters.qualities, item.quality_status_id) },
+      { key:"current_location_id", label:"Location", value:name(masters.locations, item.current_location_id) },
     ];
     const specific = {
       Machine: [
-        ["Manufacturer", name(masters.equipmentManufacturers, d.manufacturer_id)],
-        ["Model", name(masters.machineModels, d.model_id)],
-        ["Manufacturer year", d.manufacturer_year ?? "—"],
-        ["Functions", Array.isArray(d.functions) && d.functions.length ? d.functions.join(", ") : "—"],
-        ["Number of connectors", d.connector_count ?? "—"],
-        ["Monitor size", d.monitor_size == null ? "—" : d.monitor_size + String.fromCharCode(34)],
-        ["Software version", d.software_version || "—"],
-        ["Portable", d.portable == null ? "—" : d.portable ? "Yes" : "No"],
+        {key:"manufacturer_id",label:"Manufacturer",value:name(masters.equipmentManufacturers,d.manufacturer_id)},
+        {key:"model_id",label:"Model",value:name(masters.machineModels,d.model_id)},
+        {key:"manufacturer_year",label:"Manufacturer year",value:d.manufacturer_year ?? "—"},
+        {key:"functions",label:"Functions",value:Array.isArray(d.functions)&&d.functions.length?d.functions.join(", "):"—"},
+        {key:"connector_count",label:"Number of connectors",value:d.connector_count ?? "—"},
+        {key:"monitor_size",label:"Monitor size",value:d.monitor_size == null ? "—" : d.monitor_size + String.fromCharCode(34)},
+        {key:"software_version",label:"Software version",value:d.software_version || "—"},
+        {key:"portable",label:"Portable",value:d.portable == null ? "—" : d.portable ? "Yes" : "No"},
       ],
       Probe: [
-        ["Manufacturer", name(masters.equipmentManufacturers, d.manufacturer_id)],
-        ["Probe type", name(masters.probeTypes, d.probe_type_id)],
-        ["Model", name(masters.probeModels, d.model_id)],
-        ["Year", d.year ?? "—"],
+        {key:"manufacturer_id",label:"Manufacturer",value:name(masters.equipmentManufacturers,d.manufacturer_id)},
+        {key:"probe_type_id",label:"Probe type",value:name(masters.probeTypes,d.probe_type_id)},
+        {key:"model_id",label:"Model",value:name(masters.probeModels,d.model_id)},
+        {key:"year",label:"Year",value:d.year ?? "—"},
       ],
       Board: [
-        ["Compatible machine", compatibleName(d.compatible_machine_model_id)],
-        ["Board type", name(masters.boardTypes, d.board_type_id)],
-        ["Part number", d.part_number || "—"],
-        ["Version number", d.version_number || "—"],
-        ["Repaired", d.repaired == null ? "—" : d.repaired ? "Yes" : "No"],
+        {key:"compatible_machine",label:"Compatible machine",value:compatibleName(d.compatible_machine_model_id)},
+        {key:"board_type_id",label:"Board type",value:name(masters.boardTypes,d.board_type_id)},
+        {key:"part_number",label:"Part number",value:d.part_number || "—"},
+        {key:"version_number",label:"Version number",value:d.version_number || "—"},
+        {key:"repaired",label:"Repaired",value:d.repaired == null ? "—" : d.repaired ? "Yes" : "No"},
       ],
-      PSU: [["Compatible machine", compatibleName(d.compatible_machine_model_id)]],
+      PSU: [{key:"compatible_machine",label:"Compatible machine",value:compatibleName(d.compatible_machine_model_id)}],
       Monitor: [
-        ["Compatible machine", compatibleName(d.compatible_machine_model_id)],
-        ["Size", d.size == null ? "—" : d.size + String.fromCharCode(34)],
-        ["Video input", d.video_input || "—"],
+        {key:"compatible_machine",label:"Compatible machine",value:compatibleName(d.compatible_machine_model_id)},
+        {key:"monitor_size",label:"Size",value:d.size == null ? "—" : d.size + String.fromCharCode(34)},
+        {key:"video_input",label:"Video input",value:d.video_input || "—"},
       ],
-      "EMI Filter": [["Type", d.filter_type || "—"]],
+      "EMI Filter": [{key:"filter_type",label:"Type",value:d.filter_type || "—"}],
       "Hard Disk": [
-        ["Manufacturer", name(masters.hardDiskManufacturers, d.manufacturer_id)],
-        ["Type", d.disk_type || "—"],
-        ["Capacity", d.capacity_gb == null ? "—" : d.capacity_gb + " GB"],
-        ["Size", d.size_inches == null ? "—" : d.size_inches + " inches"],
-        ["Compatible machine", d.compatible_machine_model_id ? compatibleName(d.compatible_machine_model_id) : "—"],
-        ["Software version", d.software_version || "—"],
+        {key:"manufacturer_id",label:"Manufacturer",value:name(masters.hardDiskManufacturers,d.manufacturer_id)},
+        {key:"disk_type",label:"Type",value:d.disk_type || "—"},
+        {key:"capacity_gb",label:"Capacity",value:d.capacity_gb == null ? "—" : d.capacity_gb + " GB"},
+        {key:"size_inches",label:"Size",value:d.size_inches == null ? "—" : d.size_inches + " inches"},
+        {key:"compatible_machine",label:"Compatible machine",value:d.compatible_machine_model_id ? compatibleName(d.compatible_machine_model_id) : "—"},
+        {key:"software_version",label:"Software version",value:d.software_version || "—"},
       ],
-      Keyboard: [["Compatible machine", compatibleName(d.compatible_machine_model_id)]],
+      Keyboard: [{key:"compatible_machine",label:"Compatible machine",value:compatibleName(d.compatible_machine_model_id)}],
     };
     return [...(specific[item.item_type] || []), ...base];
   }
@@ -1044,8 +1275,23 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
               )}
             </div>}
           </div>
-          <div className="item-detail-grid">{fields().map(([label,value]) => <div className="item-detail-field" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
-          <div className="item-detail-notes"><div><span>Quality note</span><p>{item.quality_note || "No quality note."}</p></div></div>
+          <div className="item-detail-grid">{fields().map((field) => (
+            <div className="item-detail-field" key={field.key}>
+              <div className="item-detail-field-head"><span>{field.label}</span>{canEdit && !field.readOnly && <button type="button" className="inline-edit-button" onClick={() => beginFieldEdit(field.key)} disabled={editingField && editingField !== field.key}>Edit</button>}</div>
+              {editingField === field.key ? (
+                <div className="item-inline-editor">
+                  {field.key === "compatible_machine"
+                    ? editControl(field.key)
+                    : editControl(field.key)}
+                  <div className="item-inline-editor-actions">
+                    <button type="button" className="secondary-button" onClick={cancelFieldEdit} disabled={savingField}>Cancel</button>
+                    <button type="button" className="primary-button" onClick={saveFieldEdit} disabled={savingField}>{savingField ? "Saving..." : "Save"}</button>
+                  </div>
+                </div>
+              ) : <strong>{field.value}</strong>}
+            </div>
+          ))}</div>
+          <div className="item-detail-notes"><div><div className="item-detail-field-head"><span>Quality note</span>{canEdit && <button type="button" className="inline-edit-button" onClick={() => beginFieldEdit("quality_note")} disabled={editingField && editingField !== "quality_note"}>Edit</button>}</div>{editingField === "quality_note" ? <div className="item-inline-editor"><textarea value={editValue("quality_note")} onChange={(event) => setEditDraft({quality_note:event.target.value})} rows="4" /><div className="item-inline-editor-actions"><button type="button" className="secondary-button" onClick={cancelFieldEdit} disabled={savingField}>Cancel</button><button type="button" className="primary-button" onClick={saveFieldEdit} disabled={savingField}>{savingField ? "Saving..." : "Save"}</button></div></div> : <p>{item.quality_note || "No quality note."}</p>}</div></div>
           {error && <div className="error-message">{error}</div>}
         </div>
       </div>
