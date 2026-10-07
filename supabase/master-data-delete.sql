@@ -187,12 +187,12 @@ $fn$;
 revoke all on function public.prevent_inactive_master_reference() from public;
 grant execute on function public.prevent_inactive_master_reference() to authenticated;
 
-do $$
+do $
 declare
-  child record;
+  child_row record;
   trigger_name text := 'prevent_inactive_master_reference';
 begin
-  for child in
+  for child_row in
     select distinct
       child_ns.nspname as child_schema,
       child.relname as child_table
@@ -224,8 +224,8 @@ begin
     execute format(
       'drop trigger if exists %I on %I.%I',
       trigger_name,
-      child.child_schema,
-      child.child_table
+      child_row.child_schema,
+      child_row.child_table
     );
 
     execute format(
@@ -234,8 +234,8 @@ begin
        for each row
        execute function public.prevent_inactive_master_reference()',
       trigger_name,
-      child.child_schema,
-      child.child_table
+      child_row.child_schema,
+      child_row.child_table
     );
   end loop;
-end $$;
+end $;
