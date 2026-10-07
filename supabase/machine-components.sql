@@ -59,7 +59,7 @@ begin
 
   select s.name into component_status
   from public.items i
-  join public.statuses s on s.id = i.status_id
+  join public.inventory_statuses s on s.id = i.inventory_status_id
   where i.id = new.component_item_id;
 
   if component_status is distinct from 'Idle' then
@@ -97,21 +97,21 @@ security definer
 set search_path = public
 as $$
 declare
-  in_machine_status_id uuid;
+  in_machine_inventory_status_id uuid;
 begin
-  select id into in_machine_status_id
-  from public.statuses
+  select id into in_machine_inventory_status_id
+  from public.inventory_statuses
   where name = 'In Machine'
     and is_active = true
   order by id
   limit 1;
 
-  if in_machine_status_id is null then
-    raise exception 'Status "In Machine" was not found in the Statuses master data';
+  if in_machine_inventory_status_id is null then
+    raise exception 'Inventory Status "In Machine" was not found in the Statuses master data';
   end if;
 
   update public.items
-  set status_id = in_machine_status_id,
+  set inventory_status_id = in_machine_inventory_status_id,
       updated_at = now()
   where id = new.component_item_id;
 
@@ -133,21 +133,21 @@ security definer
 set search_path = public
 as $$
 declare
-  idle_status_id uuid;
+  idle_inventory_status_id uuid;
 begin
-  select id into idle_status_id
-  from public.statuses
+  select id into idle_inventory_status_id
+  from public.inventory_statuses
   where name = 'Idle'
     and is_active = true
   order by id
   limit 1;
 
-  if idle_status_id is null then
-    raise exception 'Status "Idle" was not found in the Statuses master data';
+  if idle_inventory_status_id is null then
+    raise exception 'Inventory Status "Idle" was not found in the Statuses master data';
   end if;
 
   update public.items
-  set status_id = idle_status_id,
+  set inventory_status_id = idle_inventory_status_id,
       updated_at = now()
   where id = old.component_item_id;
 
@@ -180,12 +180,12 @@ begin
   end if;
 
   select s.name into old_status
-  from public.statuses s
-  where s.id = old.status_id;
+  from public.inventory_statuses s
+  where s.id = old.inventory_status_id;
 
   select s.name into new_status
-  from public.statuses s
-  where s.id = new.status_id;
+  from public.inventory_statuses s
+  where s.id = new.inventory_status_id;
 
   select exists (
     select 1
@@ -204,7 +204,7 @@ $$;
 drop trigger if exists items_prevent_invalid_installed_status on public.items;
 
 create trigger items_prevent_invalid_installed_status
-before update of status_id on public.items
+before update of inventory_status_id on public.items
 for each row
 execute function public.prevent_invalid_installed_component_status();
 
