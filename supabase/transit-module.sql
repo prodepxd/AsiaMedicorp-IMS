@@ -226,7 +226,7 @@ begin
     end if;
 
     update public.transit_items
-    set transit_status_id = apply_transit_progress.transit_status_id
+    set transit_status_id = v_transit_status_id
     where transit_id = new.id;
 
   elsif new.progress = 'Completed' then
@@ -245,7 +245,7 @@ begin
     end if;
 
     update public.transit_items
-    set transit_status_id = apply_transit_progress.transit_status_id
+    set transit_status_id = v_transit_status_id
     where transit_id = new.id;
 
     update public.items i
