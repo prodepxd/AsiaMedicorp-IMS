@@ -327,7 +327,7 @@ button { cursor: pointer; }
 .master-content-title strong { display: block; color: #dbe7f5; font-size: .85rem; }
 .master-content-title span { display: block; margin-top: 3px; color: #61758c; font-size: .68rem; }
 .master-edit-form {
-  display: flex; align-items: flex-end; gap: 12px; padding: 16px 24px;
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 16px 24px;
   border-bottom: 1px solid #1b2a3d; background: #0a1726;
 }
 .master-form-field { flex: 1; min-width: 180px; display: grid; gap: 6px; }
@@ -337,7 +337,7 @@ button { cursor: pointer; }
   padding: 10px 11px; color: #dbe7f5; background: #081522;
 }
 .master-form-field input:focus, .master-form-field select:focus { border-color: #3b82f6; }
-.master-compatibility-field { min-width: 100%; }
+.master-compatibility-field { flex: 0 0 100%; min-width: 0; width: 100%; }
 .master-compatibility-heading {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 18px;
 }
@@ -468,7 +468,7 @@ button { cursor: pointer; }
 }
 .master-compatibility-menu-footer > span { color: #61758c; font-size: .6rem; }
 
-.master-form-actions { display: flex; gap: 8px; }
+.master-form-actions { flex: 0 0 100%; display: flex; gap: 8px; justify-content: flex-end; }
 .master-error { margin: 16px 24px 0; }
 .master-table-wrap { overflow-x: auto; }
 .master-table { width: 100%; border-collapse: collapse; }
