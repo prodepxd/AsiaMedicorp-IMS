@@ -409,7 +409,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     if (field.type === "probe_model") {
       const probeModels = masters.probeModels.filter((x) =>
         (!form.probe_type_id || x.probe_type_id === form.probe_type_id) &&
-        (!form.manufacturer_id || x.manufacturer_id === form.manufacturer_id)
+        (!form.manufacturer_id || x.manufacturer_id === form.manufacturer_id || (editItem && x.id === form.model_id))
       );
       return <Select value={value} onChange={onChange}
         options={probeModels.map((x) => ({value:x.id,label:x.name}))}
@@ -1554,7 +1554,7 @@ export function RedesignedMasterData({ supabase, canEdit }) {
         <div><p className="section-kicker">ADMINISTRATION</p><h2>Master Data</h2><p>Item types are fixed. Manage only the reusable reference data required by the IMS.</p></div>
       </div>
       <div className="master-tabs redesign-master-tabs">
-        {MASTER_GROUPS.map(g => <button key={g.key} className={g.key===active.key?"master-tab active":"master-tab"} onClick={()=>{setActive(g);setEditing(null);setError("");}}>{g.label}</button>)}
+        {MASTER_GROUPS.map(g => <button key={g.key} className={g.key===active.key?"master-tab active":"master-tab"} onClick={()=>{setActive(g);setRefs(g.manufacturer && g.probeType ? {manufacturers:[],probeTypes:[]} : []);setEditing(null);setError("");}}>{g.label}</button>)}
       </div>
       <div className="master-content">
         <div className="master-content-title">
