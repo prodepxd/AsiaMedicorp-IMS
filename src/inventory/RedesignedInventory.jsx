@@ -639,7 +639,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
   </div></div>;
 }
 
-export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDeleted }) {
+export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDeleted, onItemClick }) {
   const [item, setItem] = useState(null);
   const [masters, setMasters] = useState({
     statuses: [], qualities: [], locations: [], equipmentManufacturers: [],
@@ -647,6 +647,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
   });
   const [components, setComponents] = useState([]);
   const [componentDetails, setComponentDetails] = useState({});
+  const [parentMachine, setParentMachine] = useState(null);
   const [loading, setLoading] = useState(true);
   const [componentsLoading, setComponentsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -722,6 +723,25 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
       boardTypes:bt.data||[],
     });
     setItem({...row, detail:detail||{}});
+    if (row.item_type !== "Machine") {
+      const { data: relationship } = await supabase
+        .from("machine_components")
+        .select("machine_item_id")
+        .eq("component_item_id", row.id)
+        .maybeSingle();
+      if (relationship?.machine_item_id) {
+        const { data: machine } = await supabase
+          .from("items")
+          .select("id,serial_number")
+          .eq("id", relationship.machine_item_id)
+          .maybeSingle();
+        setParentMachine(machine || null);
+      } else {
+        setParentMachine(null);
+      }
+    } else {
+      setParentMachine(null);
+    }
     setLoading(false);
   }
 
@@ -804,6 +824,10 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
   useEffect(() => { loadAvailableComponents(); }, [item?.id, item?.item_type, componentType, showComponentPicker, masters.statuses.length]);
 
   const name = (list, id) => list.find((x) => x.id === id)?.name || "—";
+  const statusName = name(masters.statuses, item?.status_id);
+  const statusValue = parentMachine && statusName === "In Machine"
+    ? <><span>In Machine (</span><button type="button" className="inline-machine-link" onClick={() => onItemClick?.(parentMachine.id)}>{parentMachine.serial_number || "Machine"}</button><span>)</span></>
+    : statusName;
   const compatibleName = (id) => {
     const model = masters.machineModels.find((x) => x.id === id);
     const manufacturer = masters.equipmentManufacturers.find((x) => x.id === model?.manufacturer_id);
@@ -830,7 +854,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
     const d = item.detail || {};
     const base = [
       ["Serial number", item.serial_number || "—"],
-      ["Status", name(masters.statuses, item.status_id)],
+      ["Status", statusValue],
       ["Quality", name(masters.qualities, item.quality_status_id)],
       ["Location", name(masters.locations, item.current_location_id)],
     ];
@@ -998,7 +1022,9 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
                       <div className="machine-component-group-header"><strong>{group.type}</strong><span>{group.rows.length}</span></div>
                       {group.rows.length ? group.rows.map((link) => (
                         <div className="machine-component-row" key={link.id}>
-                          <div><strong>{link.item?.serial_number || "No serial number"}</strong><span>{componentDisplay(link)}</span></div>
+                          <button type="button" className="machine-component-open" onClick={() => onItemClick?.(link.component_item_id)}>
+                            <strong>{link.item?.serial_number || "No serial number"}</strong><span>{componentDisplay(link)}</span>
+                          </button>
                           {canEdit && <button className="table-button delete-button" onClick={() => removeComponent(link)} disabled={removingComponentId === link.component_item_id}>{removingComponentId === link.component_item_id ? "Removing..." : "Remove"}</button>}
                         </div>
                       )) : <div className="machine-component-none">None installed</div>}
