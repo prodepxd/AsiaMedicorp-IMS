@@ -1037,3 +1037,7 @@ button { cursor: pointer; }
 @media (max-width: 600px) {
   .item-inline-compatible { grid-template-columns: 1fr; }
 }
+
+
+/* Installed components cannot be deleted from Global Stock. */
+.item-delete-button:disabled { opacity: 0.45; cursor: not-allowed; }

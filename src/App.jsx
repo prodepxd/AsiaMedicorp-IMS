@@ -106,8 +106,8 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
     model_id: "",
     item_detail: "",
     current_location_id: "",
-    status_id: "",
-    quality_status_id: "",
+    inventory_status_id: "",
+    quality_inventory_status_id: "",
     quality_note: "",
   });
   const [loading, setLoading] = useState(true);
@@ -124,7 +124,7 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
       supabase.from("manufacturers").select("id, name").eq("is_active", true).order("name"),
       supabase.from("models").select("id, name, manufacturer_id").eq("is_active", true).order("name"),
       supabase.from("locations").select("id, name").eq("is_active", true).order("name"),
-      supabase.from("statuses").select("id, name").eq("is_active", true).order("name"),
+      supabase.from("inventory_statuses").select("id, name").eq("is_active", true).order("name"),
       supabase.from("quality_statuses").select("id, name").eq("is_active", true).order("name"),
     ]);
 
@@ -139,7 +139,7 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
       (result) => result.data || []
     );
 
-    const stockStatus = statuses.find((value) => value.name === "In Stock");
+    const stockInventory Status = statuses.find((value) => value.name === "In Stock");
     const goodQuality = qualities.find((value) => value.name === "Good");
 
     setMasters({ itemTypes, manufacturers, models, locations, statuses, qualities });
@@ -152,8 +152,8 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
             model_id: item.model_id || "",
             item_detail: item.item_detail || "",
             current_location_id: item.current_location_id || "",
-            status_id: item.status_id || "",
-            quality_status_id: item.quality_status_id || "",
+            inventory_status_id: item.inventory_status_id || "",
+            quality_inventory_status_id: item.quality_inventory_status_id || "",
             quality_note: item.quality_note || "",
           }
         : {
@@ -163,8 +163,8 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
             model_id: "",
             item_detail: "",
             current_location_id: "",
-            status_id: stockStatus?.id || "",
-            quality_status_id: goodQuality?.id || "",
+            inventory_status_id: stockInventory Status?.id || "",
+            quality_inventory_status_id: goodQuality?.id || "",
             quality_note: "",
           }
     );
@@ -230,8 +230,8 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
       model_id: form.model_id || null,
       item_detail: form.item_detail.trim() || null,
       current_location_id: form.current_location_id || null,
-      status_id: form.status_id,
-      quality_status_id: form.quality_status_id,
+      inventory_status_id: form.inventory_status_id,
+      quality_inventory_status_id: form.quality_inventory_status_id,
       quality_note: form.quality_note.trim() || null,
     };
 
@@ -315,8 +315,8 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
               </label>
 
               <label>
-                Status *
-                <select value={form.status_id} onChange={(event) => updateField("status_id", event.target.value)} required>
+                Inventory Status *
+                <select value={form.inventory_status_id} onChange={(event) => updateField("inventory_status_id", event.target.value)} required>
                   <option value="">Select status</option>
                   {masters.statuses.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
                 </select>
@@ -324,7 +324,7 @@ function AddItemModal({ supabase, onClose, onSaved, onDeleted, canDelete = false
 
               <label>
                 Quality *
-                <select value={form.quality_status_id} onChange={(event) => updateField("quality_status_id", event.target.value)} required>
+                <select value={form.quality_inventory_status_id} onChange={(event) => updateField("quality_inventory_status_id", event.target.value)} required>
                   <option value="">Select quality</option>
                   {masters.qualities.map((value) => <option key={value.id} value={value.id}>{value.name}</option>)}
                 </select>
@@ -435,7 +435,7 @@ function ItemTransitHistory({ supabase, itemId }) {
       )];
 
       const statusIds = [...new Set(
-        eventRows.map((event) => firstId(event, ["transit_status_id"])).filter(Boolean)
+        eventRows.map((event) => firstId(event, ["transit_inventory_status_id"])).filter(Boolean)
       )];
 
       const [locationsResult, statusesResult, shipmentsResult] = await Promise.all([
@@ -475,7 +475,7 @@ function ItemTransitHistory({ supabase, itemId }) {
           ...event,
           _fromLocation: locationMap[firstId(event, ["from_location_id"])] || "—",
           _toLocation: locationMap[firstId(event, ["to_location_id"])] || "—",
-          _status: statusMap[firstId(event, ["transit_status_id"])] || "—",
+          _status: statusMap[firstId(event, ["transit_inventory_status_id"])] || "—",
           _shipment: shipmentMap[firstId(event, ["shipment_id"])] || null,
           _date: dateValue(event),
         }))
@@ -593,7 +593,7 @@ function ItemDetailView({ supabase, item, canEdit, onBack, onEdit }) {
             <strong>{item.locations?.name || "—"}</strong>
           </div>
           <div className="item-detail-field">
-            <span>Status</span>
+            <span>Inventory Status</span>
             <strong>{item.statuses?.name || "—"}</strong>
           </div>
           <div className="item-detail-field">
@@ -633,7 +633,7 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setInventory StatusFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
 
   const loadItems = useCallback(async () => {
@@ -651,8 +651,8 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
           manufacturer_id,
           model_id,
           current_location_id,
-          status_id,
-          quality_status_id,
+          inventory_status_id,
+          quality_inventory_status_id,
           quality_note,
           created_at,
           item_types(name),
@@ -788,7 +788,7 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
           <option value="all">All types</option>
           {types.map((value) => <option key={value} value={value}>{value}</option>)}
         </select>
-        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+        <select value={statusFilter} onChange={(event) => setInventory StatusFilter(event.target.value)}>
           <option value="all">All statuses</option>
           {statuses.map((value) => <option key={value} value={value}>{value}</option>)}
         </select>
@@ -816,7 +816,7 @@ function GlobalStock({ supabase, canEdit, canDelete = false }) {
               <th>Manufacturer / Model</th>
               <th>Detail</th>
               <th>Location</th>
-              <th>Status</th>
+              <th>Inventory Status</th>
               <th>Quality</th>
             </tr>
           </thead>
@@ -867,9 +867,9 @@ const MASTER_DEFINITIONS = [
   { key: "manufacturers", label: "Manufacturers", singular: "manufacturer" },
   { key: "models", label: "Models", singular: "model", needsManufacturer: true },
   { key: "locations", label: "Locations", singular: "location" },
-  { key: "statuses", label: "Statuses", singular: "status" },
-  { key: "quality_statuses", label: "Quality Statuses", singular: "quality status" },
-  { key: "transit_statuses", label: "Transit Statuses", singular: "transit status" },
+  { key: "statuses", label: "Inventory Inventory Statuses", singular: "status" },
+  { key: "quality_statuses", label: "Quality Inventory Inventory Statuses", singular: "quality status" },
+  { key: "transit_statuses", label: "Transit Inventory Inventory Statuses", singular: "transit status" },
   { key: "suppliers", label: "Suppliers", singular: "supplier" },
   { key: "customers", label: "Customers", singular: "customer" },
 ];
@@ -1146,7 +1146,7 @@ function MasterData({ supabase }) {
               <tr>
                 <th>Name</th>
                 {definition.needsManufacturer && <th>Manufacturer</th>}
-                <th>Status</th>
+                <th>Inventory Status</th>
                 <th>Action</th>
               </tr>
             </thead>
