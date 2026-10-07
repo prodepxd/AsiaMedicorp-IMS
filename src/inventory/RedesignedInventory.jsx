@@ -56,8 +56,6 @@ export const MASTER_GROUPS = [
   { key: "statuses", label: "Statuses", table: "statuses" },
   { key: "quality_statuses", label: "Quality Statuses", table: "quality_statuses" },
   { key: "transit_statuses", label: "Transit Statuses", table: "transit_statuses" },
-  { key: "suppliers", label: "Suppliers", table: "suppliers" },
-  { key: "customers", label: "Customers", table: "customers" },
 ];
 
 const SELECT_OPTIONS = {
