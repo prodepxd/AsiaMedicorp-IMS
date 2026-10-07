@@ -27,7 +27,7 @@ begin
     'manufacturers',
     'models',
     'locations',
-    'statuses',
+    'inventory_statuses',
     'quality_statuses',
     'transit_statuses',
     'suppliers',

@@ -26,7 +26,7 @@ begin
     'probe_models',
     'board_types',
     'locations',
-    'statuses',
+    'inventory_statuses',
     'quality_statuses',
     'transit_statuses',
     'suppliers',

@@ -84,8 +84,8 @@ create table items(
   id uuid primary key default gen_random_uuid(),
   serial_number text,
   item_type text not null check(item_type in ('Machine','Probe','Board','PSU','Monitor','EMI Filter','Hard Disk','Keyboard')),
-  status_id uuid not null references statuses(id),
-  quality_status_id uuid not null references quality_statuses(id),
+  inventory_status_id uuid not null references statuses(id),
+  quality_inventory_status_id uuid not null references quality_statuses(id),
   quality_note text,
   current_location_id uuid references locations(id) on delete set null,
   notes text,
@@ -169,8 +169,8 @@ create index hard_disk_details_manufacturer_idx on hard_disk_details(manufacture
 create index hard_disk_details_machine_model_idx on hard_disk_details(compatible_machine_model_id);
 create index keyboard_details_machine_model_idx on keyboard_details(compatible_machine_model_id);
 create index items_type_idx on items(item_type);
-create index items_status_idx on items(status_id);
-create index items_quality_idx on items(quality_status_id);
+create index items_inventory_status_idx on items(inventory_status_id);
+create index items_quality_idx on items(quality_inventory_status_id);
 create index items_location_idx on items(current_location_id);
 
 create table purchase_items(
