@@ -645,10 +645,18 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
     statuses: [], qualities: [], locations: [], equipmentManufacturers: [],
     hardDiskManufacturers: [], machineModels: [], probeModels: [], probeTypes: [], boardTypes: []
   });
+  const [components, setComponents] = useState([]);
+  const [componentDetails, setComponentDetails] = useState({});
   const [loading, setLoading] = useState(true);
+  const [componentsLoading, setComponentsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState(false);
+  const [componentError, setComponentError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [showComponentPicker, setShowComponentPicker] = useState(false);
+  const [componentType, setComponentType] = useState("Probe");
+  const [selectedComponentId, setSelectedComponentId] = useState("");
+  const [addingComponent, setAddingComponent] = useState(false);
+  const [removingComponentId, setRemovingComponentId] = useState("");
 
   const detailTable = (type) => ({
     Machine:"machine_details",
@@ -660,6 +668,8 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
     "Hard Disk":"hard_disk_details",
     Keyboard:"keyboard_details",
   })[type];
+
+  const componentTypes = ["Probe", "Board", "PSU", "Monitor", "Hard Disk", "Keyboard"];
 
   async function load() {
     setLoading(true);
@@ -689,7 +699,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
       supabase.from("equipment_manufacturers").select("id,name").order("name"),
       supabase.from("hard_disk_manufacturers").select("id,name").order("name"),
       supabase.from("machine_models").select("id,name,manufacturer_id").order("name"),
-      supabase.from("probe_models").select("id,name").order("name"),
+      supabase.from("probe_models").select("id,name,probe_type_id").order("name"),
       supabase.from("probe_types").select("id,name").order("name"),
       supabase.from("board_types").select("id,name").order("name"),
     ]);
@@ -714,7 +724,58 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
     setLoading(false);
   }
 
+  async function loadComponents() {
+    if (!item || item.item_type !== "Machine") {
+      setComponents([]);
+      setComponentDetails({});
+      return;
+    }
+    setComponentsLoading(true);
+    setComponentError("");
+    const { data: links, error: linkError } = await supabase
+      .from("machine_components")
+      .select("id,component_item_id,installed_at")
+      .eq("machine_item_id", item.id)
+      .order("installed_at");
+    if (linkError) {
+      setComponentError(linkError.message);
+      setComponentsLoading(false);
+      return;
+    }
+    const componentIds = (links || []).map((x) => x.component_item_id);
+    if (!componentIds.length) {
+      setComponents([]);
+      setComponentDetails({});
+      setComponentsLoading(false);
+      return;
+    }
+    const { data: rows, error: componentLoadError } = await supabase
+      .from("items")
+      .select("id,item_type,serial_number,status_id")
+      .in("id", componentIds);
+    if (componentLoadError) {
+      setComponentError(componentLoadError.message);
+      setComponentsLoading(false);
+      return;
+    }
+    const tables = [...new Set((rows || []).map((x) => detailTable(x.item_type)).filter(Boolean))];
+    const detailResults = await Promise.all(tables.map((table) => supabase.from(table).select("*").in("item_id", componentIds)));
+    const failedDetail = detailResults.find((x) => x.error);
+    if (failedDetail) {
+      setComponentError(failedDetail.error.message);
+      setComponentsLoading(false);
+      return;
+    }
+    const allDetails = detailResults.flatMap((x) => x.data || []);
+    const detailsMap = Object.fromEntries(allDetails.map((x) => [x.item_id, x]));
+    const rowMap = Object.fromEntries((rows || []).map((x) => [x.id, x]));
+    setComponents((links || []).map((link) => ({ ...link, item: rowMap[link.component_item_id], detail: detailsMap[link.component_item_id] || {} })));
+    setComponentDetails(detailsMap);
+    setComponentsLoading(false);
+  }
+
   useEffect(() => { load(); }, [itemId]);
+  useEffect(() => { loadComponents(); }, [item?.id, item?.item_type]);
 
   const name = (list, id) => list.find((x) => x.id === id)?.name || "—";
   const compatibleName = (id) => {
@@ -722,6 +783,22 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
     const manufacturer = masters.equipmentManufacturers.find((x) => x.id === model?.manufacturer_id);
     return model && manufacturer ? manufacturer.name + " " + model.name : model?.name || "—";
   };
+
+  function componentDisplay(component) {
+    const d = component.detail || {};
+    const type = component.item?.item_type;
+    if (type === "Probe") {
+      const model = masters.probeModels.find((x) => x.id === d.model_id)?.name;
+      const probeType = masters.probeTypes.find((x) => x.id === d.probe_type_id)?.name;
+      return [model, probeType].filter(Boolean).join(" · ") || "Probe";
+    }
+    if (type === "Board") return [masters.boardTypes.find((x) => x.id === d.board_type_id)?.name, d.part_number].filter(Boolean).join(" · ") || "Board";
+    if (type === "PSU") return "PSU";
+    if (type === "Monitor") return [d.size == null ? null : d.size + String.fromCharCode(34), d.video_input].filter(Boolean).join(" · ") || "Monitor";
+    if (type === "Hard Disk") return [d.capacity_gb == null ? null : d.capacity_gb + " GB", d.disk_type].filter(Boolean).join(" · ") || "Hard Disk";
+    if (type === "Keyboard") return "Keyboard";
+    return type || "Component";
+  }
 
   function fields() {
     const d = item.detail || {};
@@ -775,6 +852,49 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
     return [...(specific[item.item_type] || []), ...base];
   }
 
+  const availableComponents = [];
+  if (item?.item_type === "Machine") {
+    availableComponents.push(componentType);
+  }
+
+  async function addComponent() {
+    if (!canEdit || !selectedComponentId || addingComponent) return;
+    setAddingComponent(true);
+    setComponentError("");
+    const result = await supabase.from("machine_components").insert({
+      machine_item_id: item.id,
+      component_item_id: selectedComponentId,
+    });
+    if (result.error) {
+      setComponentError(result.error.code === "23505"
+        ? "This component is already installed in a machine."
+        : (result.error.message || "We could not add this component."));
+      setAddingComponent(false);
+      return;
+    }
+    setSelectedComponentId("");
+    setShowComponentPicker(false);
+    setAddingComponent(false);
+    await load();
+    await loadComponents();
+  }
+
+  async function removeComponent(link) {
+    if (!canEdit || removingComponentId) return;
+    if (!window.confirm("Remove this component from the machine? Its status will become Idle.")) return;
+    setRemovingComponentId(link.component_item_id);
+    setComponentError("");
+    const result = await supabase.from("machine_components").delete().eq("id", link.id);
+    if (result.error) {
+      setComponentError(result.error.message);
+      setRemovingComponentId("");
+      return;
+    }
+    setRemovingComponentId("");
+    await load();
+    await loadComponents();
+  }
+
   async function remove() {
     if (!canEdit || deleting) return;
     if (!window.confirm("Delete this item? This cannot be undone.")) return;
@@ -800,6 +920,14 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
   if (loading) return <section className="content-card item-page-shell"><div className="modal-loading">Loading item...</div></section>;
   if (!item) return <section className="content-card item-page-shell"><div className="error-message">{error || "Item not found."}</div><div className="modal-actions"><button className="secondary-button" onClick={onBack}>Back to Global Stock</button></div></section>;
 
+  const componentGroups = componentTypes.map((type) => ({
+    type,
+    rows: components.filter((x) => x.item?.item_type === type),
+  }));
+  const selectedTypeRows = componentGroups.find((x) => x.type === componentType)?.rows || [];
+  const hasSingleComponent = componentType === "Monitor" || componentType === "Keyboard";
+  const singleAlreadyInstalled = hasSingleComponent && selectedTypeRows.length > 0;
+
   return (
     <section className="content-card item-page-shell">
       <div className="item-detail-card item-page-card">
@@ -811,18 +939,59 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
           </div>
           <div className="item-detail-actions">
             <button className="secondary-button" onClick={onBack}>Back to Global Stock</button>
-            {canEdit && <button className="primary-button" onClick={() => setEditing(true)}>Edit</button>}
             {canEdit && <button className="cancel-button" onClick={remove} disabled={deleting}>{deleting ? "Deleting..." : "Delete"}</button>}
           </div>
         </div>
         <div className="item-detail-body">
-          <div className="item-photo-placeholder"><div><span className="photo-placeholder-icon">▧</span><strong>Item photo</strong><span>Photo support will be added later.</span></div></div>
+          <div className="item-machine-top">
+            <div className="item-photo-placeholder"><div><span className="photo-placeholder-icon">▧</span><strong>Item photo</strong><span>Photo support will be added later.</span></div></div>
+            {item.item_type === "Machine" && <div className="machine-components-panel">
+              <div className="machine-components-header">
+                <div><span className="section-kicker">INSTALLED COMPONENTS</span><h3>Components</h3><p>Components currently installed in this machine.</p></div>
+                {canEdit && <button className="primary-button" onClick={() => { setShowComponentPicker((v) => !v); setComponentError(""); }}>+ Add component</button>}
+              </div>
+              {showComponentPicker && canEdit && <div className="machine-component-picker">
+                <div className="machine-component-picker-grid">
+                  <label className="redesign-field"><span>Component type</span>
+                    <select value={componentType} onChange={(e) => { setComponentType(e.target.value); setSelectedComponentId(""); }}>
+                      {componentTypes.map((type) => <option key={type}>{type}</option>)}
+                    </select>
+                  </label>
+                  <label className="redesign-field"><span>Global stock component</span>
+                    <select value={selectedComponentId} onChange={(e) => setSelectedComponentId(e.target.value)} disabled={componentsLoading || singleAlreadyInstalled}>
+                      <option value="">{componentsLoading ? "Loading..." : singleAlreadyInstalled ? "Already installed" : "Select component"}</option>
+                      {availableComponents.length > 0 && null}
+                    </select>
+                  </label>
+                </div>
+                <div className="machine-component-picker-actions">
+                  <button className="secondary-button" onClick={() => { setShowComponentPicker(false); setSelectedComponentId(""); }}>Cancel</button>
+                  <button className="primary-button" onClick={addComponent} disabled={!selectedComponentId || addingComponent || singleAlreadyInstalled}>{addingComponent ? "Adding..." : "Add component"}</button>
+                </div>
+              </div>}
+              {componentError && <div className="error-message">{componentError}</div>}
+              {componentsLoading ? <div className="machine-components-empty">Loading components...</div> : (
+                <div className="machine-components-list">
+                  {componentGroups.map((group) => (
+                    <div className="machine-component-group" key={group.type}>
+                      <div className="machine-component-group-header"><strong>{group.type}</strong><span>{group.rows.length}</span></div>
+                      {group.rows.length ? group.rows.map((link) => (
+                        <div className="machine-component-row" key={link.id}>
+                          <div><strong>{link.item?.serial_number || "No serial number"}</strong><span>{componentDisplay(link)}</span></div>
+                          {canEdit && <button className="table-button delete-button" onClick={() => removeComponent(link)} disabled={removingComponentId === link.component_item_id}>{removingComponentId === link.component_item_id ? "Removing..." : "Remove"}</button>}
+                        </div>
+                      )) : <div className="machine-component-none">None installed</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>}
+          </div>
           <div className="item-detail-grid">{fields().map(([label,value]) => <div className="item-detail-field" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
           <div className="item-detail-notes"><div><span>Quality note</span><p>{item.quality_note || "No quality note."}</p></div></div>
           {error && <div className="error-message">{error}</div>}
         </div>
       </div>
-      {editing && <ItemForm supabase={supabase} type={item.item_type} editItem={item} onClose={() => setEditing(false)} onSaved={async () => { setEditing(false); await load(); }} />}
     </section>
   );
 }
