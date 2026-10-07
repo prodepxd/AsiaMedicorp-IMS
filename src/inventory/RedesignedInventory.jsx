@@ -855,6 +855,16 @@ export function RedesignedItemView({ supabase, itemId, canEdit, onBack, onDelete
     const base = [
       ["Serial number", item.serial_number || "—"],
       ["Status", statusValue],
+      ...(parentMachine ? [[
+        "Parent machine",
+        <button
+          type="button"
+          className="inline-machine-link"
+          onClick={() => onItemClick?.(parentMachine.id)}
+        >
+          {parentMachine.serial_number || "Machine"}
+        </button>,
+      ]] : []),
       ["Quality", name(masters.qualities, item.quality_status_id)],
       ["Location", name(masters.locations, item.current_location_id)],
     ];
