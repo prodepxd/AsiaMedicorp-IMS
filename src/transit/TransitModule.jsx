@@ -174,7 +174,7 @@ function TransitForm({
           if (deleteError) throw deleteError;
         }
 
-        const additions = selectedItemIds.filter((id) => !existing.has(id));
+        const additions = selectedItemIds.filter((id) => !existing.has(id) && !lockedChildIds.has(id));
         for (const itemId of additions) {
           const { error: insertError } = await supabase.from("transit_items").insert({
             transit_id: editRecord.id,
@@ -196,7 +196,7 @@ function TransitForm({
 
         if (insertError) throw insertError;
 
-        for (const itemId of selectedItemIds) {
+        for (const itemId of selectedItemIds.filter((id) => !lockedChildIds.has(id))) {
           const { error: itemError } = await supabase.from("transit_items").insert({
             transit_id: transit.id,
             item_id: itemId,
@@ -371,7 +371,7 @@ export function ItemTransitHistory({ supabase, itemId }) {
 
       const itemsResult = await supabase
         .from("transit_items")
-        .select("transit_id")
+        .select("transit_id,transit_status_id")
         .eq("item_id", itemId);
 
       if (!alive) return;
@@ -381,6 +381,7 @@ export function ItemTransitHistory({ supabase, itemId }) {
         return;
       }
 
+      const statusByTransit = Object.fromEntries((itemsResult.data || []).map((row) => [row.transit_id, row.transit_status_id]));
       const transitIds = (itemsResult.data || []).map((row) => row.transit_id);
       if (transitIds.length === 0) {
         setTransits([]);
@@ -441,6 +442,7 @@ export function ItemTransitHistory({ supabase, itemId }) {
                 </div>
                 <div className="transit-history-meta">
                   <span className={`status-pill transit-progress-pill transit-progress-${transit.progress.toLowerCase().replace(/[^a-z]+/g, "-")}`}>{transit.progress}</span>
+                  {statusByTransit[transit.id] && <span>Item Transit Status: {statusByTransit[transit.id]}</span>}
                   <span>Sender: {transit.sender}</span>
                   <span>Carrier: {transit.carrier}</span>
                 </div>
