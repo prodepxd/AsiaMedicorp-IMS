@@ -426,11 +426,14 @@ function TransitForm({
   );
 }
 
-export function ItemTransitHistory({ supabase, itemId }) {
+export function ItemTransitHistory({ supabase, itemId, canEdit }) {
   const [rows, setRows] = useState([]);
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [savingNoteId, setSavingNoteId] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -441,7 +444,7 @@ export function ItemTransitHistory({ supabase, itemId }) {
 
       const { data, error: historyError } = await supabase
         .from("transit_items")
-        .select("id,received_at,note,created_at,transit_id,transits(id,from_location_id,to_location_id,sent_at,received_at,transit_progress,sender,receiver,carrier,note,created_at)")
+        .select("id,received_at,note,created_at,transit_id,transits(id,from_location_id,to_location_id,sent_at,received_at,transit_progress,sender,receiver,carrier,created_at)")
         .eq("item_id", itemId)
         .order("created_at", { ascending: false });
 
@@ -495,42 +498,78 @@ export function ItemTransitHistory({ supabase, itemId }) {
                     <strong>{formatDate(transit.sent_at)}</strong>
                   </div>
                   <div className="transit-history-field">
-                    <span>Sender</span>
-                    <strong>{transit.sender || "—"}</strong>
-                  </div>
-                  <div className="transit-history-field">
                     <span>Received</span>
                     <strong>{formatDate(row.received_at)}</strong>
-                  </div>
-                  <div className="transit-history-field">
-                    <span>Receiver</span>
-                    <strong>{transit.receiver || "—"}</strong>
                   </div>
                   <div className="transit-history-created">
                     <span>Created</span>
                     <strong>{formatDate(transit.created_at)}</strong>
                   </div>
                 </div>
-                <div className="transit-history-route">
-                  <div className="transit-history-route-line">
-                    <strong>{locationMap[transit.from_location_id] || "—"}</strong>
-                    <span>→</span>
-                    <strong>{locationMap[transit.to_location_id] || "—"}</strong>
+
+                <div className="transit-history-movement">
+                  <div className="transit-history-vertical-route" aria-label={`Movement from ${locationMap[transit.from_location_id] || "unknown location"} to ${locationMap[transit.to_location_id] || "unknown location"}`}>
+                    <div className="transit-history-location transit-history-location-to">
+                      <span>TO</span>
+                      <strong>{locationMap[transit.to_location_id] || "—"}</strong>
+                    </div>
+                    <div className="transit-history-route-arrow" aria-hidden="true">↑</div>
+                    <div className="transit-history-location transit-history-location-from">
+                      <span>FROM</span>
+                      <strong>{locationMap[transit.from_location_id] || "—"}</strong>
+                    </div>
                   </div>
                   <div className="transit-history-progress">
                     <span className={`status-pill transit-progress-pill transit-progress-${progressClass(transit.transit_progress)}`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
                   </div>
-                  <div className="transit-history-section">
+                  <div className="transit-history-note">
+                    <div className="transit-history-section-heading">
+                      <span>Note</span>
+                      {canEdit && editingNoteId !== row.id && (
+                        <button type="button" className="inline-edit-button" onClick={() => { setEditingNoteId(row.id); setNoteDraft(row.note || ""); setError(""); }}>
+                          {row.note ? "Edit" : "Add"}
+                        </button>
+                      )}
+                    </div>
+                    {editingNoteId === row.id ? (
+                      <div className="transit-history-note-editor">
+                        <textarea value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} rows="3" placeholder="Add a note for this item..." />
+                        <div className="transit-history-note-actions">
+                          <button type="button" className="secondary-button" onClick={() => { setEditingNoteId(null); setNoteDraft(""); }} disabled={savingNoteId === row.id}>Cancel</button>
+                          <button type="button" className="primary-button" onClick={async () => {
+                            setSavingNoteId(row.id);
+                            setError("");
+                            const { error: noteError } = await supabase.from("transit_items").update({ note: noteDraft.trim() || null }).eq("id", row.id);
+                            if (noteError) {
+                              setError(noteError.message);
+                            } else {
+                              setRows((current) => current.map((item) => item.id === row.id ? { ...item, note: noteDraft.trim() || null } : item));
+                              setEditingNoteId(null);
+                              setNoteDraft("");
+                            }
+                            setSavingNoteId(null);
+                          }} disabled={savingNoteId === row.id}>{savingNoteId === row.id ? "Saving..." : "Save"}</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p>{row.note || "No item note."}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="transit-history-people">
+                  <div className="transit-history-field">
+                    <span>Sender</span>
+                    <strong>{transit.sender || "—"}</strong>
+                  </div>
+                  <div className="transit-history-field">
                     <span>Carrier</span>
                     <strong>{transit.carrier || "—"}</strong>
                   </div>
-                  {(transit.note || row.note) && (
-                    <div className="transit-history-section transit-history-note">
-                      <span>Note</span>
-                      {transit.note && <p><strong>Transit:</strong> {transit.note}</p>}
-                      {row.note && <p><strong>Item:</strong> {row.note}</p>}
-                    </div>
-                  )}
+                  <div className="transit-history-field">
+                    <span>Receiver</span>
+                    <strong>{transit.receiver || "—"}</strong>
+                  </div>
                 </div>
               </div>
             );
