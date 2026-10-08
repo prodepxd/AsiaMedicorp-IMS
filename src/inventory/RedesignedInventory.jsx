@@ -56,7 +56,6 @@ export const MASTER_GROUPS = [
   { key: "locations", label: "Locations", table: "locations" },
   { key: "inventory_statuses", label: "Inventory Statuses", table: "inventory_statuses" },
   { key: "quality_statuses", label: "Quality Statuses", table: "quality_statuses" },
-  { key: "transit_statuses", label: "Transit Statuses", table: "transit_statuses" },
 ];
 
 const SELECT_OPTIONS = {
@@ -858,14 +857,14 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
   useEffect(() => { loadComponents(); }, [item?.id, item?.item_type]);
   useEffect(() => { loadAvailableComponents(); }, [item?.id, item?.item_type, componentType, showComponentPicker, masters.inventoryStatuses.length]);
 
-  const name = (list, id) => list.find((x) => x.id === id)?.name || "—";
-  const statusName = name(masters.inventoryStatuses, item?.inventory_status_id);
+  const name = (list, id) => (list || []).find((x) => x.id === id)?.name || "—";
+  const statusName = name(masters.inventoryStatuses || [], item?.inventory_status_id);
   const statusValue = parentMachine && statusName === "In Machine"
     ? <><span>In Machine (</span><button type="button" className="inline-machine-link" onClick={() => onItemClick?.(parentMachine.id)}>{parentMachine.serial_number || "Machine"}</button><span>)</span></>
     : statusName;
   const compatibleName = (id) => {
-    const model = masters.machineModels.find((x) => x.id === id);
-    const manufacturer = masters.equipmentManufacturers.find((x) => x.id === model?.manufacturer_id);
+    const model = (masters.machineModels || []).find((x) => x.id === id);
+    const manufacturer = (masters.equipmentManufacturers || []).find((x) => x.id === model?.manufacturer_id);
     return model && manufacturer ? manufacturer.name + " " + model.name : model?.name || "—";
   };
 
@@ -1424,7 +1423,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   function manufacturerName(item) {
     const id = item.detail?.manufacturer_id;
     const list = activeType === "Hard Disk" ? masters.hardDiskManufacturers : masters.equipmentManufacturers;
-    return list.find(x=>x.id===id)?.name || "—";
+    return (list || []).find(x=>x.id===id)?.name || "—";
   }
 
   function machineSpecificColumns() {
@@ -1439,15 +1438,15 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
     if (key==="manufacturer") return manufacturerName(item);
     if (key==="model") {
       const list = activeType === "Machine" ? masters.machineModels : masters.probeModels;
-      return list.find(x=>x.id===d.model_id)?.name || "—";
+      return (list || []).find(x=>x.id===d.model_id)?.name || "—";
     }
     if (key==="compatible_machine") {
-      const model = masters.machineModels.find(x=>x.id===d.compatible_machine_model_id);
-      const manufacturer = masters.equipmentManufacturers.find(x=>x.id===model?.manufacturer_id)?.name;
+      const model = (masters.machineModels || []).find(x=>x.id===d.compatible_machine_model_id);
+      const manufacturer = (masters.equipmentManufacturers || []).find(x=>x.id===model?.manufacturer_id)?.name;
       return manufacturer && model?.name ? manufacturer + " " + model.name : model?.name || manufacturer || "—";
     }
-    if (key==="probe_type") return masters.probeTypes.find(x=>x.id===d.probe_type_id)?.name || "—";
-    if (key==="board_type") return masters.boardTypes.find(x=>x.id===d.board_type_id)?.name || "—";
+    if (key==="probe_type") return (masters.probeTypes || []).find(x=>x.id===d.probe_type_id)?.name || "—";
+    if (key==="board_type") return (masters.boardTypes || []).find(x=>x.id===d.board_type_id)?.name || "—";
     if (key==="functions") return Array.isArray(d.functions)?d.functions.join(", "):"—";
     if (key==="portable") return d.portable == null ? "—" : d.portable ? "Yes":"No";
     if (key==="connectors") return d.connector_count ?? "—";
@@ -1474,7 +1473,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
       {error && <div className="error-message">{error}</div>}
       <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>Serial number</th>{columns.map(c=><th key={c}>{FIELD_LABELS[c]}</th>)}<th>Inventory Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
         {!loading && filtered.length===0 && <tr><td colSpan={columns.length+4} className="empty-cell">{items.length?"No matching items.":"No items of this type yet."}</td></tr>}
-        {filtered.map(item=><tr key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{masters.inventoryStatuses.find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{masters.qualities.find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{masters.locations.find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
+        {filtered.map(item=><tr key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{(masters.inventoryStatuses || []).find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{(masters.qualities || []).find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{(masters.locations || []).find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
       </tbody></table></div>
       {showAdd && <ItemForm supabase={supabase} type={activeType} onClose={()=>setShowAdd(false)} onSaved={async()=>{await loadItems();setShowAdd(false);}} />}
     </section>
@@ -1484,7 +1483,12 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
 export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveChange }) {
   const [active, setActive] = useState(() => MASTER_GROUPS.find((group) => group.key === activeKey) || MASTER_GROUPS[0]);
   const [rows, setRows] = useState([]);
-  const [refs, setRefs] = useState([]);
+  const [refs, setRefs] = useState({
+    manufacturers: [],
+    probeTypes: [],
+    machineModels: [],
+    compatibilities: [],
+  });
   const [form, setForm] = useState({name:"",manufacturer_id:"",probe_type_id:"",compatible_machine_model_ids:[]});
   const [compatibilitySearch, setCompatibilitySearch] = useState("");
   const [compatibilityOpen, setCompatibilityOpen] = useState(false);
@@ -1832,8 +1836,8 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
               {!loading&&rows.length===0&&<tr><td colSpan={(active.manufacturer?1:0)+(active.probeType?1:0)+(active.key==="probe_models"?1:0)+3} className="empty-cell">No records found.</td></tr>}
               {rows.map(row=><Fragment key={row.id}><tr>
                 <td><strong>{row.name}</strong></td>
-                {active.manufacturer&&<td>{(active.probeType ? refs.manufacturers : refs).find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}
-                {active.probeType&&<td>{(active.manufacturer ? refs.probeTypes : refs).find(x=>x.id===row.probe_type_id)?.name||"—"}</td>}
+                {active.manufacturer&&<td>{(active.probeType ? (refs.manufacturers || []) : (refs || [])).find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}
+                {active.probeType&&<td>{(active.manufacturer ? (refs.probeTypes || []) : (refs || [])).find(x=>x.id===row.probe_type_id)?.name||"—"}</td>}
                 {active.key === "probe_models" && <td>
                   {(() => {
                     const compatibleIds = (refs.compatibilities || []).filter((x) => x.probe_model_id === row.id).map((x) => x.machine_model_id);
