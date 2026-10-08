@@ -58,6 +58,7 @@ function TransitForm({
   );
   const [note, setNote] = useState(editRecord?.note || "");
   const [itemSearch, setItemSearch] = useState("");
+  const [itemDropdownOpen, setItemDropdownOpen] = useState(false);
   const [machineComponents, setMachineComponents] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -108,34 +109,52 @@ function TransitForm({
 
   function toggleItem(itemId) {
     setSelectedItemIds((current) => {
-      if (current.includes(itemId)) {
-        const item = itemMap[itemId];
-
-        if (item?.item_type === "Machine") {
-          const childIds = new Set(machineComponents[itemId] || []);
-          return current.filter((id) => id !== itemId && !childIds.has(id));
-        }
-
-        return current.filter((id) => id !== itemId);
-      }
-
       const item = itemMap[itemId];
+      if (!item) return current;
       const parentMachineIds = Object.entries(machineComponents)
         .filter(([, componentIds]) => componentIds.includes(itemId))
         .map(([machineId]) => machineId);
-
-      if (parentMachineIds.length > 0 && !parentMachineIds.some((machineId) => current.includes(machineId))) {
-        setError("This component is currently installed in a Machine. Transit the parent Machine, or remove it from the Machine first.");
+      if (parentMachineIds.length > 0) {
+        if (parentMachineIds.some((machineId) => current.includes(machineId))) setError("Installed components are included automatically with their Machine and cannot be deselected.");
+        else setError("This component is installed in a Machine. Select the parent Machine.");
         return current;
       }
-
-      const idsToAdd = [itemId, ...(item?.item_type === "Machine" ? (machineComponents[itemId] || []) : [])];
-      return [...new Set([...current, ...idsToAdd])];
+      if (current.includes(itemId)) {
+        const childIds = new Set(machineComponents[itemId] || []);
+        return current.filter((id) => id !== itemId && !childIds.has(id));
+      }
+      return [...new Set([...current, itemId, ...(machineComponents[itemId] || [])])];
     });
   }
 
-  function removeSelected(itemId) {
-    setSelectedItemIds((current) => current.filter((id) => id !== itemId));
+  const selectedSummary = useMemo(() => {
+    const selected = new Set(selectedItemIds);
+    return availableItems.filter((item) => selected.has(item.id));
+  }, [availableItems, selectedItemIds]);
+
+  const componentParentMap = useMemo(() => {
+    const map = {};
+    Object.entries(machineComponents).forEach(([machineId, componentIds]) => componentIds.forEach((componentId) => {
+      if (!map[componentId]) map[componentId] = [];
+      map[componentId].push(machineId);
+    }));
+    return map;
+  }, [machineComponents]);
+
+  const itemRows = useMemo(() => {
+    const query = itemSearch.trim().toLowerCase();
+    if (!fromLocationId) return [];
+    const matches = (item) => !query || itemLabel(item).toLowerCase().includes(query);
+    return availableItems.filter((item) => !componentParentMap[item.id]?.length).filter((item) => {
+      if (matches(item)) return true;
+      return item.item_type === "Machine" && (machineComponents[item.id] || []).some((childId) => matches(itemMap[childId]));
+    });
+  }, [availableItems, fromLocationId, itemSearch, componentParentMap, machineComponents, itemMap]);
+
+  function machineChildren(machineId) {
+    const selected = new Set(selectedItemIds);
+    const query = itemSearch.trim().toLowerCase();
+    return (machineComponents[machineId] || []).map((id) => itemMap[id]).filter(Boolean).filter((item) => !query || itemLabel(item).toLowerCase().includes(query) || selected.has(item.id));
   }
 
   async function save(event) {
@@ -258,7 +277,7 @@ function TransitForm({
 
         <form className="transit-form" onSubmit={save}>
           {mode !== "complete" && (
-            <div className="transit-form-grid">
+            <div className="transit-form-grid transit-details-grid">
               <label className="redesign-field transit-wide">
                 <span>From location *</span>
                 <select value={fromLocationId} onChange={(event) => { setFromLocationId(event.target.value); setSelectedItemIds([]); setError(""); }} required>
@@ -272,92 +291,55 @@ function TransitForm({
           {mode !== "complete" && (
             <div className="transit-item-picker">
               <div className="transit-field-heading">
-                <div>
-                  <strong>Global Stock items *</strong>
-                  <span>Select one or more items.</span>
-                </div>
+                <div><strong>Global Stock items *</strong><span>Search by serial number and select one or more items.</span></div>
                 <span className="history-count">{selectedItemIds.length} selected</span>
               </div>
-
-              <input
-                value={itemSearch}
-                onChange={(event) => setItemSearch(event.target.value)}
-                placeholder="Search serial number or item type"
-              />
-
-              <div className="transit-item-options">
-                {!fromLocationId ? (
-                  <div className="history-empty">Select a starting location to see Global Stock items available there.</div>
-                ) : itemsLoading ? (
-                  <div className="history-empty">Loading Global Stock items at this location...</div>
-                ) : filteredItems.length === 0 ? (
-                  <div className="history-empty">No Global Stock items are currently at this location.</div>
-                ) : filteredItems.map((item) => {
-                  const checked = selectedItemIds.includes(item.id);
-                  const installedParentIds = Object.entries(machineComponents)
-                    .filter(([, componentIds]) => componentIds.includes(item.id))
-                    .map(([machineId]) => machineId);
-                  const installedWithoutSelectedParent =
-                    installedParentIds.length > 0 &&
-                    !installedParentIds.some((machineId) => selectedItemIds.includes(machineId));
-                  return (
-                    <label
-                      key={item.id}
-                      className={checked ? "transit-item-option selected" : installedWithoutSelectedParent ? "transit-item-option disabled" : "transit-item-option"}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={installedWithoutSelectedParent}
-                        onChange={() => toggleItem(item.id)}
-                      />
-                      <span>
-                        <strong>{itemLabel(item)}</strong>
-                        <small>
-                          {installedWithoutSelectedParent
-                            ? "Installed in Machine — select the parent Machine"
-                            : item.inventory_status_name || "—"}
-                          {item.item_type === "Machine" && (machineComponents[item.id] || []).length > 0
-                            ? ` · Includes ${machineComponents[item.id].length} installed component${machineComponents[item.id].length === 1 ? "" : "s"}`
-                            : ""}
-                        </small>
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-
-              {selectedDisplayItems.length > 0 && (
-                <div className="transit-selected-items">
-                  <div className="transit-field-heading">
-                    <div><strong>Selected items</strong><span>All selected items must share the same current location.</span></div>
-                  </div>
-                  {selectedDisplayItems.map((item) => (
-                    <div className="transit-selected-row" key={item.id}>
-                      <div>
-                        <strong>{itemLabel(item)}</strong>
-                        <span>
-                          {item.inventory_status_name || "—"}
-                          {item.item_type === "Machine" && (machineComponents[item.id] || []).length > 0
-                            ? ` · ${machineComponents[item.id].length} installed component${machineComponents[item.id].length === 1 ? "" : "s"} included`
-                            : ""}
-                        </span>
-                      </div>
-                      <button type="button" className="table-button delete-button" onClick={() => removeSelected(item.id)}>
-                        Remove
-                      </button>
+              <div className={itemDropdownOpen ? "transit-item-dropdown open" : "transit-item-dropdown"}>
+                <button type="button" className="transit-item-dropdown-trigger" onClick={() => setItemDropdownOpen((open) => !open)} disabled={!fromLocationId || itemsLoading}>
+                  <span>{!fromLocationId ? "Select a starting location first" : itemsLoading ? "Loading Global Stock..." : selectedSummary.length ? (selectedSummary.filter((item) => item.item_type === "Machine").length + " machine" + (selectedSummary.filter((item) => item.item_type === "Machine").length === 1 ? "" : "s") + " · " + selectedItemIds.length + " items selected") : "Select Global Stock items"}</span>
+                  <span className="transit-item-dropdown-chevron">▾</span>
+                </button>
+                {itemDropdownOpen && fromLocationId && !itemsLoading && (
+                  <div className="transit-item-dropdown-menu">
+                    <input autoFocus value={itemSearch} onChange={(event) => setItemSearch(event.target.value)} placeholder="Search by serial number" />
+                    <div className="transit-item-checklist">
+                      {itemRows.length === 0 ? <div className="history-empty">No Global Stock items match this search.</div> : itemRows.map((item) => {
+                        const checked = selectedItemIds.includes(item.id);
+                        const children = item.item_type === "Machine" ? machineChildren(item.id) : [];
+                        return (
+                          <div className="transit-item-tree" key={item.id}>
+                            <label className={checked ? "transit-item-option selected" : "transit-item-option"}>
+                              <input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} />
+                              <span><strong>{itemLabel(item)}</strong><small>{item.inventory_status_name || "—"}{children.length > 0 ? " · Includes " + children.length + " installed component" + (children.length === 1 ? "" : "s") : ""}</small></span>
+                            </label>
+                            {children.length > 0 && <div className="transit-component-list">{children.map((child) => (
+                              <div className={selectedItemIds.includes(child.id) ? "transit-component-row selected" : "transit-component-row"} key={child.id}>
+                                <input type="checkbox" checked={selectedItemIds.includes(child.id)} disabled readOnly />
+                                <span><strong>{itemLabel(child)}</strong><small>{child.inventory_status_name || "In Machine"}</small></span>
+                              </div>
+                            ))}</div>}
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
-
           <div className="transit-form-grid">
             <label className="redesign-field">
               <span>To location *</span>
               <select value={toLocationId} onChange={(event) => setToLocationId(event.target.value)} required>
                 <option value="">Select destination</option>
+                {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+              </select>
+            </label>
+
+            <label className="redesign-field">
+              <span>From location *</span>
+              <select value={fromLocationId} disabled={mode === "complete"} onChange={(event) => { setFromLocationId(event.target.value); setSelectedItemIds([]); setError(""); }} required>
+                <option value="">Select starting location</option>
                 {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
               </select>
             </label>
@@ -387,7 +369,7 @@ function TransitForm({
               <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} required={mode === "complete"} />
             </label>
 
-            <label className="redesign-field transit-wide">
+            <label className="redesign-field transit-wide transit-note-field">
               <span>Transit note <em>· Optional</em></span>
               <textarea value={note} onChange={(event) => setNote(event.target.value)} rows="4" placeholder="Optional note for the overall Transit" />
             </label>
