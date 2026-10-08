@@ -508,15 +508,15 @@ export function ItemTransitHistory({ supabase, itemId, canEdit }) {
                 </div>
 
                 <div className="transit-history-movement">
-                  <div className="transit-history-vertical-route" aria-label={`Movement from ${locationMap[transit.from_location_id] || "unknown location"} to ${locationMap[transit.to_location_id] || "unknown location"}`}>
-                    <div className="transit-history-location transit-history-location-to">
-                      <span>TO</span>
-                      <strong>{locationMap[transit.to_location_id] || "—"}</strong>
-                    </div>
-                    <div className="transit-history-route-arrow" aria-hidden="true">↑</div>
+                  <div className="transit-history-horizontal-route" aria-label={`Movement from ${locationMap[transit.from_location_id] || "unknown location"} to ${locationMap[transit.to_location_id] || "unknown location"}`}>
                     <div className="transit-history-location transit-history-location-from">
                       <span>FROM</span>
                       <strong>{locationMap[transit.from_location_id] || "—"}</strong>
+                    </div>
+                    <div className="transit-history-route-arrow" aria-hidden="true">→</div>
+                    <div className="transit-history-location transit-history-location-to">
+                      <span>TO</span>
+                      <strong>{locationMap[transit.to_location_id] || "—"}</strong>
                     </div>
                   </div>
                   <div className="transit-history-progress">
