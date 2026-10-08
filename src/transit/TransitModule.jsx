@@ -668,7 +668,7 @@ export function ItemTransitHistory({ supabase, itemId, canEdit, focusLatestMovin
   );
 }
 
-function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMoving }) {
+function TransitCard({ transit, itemMap, locationMap, canEdit, canDelete, onEdit, onStartMoving, onCancel, onDelete }) {
   const transitItems = transit.item_ids.map((id) => itemMap[id]).filter(Boolean);
 
   return (
@@ -731,16 +731,22 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMo
         </div>
       )}
 
-      {canEdit && (
+      {(canEdit || canDelete) && (
         <div className="transit-box-actions">
-          {transit.transit_progress === PROGRESS.standby && (
+          {canEdit && transit.transit_progress === PROGRESS.standby && (
             <>
               <button className="secondary-button" onClick={() => onEdit?.("edit", transit)}>Edit</button>
               <button className="primary-button" onClick={() => onStartMoving(transit)}>Start Moving</button>
             </>
           )}
-          {transit.transit_progress === PROGRESS.moving && (
+          {canEdit && transit.transit_progress === PROGRESS.moving && (
             <button className="primary-button" onClick={() => onEdit?.("complete", transit)}>Receive & Complete</button>
+          )}
+          {canDelete && transit.transit_progress !== PROGRESS.completed && (
+            <button className="danger-button" onClick={() => onCancel?.(transit)}>Cancel Transit</button>
+          )}
+          {canDelete && transit.transit_progress === PROGRESS.completed && (
+            <button className="danger-button" onClick={() => onDelete?.(transit)}>Delete Transit</button>
           )}
         </div>
       )}
@@ -748,7 +754,7 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMo
   );
 }
 
-export default function TransitModule({ supabase, canEdit, onItemClick, view = "active" }) {
+export default function TransitModule({ supabase, canEdit, canDelete, onItemClick, view = "active" }) {
   const [items, setItems] = useState([]);
   const [locations, setLocations] = useState([]);
   const [inventoryStatuses, setInventoryStatuses] = useState([]);
@@ -916,6 +922,30 @@ export default function TransitModule({ supabase, canEdit, onItemClick, view = "
     await load();
   }
 
+  async function deleteTransit(transit, action = "delete") {
+    setError("");
+    const isCompleted = transit.transit_progress === PROGRESS.completed;
+    const actionLabel = isCompleted ? "delete" : "cancel";
+    const confirmed = window.confirm(
+      isCompleted
+        ? "Delete this completed Transit? Its Transit history entries for the included items will also be removed."
+        : "Cancel this Transit? The Transit and its item history entries will be removed."
+    );
+    if (!confirmed) return;
+
+    const { error: deleteError } = await supabase
+      .from("transits")
+      .delete()
+      .eq("id", transit.id);
+
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+
+    await load();
+  }
+
   async function afterSave() {
     setShowForm(false);
     setEditingTransit(null);
@@ -944,12 +974,15 @@ export default function TransitModule({ supabase, canEdit, onItemClick, view = "
                 itemMap={itemMap}
                 locationMap={locationMap}
                 canEdit={canEdit}
+                canDelete={canDelete}
                 onEdit={(action, value) => {
                   if (action === "item") onItemClick?.(value);
                   else if (action === "complete") openComplete(value);
                   else openEdit(value);
                 }}
                 onStartMoving={startMoving}
+                onCancel={(value) => deleteTransit(value, "cancel")}
+                onDelete={(value) => deleteTransit(value, "delete")}
               />
             ))}
           </div>
