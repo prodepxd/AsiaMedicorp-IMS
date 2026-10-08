@@ -269,7 +269,7 @@ function TransitForm({
             <p>
               {mode === "complete"
                 ? "Record the receiver and received date/time before completion."
-                : "A Transit can contain one or more Global Stock items. The source location is determined from the selected items."}
+                : "A Transit can contain one or more Global Stock items. Select the starting location first, then choose the items to move."}
             </p>
           </div>
           <button className="modal-close" onClick={onClose}>×</button>
@@ -817,54 +817,6 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
         />
       )}
     </section>
-  );
-}<div className="transit-form-grid transit-details-grid">
-            <div className="transit-details-row transit-three-col">
-            <label className="redesign-field">
-              <span>Sender *</span>
-              <input value={sender} onChange={(event) => setSender(event.target.value)} placeholder="Sender" required />
-            </label>
-
-            <label className="redesign-field">
-              <span>Carrier *</span>
-              <input value={carrier} onChange={(event) => setCarrier(event.target.value)} placeholder="Carrier" required />
-            </label>
-
-            <label className="redesign-field">
-              <span>Receiver{mode === "complete" ? " *" : ""}</span>
-              <input value={receiver} onChange={(event) => setReceiver(event.target.value)} placeholder={mode === "complete" ? "Receiver" : "Optional until completion"} required={mode === "complete"} />
-            </label>
-
-            </div>
-            <div className="transit-details-row transit-two-col">
-            <label className="redesign-field">
-              <span>Sent date & time{mode === "complete" ? " *" : ""}</span>
-              <input type="datetime-local" value={sentAt} onChange={(event) => setSentAt(event.target.value)} required={mode === "complete"} />
-            </label>
-
-            <label className="redesign-field">
-              <span>Received date & time{mode === "complete" ? " *" : ""}</span>
-              <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} required={mode === "complete"} />
-            </label>
-
-            </div>
-            <label className="redesign-field transit-wide transit-note-field">
-              <span>Transit note <em>· Optional</em></span>
-              <textarea value={note} onChange={(event) => setNote(event.target.value)} rows="4" placeholder="Optional note for the overall Transit" />
-            </label>
-          </div></div>
-
-          {error && <div className="error-message">{error}</div>}
-
-          <div className="modal-actions">
-            <button type="button" className="secondary-button" onClick={onClose} disabled={saving}>Cancel</button>
-            <button type="submit" className="primary-button" disabled={saving}>
-              {saving ? "Saving..." : mode === "complete" ? "Complete Transit" : editRecord ? "Save changes" : "Create Transit"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
   );
 }
 
