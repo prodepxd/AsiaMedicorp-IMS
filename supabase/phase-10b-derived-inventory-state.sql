@@ -78,8 +78,10 @@ SELECT
   mc.machine_item_id,
   machine.serial_number AS machine_serial_number,
   CASE
+    WHEN mc.machine_item_id IS NOT NULL AND machine.serial_number IS NOT NULL THEN
+      'In Machine (' || machine.serial_number || ')'
     WHEN mc.machine_item_id IS NOT NULL THEN
-      'In Machine (' || COALESCE(machine.serial_number, 'Unknown') || ')'
+      'In Machine'
     ELSE
       s.name
   END AS inventory_state
