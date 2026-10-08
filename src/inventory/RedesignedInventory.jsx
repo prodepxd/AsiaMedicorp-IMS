@@ -126,6 +126,17 @@ function activeOrCurrent(list, currentIds = []) {
   return (list || []).filter((row) => row.is_active !== false || ids.includes(row.id));
 }
 
+async function loadInventoryStateMap(supabase, itemIds) {
+  const ids = [...new Set((itemIds || []).filter(Boolean))];
+  if (!ids.length) return {};
+  const { data, error } = await supabase
+    .from("item_inventory_state")
+    .select("item_id,inventory_state")
+    .in("item_id", ids);
+  if (error) throw error;
+  return Object.fromEntries((data || []).map((row) => [row.item_id, row.inventory_state]));
+}
+
 function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSaved }) {
   const [type, setType] = useState(initialType || "");
   const [masters, setMasters] = useState({
@@ -768,7 +779,17 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
         .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0] || null;
       setMovingTransit(latestMoving);
     }
-    setItem({...row, detail:detail||{}});
+    let inventoryState = null;
+    try {
+      const stateMap = await loadInventoryStateMap(supabase, [row.id]);
+      inventoryState = stateMap[row.id] || null;
+    } catch (stateError) {
+      setError(stateError.message || "We could not load the item's derived inventory state.");
+      setLoading(false);
+      return;
+    }
+    if (requestId !== loadRequestRef.current) return;
+    setItem({...row, detail:detail||{}, inventory_state:inventoryState});
     if (row.item_type !== "Machine") {
       const { data: relationship } = await supabase
         .from("machine_components")
@@ -977,9 +998,9 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
 
   const name = (list, id) => (list || []).find((x) => x.id === id)?.name || "—";
   const statusName = name(masters.inventoryStatuses || [], item?.inventory_status_id);
-  const statusValue = parentMachine && statusName === "In Machine"
+  const statusValue = parentMachine
     ? <><span>In Machine (</span><button type="button" className="inline-machine-link" onClick={() => onItemClick?.(parentMachine.id)}>{parentMachine.serial_number || "Machine"}</button><span>)</span></>
-    : statusName;
+    : (item?.inventory_state || statusName);
   const compatibleName = (id) => {
     const model = (masters.machineModels || []).find((x) => x.id === id);
     const manufacturer = (masters.equipmentManufacturers || []).find((x) => x.id === model?.manufacturer_id);
@@ -1371,7 +1392,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
   }
   async function removeComponent(link) {
     if (!canEdit || removingComponentId) return;
-    if (!window.confirm("Remove this component from the machine? Its status will become Idle.")) return;
+    if (!window.confirm("Remove this component from the machine? It will no longer be shown as installed and will return to its base inventory state.")) return;
     setRemovingComponentId(link.component_item_id);
     setComponentError("");
     const result = await supabase.from("machine_components").delete().eq("id", link.id);
@@ -1583,7 +1604,20 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
       details = result.data || [];
     }
     const detailMap = Object.fromEntries(details.map(x=>[x.item_id,x]));
-    setItems(rows.map(x=>({...x, detail:detailMap[x.id]||{}})));
+    let inventoryStateMap = {};
+    try {
+      inventoryStateMap = await loadInventoryStateMap(supabase, ids);
+    } catch (stateError) {
+      setError(stateError.message || "We could not load derived inventory state.");
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+    setItems(rows.map(x=>({
+      ...x,
+      detail:detailMap[x.id]||{},
+      inventory_state: inventoryStateMap[x.id] || null,
+    })));
     setLoading(false);
   }
 
@@ -1649,7 +1683,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
       {error && <div className="error-message">{error}</div>}
       <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>Serial number</th>{columns.map(c=><th key={c}>{FIELD_LABELS[c]}</th>)}<th>Inventory Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
         {!loading && filtered.length===0 && <tr><td colSpan={columns.length+4} className="empty-cell">{items.length?"No matching items.":"No items of this type yet."}</td></tr>}
-        {filtered.map(item=><tr key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{(masters.inventoryStatuses || []).find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{(masters.qualities || []).find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{(masters.locations || []).find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
+        {filtered.map(item=><tr key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{item.inventory_state || (masters.inventoryStatuses || []).find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{(masters.qualities || []).find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{(masters.locations || []).find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
       </tbody></table></div>
       {showAdd && <ItemForm supabase={supabase} type={activeType} onClose={()=>setShowAdd(false)} onSaved={async()=>{await loadItems();setShowAdd(false);}} />}
     </section>
