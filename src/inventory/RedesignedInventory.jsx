@@ -1390,6 +1390,25 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
     if (!window.confirm("Delete this item? This cannot be undone.")) return;
     setDeleting(true);
     setError("");
+
+    const { data: transitHistory, error: transitHistoryError } = await supabase
+      .from("transit_items")
+      .select("id")
+      .eq("item_id", item.id)
+      .limit(1);
+
+    if (transitHistoryError) {
+      setError(transitHistoryError.message);
+      setDeleting(false);
+      return;
+    }
+
+    if ((transitHistory || []).length > 0) {
+      setError("This item cannot be deleted because it has Transit history. Delete the related Transit history first.");
+      setDeleting(false);
+      return;
+    }
+
     const table = detailTable(item.item_type);
     const detailResult = await supabase.from(table).delete().eq("item_id", item.id);
     if (detailResult.error) {
@@ -1397,12 +1416,14 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       setDeleting(false);
       return;
     }
+
     const itemResult = await supabase.from("items").delete().eq("id", item.id);
     if (itemResult.error) {
       setError(itemResult.error.message);
       setDeleting(false);
       return;
     }
+
     setDeleting(false);
     onDeleted();
   }
