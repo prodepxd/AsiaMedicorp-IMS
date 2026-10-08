@@ -339,7 +339,13 @@ function TransitForm({
                     {selectedSummary.filter((item) => !componentParentMap[item.id]?.length).map((item) => (
                       <div className="transit-selected-tree-item" key={item.id}>
                         <div className="transit-selected-main">
-                          <span className="transit-selected-check">✓</span>
+                          <input
+                            type="checkbox"
+                            className="transit-selected-checkbox"
+                            checked
+                            onChange={() => toggleItem(item.id)}
+                            aria-label={`Remove ${itemLabel(item)} from selected Transit items`}
+                          />
                           <div>
                             <strong>{itemLabel(item)}</strong>
                             <small>{item.inventory_status_name || "—"}</small>
@@ -349,7 +355,14 @@ function TransitForm({
                           <div className="transit-selected-components">
                             {machineChildren(item.id).map((child) => (
                               <div className="transit-selected-component" key={child.id}>
-                                <span className="transit-selected-check">✓</span>
+                                <input
+                                  type="checkbox"
+                                  className="transit-selected-checkbox"
+                                  checked
+                                  disabled
+                                  readOnly
+                                  aria-label={`${itemLabel(child)} is included automatically`}
+                                />
                                 <div>
                                   <strong>{itemLabel(child)}</strong>
                                   <small>{child.inventory_status_name || "In Machine"} · Included automatically</small>
@@ -365,8 +378,8 @@ function TransitForm({
               )}
             </div>
           )}
-          <div className="transit-form-grid transit-details-grid">
-            <div className="transit-details-row transit-three-col">
+          <div className="transit-details-grid">
+            <div className="transit-details-row transit-two-col">
               <label className="redesign-field">
                 <span>Sender *</span>
                 <input value={sender} onChange={(event) => setSender(event.target.value)} placeholder="Sender" required />
@@ -375,11 +388,8 @@ function TransitForm({
                 <span>Receiver{mode === "complete" ? " *" : ""}</span>
                 <input value={receiver} onChange={(event) => setReceiver(event.target.value)} placeholder={mode === "complete" ? "Receiver" : "Optional until completion"} required={mode === "complete"} />
               </label>
-              <label className="redesign-field">
-                <span>Carrier *</span>
-                <input value={carrier} onChange={(event) => setCarrier(event.target.value)} placeholder="Carrier" required />
-              </label>
             </div>
+
             <div className="transit-details-row transit-two-col">
               <label className="redesign-field">
                 <span>Sent date & time{mode === "complete" ? " *" : ""}</span>
@@ -390,12 +400,18 @@ function TransitForm({
                 <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} required={mode === "complete"} />
               </label>
             </div>
-            <label className="redesign-field transit-wide transit-note-field">
-              <span>Transit note <em>· Optional</em></span>
-              <textarea value={note} onChange={(event) => setNote(event.target.value)} rows="4" placeholder="Optional note for the overall Transit" />
-            </label>
-          </div>
 
+            <div className="transit-details-row transit-two-col">
+              <label className="redesign-field">
+                <span>Carrier *</span>
+                <input value={carrier} onChange={(event) => setCarrier(event.target.value)} placeholder="Carrier" required />
+              </label>
+              <label className="redesign-field">
+                <span>Transit note <em>· Optional</em></span>
+                <textarea value={note} onChange={(event) => setNote(event.target.value)} rows="4" placeholder="Optional note for the overall Transit" />
+              </label>
+            </div>
+          </div>
           {error && <div className="error-message">{error}</div>}
 
           <div className="modal-actions">
