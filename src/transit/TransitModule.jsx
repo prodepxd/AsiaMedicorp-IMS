@@ -198,6 +198,12 @@ function TransitForm({
           .update({ received_at: new Date(receivedAt).toISOString() })
           .eq("transit_id", editRecord.id);
         if (itemUpdateError) throw itemUpdateError;
+
+        const { error: locationUpdateError } = await supabase
+          .from("items")
+          .update({ current_location_id: toLocationId })
+          .in("id", selectedItemIds);
+        if (locationUpdateError) throw locationUpdateError;
       } else if (editRecord) {
         const { error: updateError } = await supabase
           .from("transits")
@@ -426,7 +432,7 @@ function TransitForm({
   );
 }
 
-export function ItemTransitHistory({ supabase, itemId, canEdit }) {
+export function ItemTransitHistory({ supabase, itemId, canEdit, focusLatestMoving = 0 }) {
   const [rows, setRows] = useState([]);
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -434,6 +440,7 @@ export function ItemTransitHistory({ supabase, itemId, canEdit }) {
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [savingNoteId, setSavingNoteId] = useState(null);
+  const historyRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -466,10 +473,16 @@ export function ItemTransitHistory({ supabase, itemId, canEdit }) {
     supabase.from("locations").select("id,name").order("name").then(({ data }) => setLocations(data || []));
   }, [supabase]);
 
+  useEffect(() => {
+    if (!focusLatestMoving || loading || error || rows.length === 0) return;
+    const target = historyRef.current?.querySelector(".transit-history-row-moving");
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusLatestMoving, loading, error, rows]);
+
   const locationMap = useMemo(() => Object.fromEntries(locations.map((row) => [row.id, row.name])), [locations]);
 
   return (
-    <div className="item-transit-history">
+    <div className="item-transit-history" ref={historyRef}>
       <div className="item-transit-history-header">
         <div>
           <p className="section-kicker">MOVEMENT HISTORY</p>
@@ -491,7 +504,7 @@ export function ItemTransitHistory({ supabase, itemId, canEdit }) {
             const transit = row.transits;
             if (!transit) return null;
             return (
-              <div className="transit-history-row" key={row.id}>
+              <div className={"transit-history-row" + (transit.transit_progress === PROGRESS.moving ? " transit-history-row-moving" : "")} key={row.id}>
                 <div className="transit-history-details">
                   <div className="transit-history-field">
                     <span>Sent</span>
