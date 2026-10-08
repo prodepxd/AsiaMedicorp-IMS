@@ -75,6 +75,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("Global Stock");
   const [masterCategory, setMasterCategory] = useState(MASTER_GROUPS[0].key);
+  const [transitCategory, setTransitCategory] = useState("active");
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [error, setError] = useState("");
 
@@ -133,11 +134,12 @@ export default function App() {
       <nav className="nav"><p className="nav-title">WORKSPACE</p>
         {visibleNav.map(item=><div key={item.label} className="nav-group">
           <button
-            className={active===item.label?"nav-item active":"nav-item"}
+            className={(active===item.label || (item.label === "Transit" && active.startsWith("Transit")))?"nav-item active":"nav-item"}
             onClick={()=>{
               setActive(item.label);
               setSelectedItemId(null);
               if (item.label === "Admin / Master Data") setMasterCategory((current) => current || MASTER_GROUPS[0].key);
+              if (item.label === "Transit") setTransitCategory("active");
             }}
           >
             <span>{item.icon}</span>{item.label}
@@ -159,6 +161,30 @@ export default function App() {
               ))}
             </div>
           )}
+          {item.label === "Transit" && active.startsWith("Transit") && (
+            <div className="nav-submenu">
+              <button
+                className={transitCategory === "active" ? "nav-subitem active" : "nav-subitem"}
+                onClick={() => {
+                  setActive("Transit / Active Transits");
+                  setTransitCategory("active");
+                  setSelectedItemId(null);
+                }}
+              >
+                Active Transits
+              </button>
+              <button
+                className={transitCategory === "past" ? "nav-subitem active" : "nav-subitem"}
+                onClick={() => {
+                  setActive("Transit / Past Transits");
+                  setTransitCategory("past");
+                  setSelectedItemId(null);
+                }}
+              >
+                Past Transits
+              </button>
+            </div>
+          )}
         </div>)}
       </nav>
       <div className="sidebar-footer"><div className="secure-badge">● Secure workspace</div><span>{profile.role.toUpperCase()} access</span></div>
@@ -172,9 +198,9 @@ export default function App() {
         {active==="Global Stock" && !selectedItemId && <RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} onItemClick={setSelectedItemId} />}
         {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onBack={()=>setSelectedItemId(null)} onDeleted={()=>setSelectedItemId(null)} onItemClick={setSelectedItemId} />}
         {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} activeKey={masterCategory} onActiveChange={setMasterCategory} />}
-        {active==="Transit" && <TransitModule supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onItemClick={(id) => { setActive("Global Stock"); setSelectedItemId(id); }} />}
+        {active.startsWith("Transit") && <TransitModule supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} view={transitCategory} onItemClick={(id) => { setActive("Global Stock"); setSelectedItemId(id); }} />}
       </WorkspaceErrorBoundary>
-      {active!=="Global Stock" && active!=="Admin / Master Data" && active!=="Transit" && <section className="content-card"><div className="section-heading">
+      {active!=="Global Stock" && active!=="Admin / Master Data" && !active.startsWith("Transit") && <section className="content-card"><div className="section-heading">
         <div><p className="section-kicker">{active.toUpperCase()}</p><h2>Module ready</h2><p>Authentication and role access are connected. This module will be built on the live IMS database next.</p></div>
       </div></section>}
     </main>
