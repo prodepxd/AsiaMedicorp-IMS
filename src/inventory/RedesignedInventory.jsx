@@ -851,25 +851,119 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       setAvailableComponents([]);
       return;
     }
+
     const idleStatus = masters.inventoryStatuses.find((x) => x.name === "Idle");
     if (!idleStatus) {
       setComponentError('Status "Idle" was not found in the Statuses master data.');
+      setAvailableComponents([]);
       return;
     }
-    const { data, error: availableError } = await supabase
+
+    const machineModelId = item.detail?.model_id;
+    if (!machineModelId) {
+      setComponentError("Select a Machine model before adding components.");
+      setAvailableComponents([]);
+      return;
+    }
+
+    const { data: itemRows, error: itemError } = await supabase
       .from("items")
       .select("id,item_type,serial_number")
       .eq("item_type", componentType)
       .eq("inventory_status_id", idleStatus.id)
       .order("serial_number");
-    if (availableError) {
-      setComponentError(availableError.message);
+
+    if (itemError) {
+      setComponentError(itemError.message);
       setAvailableComponents([]);
       return;
     }
-    setAvailableComponents(data || []);
-  }
 
+    const rows = itemRows || [];
+    if (!rows.length) {
+      setComponentError("");
+      setAvailableComponents([]);
+      return;
+    }
+
+    let compatibleIds = new Set();
+
+    if (componentType === "Probe") {
+      const { data: probeDetails, error: probeDetailsError } = await supabase
+        .from("probe_details")
+        .select("item_id,model_id")
+        .in("item_id", rows.map((row) => row.id));
+
+      if (probeDetailsError) {
+        setComponentError(probeDetailsError.message);
+        setAvailableComponents([]);
+        return;
+      }
+
+      const probeModelIds = [...new Set((probeDetails || []).map((row) => row.model_id).filter(Boolean))];
+      if (probeModelIds.length) {
+        const { data: compatibilityRows, error: compatibilityError } = await supabase
+          .from("probe_model_machine_models")
+          .select("probe_model_id")
+          .eq("machine_model_id", machineModelId)
+          .in("probe_model_id", probeModelIds);
+
+        if (compatibilityError) {
+          setComponentError(compatibilityError.message);
+          setAvailableComponents([]);
+          return;
+        }
+
+        const compatibleProbeModelIds = new Set((compatibilityRows || []).map((row) => row.probe_model_id));
+        compatibleIds = new Set(
+          (probeDetails || [])
+            .filter((row) => compatibleProbeModelIds.has(row.model_id))
+            .map((row) => row.item_id)
+        );
+      }
+    } else {
+      const detailTable = ({
+        Board: "board_details",
+        PSU: "psu_details",
+        Monitor: "monitor_details",
+        "Hard Disk": "hard_disk_details",
+        Keyboard: "keyboard_details",
+      })[componentType];
+
+      if (!detailTable) {
+        setComponentError("");
+        setAvailableComponents(rows);
+        return;
+      }
+
+      const selectFields = componentType === "Hard Disk"
+        ? "item_id,compatible_machine_model_id"
+        : "item_id,compatible_machine_model_id";
+
+      const { data: detailRows, error: detailError } = await supabase
+        .from(detailTable)
+        .select(selectFields)
+        .in("item_id", rows.map((row) => row.id));
+
+      if (detailError) {
+        setComponentError(detailError.message);
+        setAvailableComponents([]);
+        return;
+      }
+
+      compatibleIds = new Set(
+        (detailRows || [])
+          .filter((row) =>
+            row.compatible_machine_model_id === machineModelId ||
+            (componentType === "Hard Disk" && row.compatible_machine_model_id == null)
+          )
+          .map((row) => row.item_id)
+      );
+    }
+
+    setComponentError("");
+    setAvailableComponents(rows.filter((row) => compatibleIds.has(row.id)));
+  }
   useEffect(() => { loadComponents(); }, [item?.id, item?.item_type]);
   useEffect(() => { loadAvailableComponents(); }, [item?.id, item?.item_type, componentType, showComponentPicker, masters.inventoryStatuses.length]);
 
