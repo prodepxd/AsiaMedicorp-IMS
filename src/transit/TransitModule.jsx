@@ -332,15 +332,7 @@ function TransitForm({
               </div>
             </div>
           )}
-          <div className="transit-form-grid">
-            <label className="redesign-field">
-              <span>From location *</span>
-              <select value={fromLocationId} disabled={mode === "complete"} onChange={(event) => { setFromLocationId(event.target.value); setSelectedItemIds([]); setError(""); }} required>
-                <option value="">Select starting location</option>
-                {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-              </select>
-            </label>
-
+          <div className="transit-form-grid transit-details-grid">
             <label className="redesign-field">
               <span>Sender *</span>
               <input value={sender} onChange={(event) => setSender(event.target.value)} placeholder="Sender" required />
