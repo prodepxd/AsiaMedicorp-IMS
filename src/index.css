@@ -648,13 +648,50 @@ button { cursor: pointer; }
 .transit-history-list { display: grid; }
 .transit-history-row {
   display: grid;
-  grid-template-columns: minmax(155px, .35fr) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: minmax(180px, .42fr) minmax(0, 1fr);
+  gap: 24px;
   padding: 18px;
   border-top: 1px solid #172638;
 }
 .transit-history-row:first-child { border-top: 0; }
-.transit-history-date strong { color: #aebed0; font-size: .72rem; font-weight: 700; }
+.transit-history-details {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.transit-history-field,
+.transit-history-created {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.transit-history-field span,
+.transit-history-created span,
+.transit-history-section > span {
+  color: #61758c;
+  font-size: .61rem;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  font-weight: 700;
+}
+.transit-history-field strong {
+  color: #dbe7f5;
+  font-size: .72rem;
+  overflow-wrap: anywhere;
+}
+.transit-history-created {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid #1b2a3d;
+}
+.transit-history-created strong {
+  color: #aebed0;
+  font-size: .68rem;
+  overflow-wrap: anywhere;
+}
+.transit-history-route {
+  min-width: 0;
+}
 .transit-history-route-line {
   display: flex;
   align-items: center;
@@ -664,24 +701,32 @@ button { cursor: pointer; }
   font-size: .78rem;
 }
 .transit-history-route-line span { color: #526f8d; }
-.transit-history-meta {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  flex-wrap: wrap;
-  margin-top: 7px;
-  color: #61758c;
-  font-size: .67rem;
+.transit-history-progress {
+  margin-top: 8px;
 }
-.transit-history-route p {
-  margin: 8px 0 0;
+.transit-history-section {
+  display: grid;
+  gap: 4px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid #1b2a3d;
+}
+.transit-history-section strong {
+  color: #dbe7f5;
+  font-size: .72rem;
+  overflow-wrap: anywhere;
+}
+.transit-history-note p {
+  margin: 2px 0 0;
   color: #8fa4ba;
   font-size: .72rem;
   line-height: 1.5;
   white-space: pre-wrap;
 }
+.transit-history-note p + p { margin-top: 6px; }
 @media (max-width: 700px) {
-  .transit-history-row { grid-template-columns: 1fr; gap: 9px; }
+  .transit-history-row { grid-template-columns: 1fr; gap: 16px; }
+  .transit-history-created { margin-top: 2px; }
 }
 
 
