@@ -14,7 +14,7 @@ const PROGRESS_LABEL = {
 
 function localDateTimeValue(date = new Date()) {
   const pad = (value) => String(value).padStart(2, "0");
-  return \`\${date.getFullYear()}-\${pad(date.getMonth() + 1)}-\${pad(date.getDate())}T\${pad(date.getHours())}:\${pad(date.getMinutes())}\`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 function formatDate(value) {
@@ -25,7 +25,7 @@ function formatDate(value) {
 
 function itemLabel(item) {
   if (!item) return "Unknown item";
-  return \`\${item.serial_number || "No serial number"} · \${item.item_type || "Item"}\`;
+  return `${item.serial_number || "No serial number"} · ${item.item_type || "Item"}`;
 }
 
 function progressClass(progress) {
@@ -410,7 +410,7 @@ export function ItemTransitHistory({ supabase, itemId }) {
                     <strong>{locationMap[transit.to_location_id] || "—"}</strong>
                   </div>
                   <div className="transit-history-meta">
-                    <span className={\`status-pill transit-progress-pill transit-progress-\${progressClass(transit.transit_progress)}\`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
+                    <span className={`status-pill transit-progress-pill transit-progress-${progressClass(transit.transit_progress)}`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
                     <span>Sender: {transit.sender || "—"}</span>
                     <span>Carrier: {transit.carrier || "—"}</span>
                   </div>
@@ -432,14 +432,14 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMo
   const transitItems = transit.item_ids.map((id) => itemMap[id]).filter(Boolean);
 
   return (
-    <article className={\`transit-box transit-box-\${progressClass(transit.transit_progress)}\`}>
+    <article className={`transit-box transit-box-${progressClass(transit.transit_progress)}`}>
       <div className="transit-box-header">
         <div>
           <p className="section-kicker">TRANSIT</p>
           <h3>{locationMap[transit.from_location_id] || "—"} <span>→</span> {locationMap[transit.to_location_id] || "—"}</h3>
           <p>Created {formatDate(transit.created_at)}</p>
         </div>
-        <span className={\`transit-progress-badge transit-progress-\${progressClass(transit.transit_progress)}\`}>
+        <span className={`transit-progress-badge transit-progress-${progressClass(transit.transit_progress)}`}>
           {PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}
         </span>
       </div>
@@ -654,7 +654,7 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
 
   function renderSection(title, key, className, list) {
     return (
-      <section className={\`transit-section transit-section-\${className}\`}>
+      <section className={`transit-section transit-section-${className}`}>
         <div className="transit-section-heading">
           <div>
             <p className="section-kicker">TRANSIT</p>
