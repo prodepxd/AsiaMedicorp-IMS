@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const PROGRESS = {
   standby: "stand-by",
@@ -674,7 +674,7 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMo
   );
 }
 
-export default function TransitModule({ supabase, canEdit, onItemClick }) {
+export default function TransitModule({ supabase, canEdit, onItemClick, view = "active" }) {
   const [items, setItems] = useState([]);
   const [locations, setLocations] = useState([]);
   const [inventoryStatuses, setInventoryStatuses] = useState([]);
@@ -682,12 +682,14 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [locationFilter, setLocationFilter] = useState("all");
+  const [startingLocationFilter, setStartingLocationFilter] = useState("all");
+  const [destinationLocationFilter, setDestinationLocationFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [formMode, setFormMode] = useState("edit");
   const [editingTransit, setEditingTransit] = useState(null);
   const [editingItemIds, setEditingItemIds] = useState([]);
-  const [completedVisible, setCompletedVisible] = useState(1);
+  const [pastVisible, setPastVisible] = useState(15);
+  const pastLoadRef = useRef(null);
 
   async function load() {
     setLoading(true);
@@ -756,19 +758,41 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
         ...transitItems.flatMap((item) => [item.serial_number, item.item_type]),
       ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
 
-      const matchesLocation = locationFilter === "all"
-        || transit.from_location_id === locationFilter
-        || transit.to_location_id === locationFilter;
+      const matchesStartingLocation = startingLocationFilter === "all"
+        || transit.from_location_id === startingLocationFilter;
+      const matchesDestinationLocation = destinationLocationFilter === "all"
+        || transit.to_location_id === destinationLocationFilter;
 
-      return matchesSearch && matchesLocation;
+      return matchesSearch && matchesStartingLocation && matchesDestinationLocation;
     });
-  }, [transits, itemMap, locationMap, search, locationFilter]);
+  }, [transits, itemMap, locationMap, search, startingLocationFilter, destinationLocationFilter]);
 
   const grouped = useMemo(() => ({
     [PROGRESS.moving]: filteredTransits.filter((x) => x.transit_progress === PROGRESS.moving),
     [PROGRESS.standby]: filteredTransits.filter((x) => x.transit_progress === PROGRESS.standby),
     [PROGRESS.completed]: filteredTransits.filter((x) => x.transit_progress === PROGRESS.completed),
   }), [filteredTransits]);
+
+  const activeTransits = useMemo(
+    () => [...grouped[PROGRESS.moving], ...grouped[PROGRESS.standby]],
+    [grouped]
+  );
+  const pastTransits = grouped[PROGRESS.completed];
+
+  useEffect(() => {
+    setPastVisible(15);
+  }, [search, startingLocationFilter, destinationLocationFilter, view]);
+
+  useEffect(() => {
+    if (view !== "past" || pastVisible >= pastTransits.length || !pastLoadRef.current) return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) {
+        setPastVisible((value) => Math.min(value + 9, pastTransits.length));
+      }
+    }, { rootMargin: "0px 0px 240px 0px" });
+    observer.observe(pastLoadRef.current);
+    return () => observer.disconnect();
+  }, [view, pastVisible, pastTransits.length]);
 
   function openCreate() {
     setEditingTransit(null);
@@ -825,7 +849,7 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
     await load();
   }
 
-  function renderSection(title, key, className, list) {
+  function renderSection(title, key, className, list, limit = list.length) {
     return (
       <section className={`transit-section transit-section-${className}`}>
         <div className="transit-section-heading">
@@ -839,7 +863,7 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
           <div className="transit-empty-section">No {title.toLowerCase()} transits.</div>
         ) : (
           <div className="transit-box-list">
-            {list.slice(0, key === PROGRESS.completed ? completedVisible : list.length).map((transit) => (
+            {list.slice(0, limit).map((transit) => (
               <TransitCard
                 key={transit.id}
                 transit={transit}
@@ -856,11 +880,6 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
             ))}
           </div>
         )}
-        {key === PROGRESS.completed && completedVisible < list.length && (
-          <button className="secondary-button transit-show-more" onClick={() => setCompletedVisible((value) => Math.min(value + 3, list.length))}>
-            Show more
-          </button>
-        )}
       </section>
     );
   }
@@ -870,19 +889,23 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
       <div className="section-heading transit-header">
         <div>
           <p className="section-kicker">TRANSIT</p>
-          <h2>Inventory Transits</h2>
+          <h2>{view === "past" ? "Past Transits" : "Active Transits"}</h2>
           <p>Move one or more Global Stock items between locations.</p>
         </div>
         <div className="transit-header-actions">
           <button className="secondary-button" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
-          {canEdit && <button className="primary-button" onClick={openCreate}>+ Create Transit</button>}
+          {canEdit && view === "active" && <button className="primary-button" onClick={openCreate}>+ Create Transit</button>}
         </div>
       </div>
 
       <div className="stock-filters transit-filters">
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search item, sender, carrier, location..." />
-        <select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
-          <option value="all">All locations</option>
+        <select value={startingLocationFilter} onChange={(event) => setStartingLocationFilter(event.target.value)}>
+          <option value="all">All starting locations</option>
+          {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+        </select>
+        <select value={destinationLocationFilter} onChange={(event) => setDestinationLocationFilter(event.target.value)}>
+          <option value="all">All destination locations</option>
           {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
         </select>
       </div>
@@ -893,9 +916,17 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
         <div className="history-empty">Loading Transits...</div>
       ) : (
         <div className="transit-sections">
-          {renderSection("Moving", PROGRESS.moving, "moving", grouped[PROGRESS.moving])}
-          {renderSection("Stand-By", PROGRESS.standby, "standby", grouped[PROGRESS.standby])}
-          {renderSection("Completed", PROGRESS.completed, "completed", grouped[PROGRESS.completed])}
+          {view === "active" ? (
+            <>
+              {renderSection("Moving", PROGRESS.moving, "moving", grouped[PROGRESS.moving])}
+              {renderSection("Stand-By", PROGRESS.standby, "standby", grouped[PROGRESS.standby])}
+            </>
+          ) : (
+            <>
+              {renderSection("Completed", PROGRESS.completed, "completed", pastTransits, pastVisible)}
+              {pastVisible < pastTransits.length && <div ref={pastLoadRef} className="transit-infinite-sentinel" aria-hidden="true" />}
+            </>
+          )}
         </div>
       )}
 
