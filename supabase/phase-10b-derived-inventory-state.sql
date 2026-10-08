@@ -9,7 +9,18 @@
 
 BEGIN;
 
-DO $$
+-- Retire the legacy triggers that stored "In Machine" on items.
+-- These objects are safe to drop here because installation truth is now
+-- machine_components and the derived view below.
+DROP TRIGGER IF EXISTS machine_components_after_insert ON public.machine_components;
+DROP TRIGGER IF EXISTS machine_components_after_delete ON public.machine_components;
+DROP TRIGGER IF EXISTS items_prevent_invalid_installed_status ON public.items;
+
+DROP FUNCTION IF EXISTS public.machine_components_set_in_machine();
+DROP FUNCTION IF EXISTS public.machine_components_set_idle();
+DROP FUNCTION IF EXISTS public.prevent_invalid_installed_component_status();
+
+DO $
 DECLARE
   v_in_machine_status_id uuid;
   v_idle_status_id uuid;
@@ -52,6 +63,7 @@ BEGIN
 END
 $$;
 
+DROP FUNCTION IF EXISTS public.get_item_inventory_state(uuid);
 DROP VIEW IF EXISTS public.item_inventory_state;
 
 CREATE VIEW public.item_inventory_state
@@ -126,5 +138,8 @@ BEGIN
   END IF;
 END
 $$;
+
+GRANT SELECT ON public.item_inventory_state TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_item_inventory_state(uuid) TO authenticated;
 
 COMMIT;
