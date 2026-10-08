@@ -857,7 +857,7 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
           </div>
         )}
         {key === PROGRESS.completed && completedVisible < list.length && (
-          <button className="secondary-button transit-show-more" onClick={() => setCompletedVisible((value) => Math.min(value + 2, list.length))}>
+          <button className="secondary-button transit-show-more" onClick={() => setCompletedVisible((value) => Math.min(value + 3, list.length))}>
             Show more
           </button>
         )}
