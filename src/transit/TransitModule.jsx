@@ -114,7 +114,7 @@ function TransitForm({
     if (fromLocationId === toLocationId) return setError("From and To locations must be different.");
     if (!sender.trim()) return setError("Sender is required.");
     if (!carrier.trim()) return setError("Carrier is required.");
-    if (!sentAt) return setError("Sent date/time is required.");
+    if (mode === "complete" && !sentAt) return setError("Sent date/time is required to complete the Transit.");
     if (mode === "complete" && (!receiver.trim() || !receivedAt)) {
       return setError("Receiver and received date/time are required to complete the Transit.");
     }
@@ -125,7 +125,7 @@ function TransitForm({
       const payload = {
         from_location_id: fromLocationId,
         to_location_id: toLocationId,
-        sent_at: new Date(sentAt).toISOString(),
+        sent_at: sentAt ? new Date(sentAt).toISOString() : null,
         received_at: receivedAt ? new Date(receivedAt).toISOString() : null,
         sender: sender.trim(),
         receiver: receiver.trim() || null,
@@ -305,8 +305,8 @@ function TransitForm({
             </label>
 
             <label className="redesign-field">
-              <span>Sent date & time *</span>
-              <input type="datetime-local" value={sentAt} onChange={(event) => setSentAt(event.target.value)} required />
+              <span>Sent date & time{mode === "complete" ? " *" : ""}</span>
+              <input type="datetime-local" value={sentAt} onChange={(event) => setSentAt(event.target.value)} required={mode === "complete"} />
             </label>
 
             <label className="redesign-field">
