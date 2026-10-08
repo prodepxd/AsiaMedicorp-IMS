@@ -36,9 +36,7 @@ class WorkspaceErrorBoundary extends React.Component {
 
 const navItems = [
   { label: "Global Stock", icon: "▦" },
-  { label: "Purchases", icon: "↘" },
   { label: "Transit", icon: "⇄" },
-  { label: "Sales", icon: "↗" },
   { label: "Admin / Master Data", icon: "⚙", adminOnly: true },
 ];
 
