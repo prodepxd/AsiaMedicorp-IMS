@@ -620,7 +620,8 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
       supabase.from("inventory_statuses").select("id,name"),
     ]);
 
-    const failed = [itemsResult, locationsResult, transitResult, transitItemsResult, statusResult].find((result) => result.error);
+    // Status names are display-only. Do not let a status lookup failure hide Global Stock items.
+    const failed = [itemsResult, locationsResult, transitResult, transitItemsResult].find((result) => result.error);
     if (failed) {
       setError(failed.error.message);
       setLoading(false);
