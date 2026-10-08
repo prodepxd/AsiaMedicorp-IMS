@@ -130,10 +130,26 @@ function TransitForm({
   function toggleItem(itemId) {
     setSelectedItemIds((current) => {
       if (current.includes(itemId)) {
+        const item = itemMap[itemId];
+
+        if (item?.item_type === "Machine") {
+          const childIds = new Set(machineComponents[itemId] || []);
+          return current.filter((id) => id !== itemId && !childIds.has(id));
+        }
+
         return current.filter((id) => id !== itemId);
       }
 
       const item = itemMap[itemId];
+      const parentMachineIds = Object.entries(machineComponents)
+        .filter(([, componentIds]) => componentIds.includes(itemId))
+        .map(([machineId]) => machineId);
+
+      if (parentMachineIds.length > 0 && !parentMachineIds.some((machineId) => current.includes(machineId))) {
+        setError("This component is currently installed in a Machine. Transit the parent Machine, or remove it from the Machine first.");
+        return current;
+      }
+
       const idsToAdd = [itemId, ...(item?.item_type === "Machine" ? (machineComponents[itemId] || []) : [])];
       return [...new Set([...current, ...idsToAdd])];
     });
@@ -285,13 +301,29 @@ function TransitForm({
                   <div className="history-empty">No Global Stock items found.</div>
                 ) : filteredItems.map((item) => {
                   const checked = selectedItemIds.includes(item.id);
+                  const installedParentIds = Object.entries(machineComponents)
+                    .filter(([, componentIds]) => componentIds.includes(item.id))
+                    .map(([machineId]) => machineId);
+                  const installedWithoutSelectedParent =
+                    installedParentIds.length > 0 &&
+                    !installedParentIds.some((machineId) => selectedItemIds.includes(machineId));
                   return (
-                    <label key={item.id} className={checked ? "transit-item-option selected" : "transit-item-option"}>
-                      <input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} />
+                    <label
+                      key={item.id}
+                      className={checked ? "transit-item-option selected" : installedWithoutSelectedParent ? "transit-item-option disabled" : "transit-item-option"}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={installedWithoutSelectedParent}
+                        onChange={() => toggleItem(item.id)}
+                      />
                       <span>
                         <strong>{itemLabel(item)}</strong>
                         <small>
-                          {item.inventory_status_name || "—"}
+                          {installedWithoutSelectedParent
+                            ? "Installed in Machine — select the parent Machine"
+                            : item.inventory_status_name || "—"}
                           {item.item_type === "Machine" && (machineComponents[item.id] || []).length > 0
                             ? ` · Includes ${machineComponents[item.id].length} installed component${machineComponents[item.id].length === 1 ? "" : "s"}`
                             : ""}
