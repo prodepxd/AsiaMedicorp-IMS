@@ -922,10 +922,9 @@ export default function TransitModule({ supabase, canEdit, canDelete, onItemClic
     await load();
   }
 
-  async function deleteTransit(transit, action = "delete") {
+  async function deleteTransit(transit) {
     setError("");
     const isCompleted = transit.transit_progress === PROGRESS.completed;
-    const actionLabel = isCompleted ? "delete" : "cancel";
     const confirmed = window.confirm(
       isCompleted
         ? "Delete this completed Transit? Its Transit history entries for the included items will also be removed."
@@ -981,8 +980,8 @@ export default function TransitModule({ supabase, canEdit, canDelete, onItemClic
                   else openEdit(value);
                 }}
                 onStartMoving={startMoving}
-                onCancel={(value) => deleteTransit(value, "cancel")}
-                onDelete={(value) => deleteTransit(value, "delete")}
+                onCancel={deleteTransit}
+                onDelete={deleteTransit}
               />
             ))}
           </div>
