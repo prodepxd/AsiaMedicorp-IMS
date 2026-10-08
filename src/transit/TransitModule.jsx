@@ -64,6 +64,17 @@ function TransitForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  async function loadInventoryStateMap(itemIds) {
+    const ids = [...new Set((itemIds || []).filter(Boolean))];
+    if (!ids.length) return {};
+    const { data, error } = await supabase
+      .from("item_inventory_state")
+      .select("item_id,inventory_state")
+      .in("item_id", ids);
+    if (error) throw error;
+    return Object.fromEntries((data || []).map((row) => [row.item_id, row.inventory_state]));
+  }
+
   const itemMap = useMemo(() => Object.fromEntries(availableItems.map((item) => [item.id, item])), [availableItems]);
   const movingItemIdSet = useMemo(() => new Set(movingItemIds), [movingItemIds]);
 
@@ -84,7 +95,23 @@ function TransitForm({
         if (statusError) { setAvailableItems([]); setMachineComponents({}); setMovingItemIds([]); setError(statusError.message); setItemsLoading(false); return; }
         statusMap = Object.fromEntries((statuses || []).map((status) => [status.id, status.name]));
       }
-      const rows = (data || []).map((item) => ({ ...item, inventory_status_name: statusMap[item.inventory_status_id] || "—" }));
+      let inventoryStateMap = {};
+      try {
+        inventoryStateMap = await loadInventoryStateMap((data || []).map((item) => item.id));
+      } catch (stateError) {
+        if (!alive) return;
+        setAvailableItems([]);
+        setMachineComponents({});
+        setMovingItemIds([]);
+        setError(stateError.message || "We could not load derived inventory state.");
+        setItemsLoading(false);
+        return;
+      }
+      const rows = (data || []).map((item) => ({
+        ...item,
+        inventory_status_name: statusMap[item.inventory_status_id] || "—",
+        inventory_state: inventoryStateMap[item.id] || null,
+      }));
       setAvailableItems(rows);
       const machineIds = rows.filter((item) => item.item_type === "Machine").map((item) => item.id);
       let componentRows = [];
@@ -379,14 +406,14 @@ function TransitForm({
                           <div className="transit-item-tree" key={item.id}>
                             <label className={(checked ? "transit-item-option selected" : "transit-item-option") + (itemBlocked ? " moving" : "")} title={itemTitle}>
                               <input type="checkbox" checked={checked} disabled={itemBlocked} onChange={() => toggleItem(item.id)} />
-                              <span><strong>{itemLabel(item)}</strong><small>{itemBlocked ? (itemIsMoving(item.id) ? "Currently moving" : "Installed component currently moving") : (item.inventory_status_name || "—")}{children.length > 0 ? " · Includes " + children.length + " installed component" + (children.length === 1 ? "" : "s") : ""}</small></span>
+                              <span><strong>{itemLabel(item)}</strong><small>{itemBlocked ? (itemIsMoving(item.id) ? "Currently moving" : "Installed component currently moving") : (item.inventory_state || item.inventory_status_name || "—")}{children.length > 0 ? " · Includes " + children.length + " installed component" + (children.length === 1 ? "" : "s") : ""}</small></span>
                             </label>
                             {children.length > 0 && <div className="transit-component-list">{children.map((child) => {
                               const childMoving = itemIsMoving(child.id);
                               return (
                                 <div className={(selectedItemIds.includes(child.id) ? "transit-component-row selected" : "transit-component-row") + (childMoving ? " moving" : "")} key={child.id} title={childMoving ? "This item is currently moving." : undefined}>
                                   <input type="checkbox" checked={selectedItemIds.includes(child.id)} disabled readOnly />
-                                  <span><strong>{itemLabel(child)}</strong><small>{childMoving ? "Currently moving" : (child.inventory_status_name || "In Machine")}</small></span>
+                                  <span><strong>{itemLabel(child)}</strong><small>{childMoving ? "Currently moving" : (child.inventory_state || child.inventory_status_name || "—")}</small></span>
                                 </div>
                               );
                             })}</div>}
@@ -415,7 +442,7 @@ function TransitForm({
                           />
                           <div>
                             <strong>{itemLabel(item)}</strong>
-                            <small>{item.inventory_status_name || "—"}</small>
+                            <small>{item.inventory_state || item.inventory_status_name || "—"}</small>
                           </div>
                         </div>
                         {item.item_type === "Machine" && machineChildren(item.id).length > 0 && (
@@ -432,7 +459,7 @@ function TransitForm({
                                 />
                                 <div>
                                   <strong>{itemLabel(child)}</strong>
-                                  <small>{child.inventory_status_name || "In Machine"} · Included automatically</small>
+                                  <small>{child.inventory_state || child.inventory_status_name || "—"} · Included automatically</small>
                                 </div>
                               </div>
                             ))}
@@ -794,9 +821,18 @@ export default function TransitModule({ supabase, canEdit, canDelete, onItemClic
     }
 
     const statusMap = Object.fromEntries((statusResult.data || []).map((status) => [status.id, status.name]));
+    let inventoryStateMap = {};
+    try {
+      inventoryStateMap = await loadInventoryStateMap((itemsResult.data || []).map((item) => item.id));
+    } catch (stateError) {
+      setError(stateError.message || "We could not load derived inventory state.");
+      setLoading(false);
+      return;
+    }
     const itemRows = (itemsResult.data || []).map((item) => ({
       ...item,
       inventory_status_name: statusMap[item.inventory_status_id] || "—",
+      inventory_state: inventoryStateMap[item.id] || null,
     }));
 
     const itemMap = Object.fromEntries(itemRows.map((item) => [item.id, item]));
