@@ -60,36 +60,66 @@ function TransitForm({
   const [itemSearch, setItemSearch] = useState("");
   const [itemDropdownOpen, setItemDropdownOpen] = useState(false);
   const [machineComponents, setMachineComponents] = useState({});
+  const [movingItemIds, setMovingItemIds] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const itemMap = useMemo(() => Object.fromEntries(availableItems.map((item) => [item.id, item])), [availableItems]);
+  const movingItemIdSet = useMemo(() => new Set(movingItemIds), [movingItemIds]);
 
   useEffect(() => {
     let alive = true;
     async function loadItemsAtLocation() {
       setItemSearch("");
-      if (!fromLocationId) { setSelectedItemIds([]); setAvailableItems([]); setMachineComponents({}); return; }
+      if (!fromLocationId) { setSelectedItemIds([]); setAvailableItems([]); setMachineComponents({}); setMovingItemIds([]); return; }
       setItemsLoading(true);
       const { data, error: itemError } = await supabase.from("items").select("id,serial_number,item_type,current_location_id,inventory_status_id").eq("current_location_id", fromLocationId).order("serial_number");
       if (!alive) return;
-      if (itemError) { setAvailableItems([]); setMachineComponents({}); setError(itemError.message); setItemsLoading(false); return; }
+      if (itemError) { setAvailableItems([]); setMachineComponents({}); setMovingItemIds([]); setError(itemError.message); setItemsLoading(false); return; }
       const statusIds = [...new Set((data || []).map((item) => item.inventory_status_id).filter(Boolean))];
       let statusMap = {};
       if (statusIds.length) {
         const { data: statuses, error: statusError } = await supabase.from("inventory_statuses").select("id,name").in("id", statusIds);
         if (!alive) return;
-        if (statusError) { setAvailableItems([]); setMachineComponents({}); setError(statusError.message); setItemsLoading(false); return; }
+        if (statusError) { setAvailableItems([]); setMachineComponents({}); setMovingItemIds([]); setError(statusError.message); setItemsLoading(false); return; }
         statusMap = Object.fromEntries((statuses || []).map((status) => [status.id, status.name]));
       }
       const rows = (data || []).map((item) => ({ ...item, inventory_status_name: statusMap[item.inventory_status_id] || "—" }));
       setAvailableItems(rows);
       const machineIds = rows.filter((item) => item.item_type === "Machine").map((item) => item.id);
-      if (!machineIds.length) { setMachineComponents({}); setItemsLoading(false); return; }
-      const { data: components, error: componentError } = await supabase.from("machine_components").select("machine_item_id,component_item_id").in("machine_item_id", machineIds);
-      if (!alive) return;
-      if (componentError) { setError(componentError.message); setMachineComponents({}); }
-      else { const map = {}; (components || []).forEach((row) => { if (!map[row.machine_item_id]) map[row.machine_item_id] = []; if (!map[row.machine_item_id].includes(row.component_item_id)) map[row.machine_item_id].push(row.component_item_id); }); setMachineComponents(map); }
+      let componentRows = [];
+      if (machineIds.length) {
+        const { data: components, error: componentError } = await supabase.from("machine_components").select("machine_item_id,component_item_id").in("machine_item_id", machineIds);
+        if (!alive) return;
+        if (componentError) { setError(componentError.message); setMachineComponents({}); setMovingItemIds([]); setItemsLoading(false); return; }
+        componentRows = components || [];
+        const map = {};
+        componentRows.forEach((row) => {
+          if (!map[row.machine_item_id]) map[row.machine_item_id] = [];
+          if (!map[row.machine_item_id].includes(row.component_item_id)) map[row.machine_item_id].push(row.component_item_id);
+        });
+        setMachineComponents(map);
+      } else {
+        setMachineComponents({});
+      }
+      const movingCandidateIds = [...new Set([...rows.map((item) => item.id), ...componentRows.map((row) => row.component_item_id)])];
+      if (movingCandidateIds.length) {
+        const { data: activeTransitItems, error: movingItemError } = await supabase.from("transit_items").select("item_id,transit_id").in("item_id", movingCandidateIds);
+        if (!alive) return;
+        if (movingItemError) { setError(movingItemError.message); setMovingItemIds([]); setItemsLoading(false); return; }
+        const transitIds = [...new Set((activeTransitItems || []).map((row) => row.transit_id).filter(Boolean))];
+        if (transitIds.length) {
+          const { data: movingTransits, error: movingTransitError } = await supabase.from("transits").select("id").in("id", transitIds).eq("transit_progress", PROGRESS.moving);
+          if (!alive) return;
+          if (movingTransitError) { setError(movingTransitError.message); setMovingItemIds([]); setItemsLoading(false); return; }
+          const movingTransitIdSet = new Set((movingTransits || []).map((transit) => transit.id));
+          setMovingItemIds((activeTransitItems || []).filter((row) => movingTransitIdSet.has(row.transit_id)).map((row) => row.item_id));
+        } else {
+          setMovingItemIds([]);
+        }
+      } else {
+        setMovingItemIds([]);
+      }
       setItemsLoading(false);
     }
     loadItemsAtLocation();
@@ -107,7 +137,17 @@ function TransitForm({
     return availableItems.filter((item) => !query || itemLabel(item).toLowerCase().includes(query));
   }, [availableItems, fromLocationId, itemSearch]);
 
+  function itemIsMoving(itemId) { return movingItemIdSet.has(itemId); }
+
+  function machineIsBlocked(machineId) {
+    return itemIsMoving(machineId) || (machineComponents[machineId] || []).some((childId) => itemIsMoving(childId));
+  }
+
   function toggleItem(itemId) {
+    if (itemIsMoving(itemId) || machineIsBlocked(itemId)) {
+      setError("This item is currently moving and cannot be added to another Transit.");
+      return;
+    }
     setSelectedItemIds((current) => {
       const item = itemMap[itemId];
       if (!item) return current;
@@ -145,11 +185,14 @@ function TransitForm({
     const query = itemSearch.trim().toLowerCase();
     if (!fromLocationId) return [];
     const matches = (item) => !query || itemLabel(item).toLowerCase().includes(query);
-    return availableItems.filter((item) => !componentParentMap[item.id]?.length).filter((item) => {
-      if (matches(item)) return true;
-      return item.item_type === "Machine" && (machineComponents[item.id] || []).some((childId) => matches(itemMap[childId]));
-    });
-  }, [availableItems, fromLocationId, itemSearch, componentParentMap, machineComponents, itemMap]);
+    return availableItems
+      .filter((item) => !componentParentMap[item.id]?.length)
+      .filter((item) => {
+        if (matches(item)) return true;
+        return item.item_type === "Machine" && (machineComponents[item.id] || []).some((childId) => matches(itemMap[childId]));
+      })
+      .sort((a, b) => Number(machineIsBlocked(a.id)) - Number(machineIsBlocked(b.id)));
+  }, [availableItems, fromLocationId, itemSearch, componentParentMap, machineComponents, itemMap, movingItemIdSet]);
 
   function machineChildren(machineId) {
     const selected = new Set(selectedItemIds);
@@ -170,6 +213,19 @@ function TransitForm({
     if (mode === "complete" && !sentAt) return setError("Sent date/time is required to complete the Transit.");
     if (mode === "complete" && (!receiver.trim() || !receivedAt)) {
       return setError("Receiver and received date/time are required to complete the Transit.");
+    }
+
+    if (mode !== "complete") {
+      const { data: activeRows, error: activeRowsError } = await supabase.from("transit_items").select("item_id,transit_id").in("item_id", selectedItemIds);
+      if (activeRowsError) return setError(activeRowsError.message);
+      const transitIds = [...new Set((activeRows || []).map((row) => row.transit_id).filter(Boolean))];
+      if (transitIds.length) {
+        const { data: movingTransits, error: movingError } = await supabase.from("transits").select("id").in("id", transitIds).eq("transit_progress", PROGRESS.moving);
+        if (movingError) return setError(movingError.message);
+        const movingTransitIds = new Set((movingTransits || []).map((transit) => transit.id));
+        const blockedIds = (activeRows || []).filter((row) => movingTransitIds.has(row.transit_id)).map((row) => row.item_id);
+        if (blockedIds.length) return setError("One or more selected items are currently moving and cannot be added to another Transit.");
+      }
     }
 
     setSaving(true);
@@ -317,18 +373,23 @@ function TransitForm({
                       {itemRows.length === 0 ? <div className="history-empty">No Global Stock items match this search.</div> : itemRows.map((item) => {
                         const checked = selectedItemIds.includes(item.id);
                         const children = item.item_type === "Machine" ? machineChildren(item.id) : [];
+                        const itemBlocked = machineIsBlocked(item.id);
+                        const itemTitle = itemBlocked ? (itemIsMoving(item.id) ? "This item is currently moving." : "This Machine cannot be selected because an installed component is currently moving.") : undefined;
                         return (
                           <div className="transit-item-tree" key={item.id}>
-                            <label className={checked ? "transit-item-option selected" : "transit-item-option"}>
-                              <input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} />
-                              <span><strong>{itemLabel(item)}</strong><small>{item.inventory_status_name || "—"}{children.length > 0 ? " · Includes " + children.length + " installed component" + (children.length === 1 ? "" : "s") : ""}</small></span>
+                            <label className={(checked ? "transit-item-option selected" : "transit-item-option") + (itemBlocked ? " moving" : "")} title={itemTitle}>
+                              <input type="checkbox" checked={checked} disabled={itemBlocked} onChange={() => toggleItem(item.id)} />
+                              <span><strong>{itemLabel(item)}</strong><small>{itemBlocked ? (itemIsMoving(item.id) ? "Currently moving" : "Installed component currently moving") : (item.inventory_status_name || "—")}{children.length > 0 ? " · Includes " + children.length + " installed component" + (children.length === 1 ? "" : "s") : ""}</small></span>
                             </label>
-                            {children.length > 0 && <div className="transit-component-list">{children.map((child) => (
-                              <div className={selectedItemIds.includes(child.id) ? "transit-component-row selected" : "transit-component-row"} key={child.id}>
-                                <input type="checkbox" checked={selectedItemIds.includes(child.id)} disabled readOnly />
-                                <span><strong>{itemLabel(child)}</strong><small>{child.inventory_status_name || "In Machine"}</small></span>
-                              </div>
-                            ))}</div>}
+                            {children.length > 0 && <div className="transit-component-list">{children.map((child) => {
+                              const childMoving = itemIsMoving(child.id);
+                              return (
+                                <div className={(selectedItemIds.includes(child.id) ? "transit-component-row selected" : "transit-component-row") + (childMoving ? " moving" : "")} key={child.id} title={childMoving ? "This item is currently moving." : undefined}>
+                                  <input type="checkbox" checked={selectedItemIds.includes(child.id)} disabled readOnly />
+                                  <span><strong>{itemLabel(child)}</strong><small>{childMoving ? "Currently moving" : (child.inventory_status_name || "In Machine")}</small></span>
+                                </div>
+                              );
+                            })}</div>}
                           </div>
                         );
                       })}
