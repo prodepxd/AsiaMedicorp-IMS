@@ -594,6 +594,7 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMo
 export default function TransitModule({ supabase, canEdit, onItemClick }) {
   const [items, setItems] = useState([]);
   const [locations, setLocations] = useState([]);
+  const [inventoryStatuses, setInventoryStatuses] = useState([]);
   const [transits, setTransits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -609,23 +610,27 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
     setLoading(true);
     setError("");
 
-    const [itemsResult, locationsResult, transitResult, transitItemsResult] = await Promise.all([
-      supabase.from("items").select("id,serial_number,item_type,current_location_id,inventory_status_id,inventory_statuses(name)").order("serial_number"),
+    const [itemsResult, locationsResult, transitResult, transitItemsResult, statusResult] = await Promise.all([
+      // Keep the item query independent of PostgREST's inventory-status relationship.
+      // Transit eligibility depends on current_location_id, not on the status join.
+      supabase.from("items").select("id,serial_number,item_type,current_location_id,inventory_status_id").order("serial_number"),
       supabase.from("locations").select("id,name,is_active").order("name"),
       supabase.from("transits").select("id,from_location_id,to_location_id,sent_at,received_at,transit_progress,sender,receiver,carrier,note,created_by,created_at,updated_at").order("created_at", { ascending: false }),
       supabase.from("transit_items").select("id,transit_id,item_id,received_at,note,created_at,updated_at").order("created_at"),
+      supabase.from("inventory_statuses").select("id,name"),
     ]);
 
-    const failed = [itemsResult, locationsResult, transitResult, transitItemsResult].find((result) => result.error);
+    const failed = [itemsResult, locationsResult, transitResult, transitItemsResult, statusResult].find((result) => result.error);
     if (failed) {
       setError(failed.error.message);
       setLoading(false);
       return;
     }
 
+    const statusMap = Object.fromEntries((statusResult.data || []).map((status) => [status.id, status.name]));
     const itemRows = (itemsResult.data || []).map((item) => ({
       ...item,
-      inventory_status_name: item.inventory_statuses?.name || "—",
+      inventory_status_name: statusMap[item.inventory_status_id] || "—",
     }));
 
     const itemMap = Object.fromEntries(itemRows.map((item) => [item.id, item]));
@@ -637,6 +642,7 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
 
     setItems(itemRows);
     setLocations((locationsResult.data || []).filter((row) => row.is_active !== false));
+    setInventoryStatuses(statusResult.data || []);
     setTransits((transitResult.data || []).map((transit) => ({
       ...transit,
       item_ids: itemIdsByTransit[transit.id] || [],
