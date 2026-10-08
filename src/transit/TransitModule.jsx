@@ -862,7 +862,7 @@ export default function TransitModule({ supabase, canEdit, onItemClick, view = "
         {list.length === 0 ? (
           <div className="transit-empty-section">No {title.toLowerCase()} transits.</div>
         ) : (
-          <div className="transit-box-list">
+          <div className={className === "moving" || className === "standby" ? "transit-box-list transit-box-carousel" : "transit-box-list"}>
             {list.slice(0, limit).map((transit) => (
               <TransitCard
                 key={transit.id}
