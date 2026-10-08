@@ -9,9 +9,7 @@
 
 BEGIN;
 
--- Retire the legacy triggers that stored "In Machine" on items.
--- These objects are safe to drop here because installation truth is now
--- machine_components and the derived view below.
+-- Retire only the obsolete triggers from the pre-10A stored-status architecture.
 DROP TRIGGER IF EXISTS machine_components_after_insert ON public.machine_components;
 DROP TRIGGER IF EXISTS machine_components_after_delete ON public.machine_components;
 DROP TRIGGER IF EXISTS items_prevent_invalid_installed_status ON public.items;
@@ -20,24 +18,19 @@ DROP FUNCTION IF EXISTS public.machine_components_set_in_machine();
 DROP FUNCTION IF EXISTS public.machine_components_set_idle();
 DROP FUNCTION IF EXISTS public.prevent_invalid_installed_component_status();
 
-DO $
+-- The current 10A trigger correctly prevents status changes while installed.
+-- Temporarily remove only the trigger (not its function) so legacy
+-- "In Machine" rows can be converted to their base status inside this
+-- transaction. It is recreated immediately after the conversion.
+DROP TRIGGER IF EXISTS items_prevent_installed_component_status_change ON public.items;
+
+DO $$
 DECLARE
-  v_in_machine_status_id uuid;
   v_idle_status_id uuid;
   v_count integer;
 BEGIN
-  SELECT id INTO v_in_machine_status_id
-    FROM public.inventory_statuses
-   WHERE name = 'In Machine'
-   ORDER BY id
-   LIMIT 1;
-
-  IF v_in_machine_status_id IS NULL THEN
-    RAISE NOTICE 'No "In Machine" inventory status exists. Continuing.';
-    RETURN;
-  END IF;
-
-  SELECT id INTO v_idle_status_id
+  SELECT id
+    INTO v_idle_status_id
     FROM public.inventory_statuses
    WHERE name = 'Idle'
      AND is_active = true
@@ -45,20 +38,50 @@ BEGIN
    LIMIT 1;
 
   IF v_idle_status_id IS NULL THEN
-    RAISE EXCEPTION 'Phase 10B cannot continue: active "Idle" inventory status was not found.';
+    RAISE EXCEPTION
+      'Phase 10B cannot continue: active "Idle" inventory status was not found.';
   END IF;
 
-  SELECT count(*) INTO v_count
-    FROM public.items
-   WHERE inventory_status_id = v_in_machine_status_id;
+  SELECT count(*)
+    INTO v_count
+    FROM public.items i
+    JOIN public.inventory_statuses s
+      ON s.id = i.inventory_status_id
+   WHERE s.name = 'In Machine';
 
   IF v_count > 0 THEN
     RAISE NOTICE 'Migrating % legacy "In Machine" item(s) to "Idle".', v_count;
 
-    UPDATE public.items
+    UPDATE public.items i
        SET inventory_status_id = v_idle_status_id,
            updated_at = now()
-     WHERE inventory_status_id = v_in_machine_status_id;
+     FROM public.inventory_statuses s
+     WHERE s.id = i.inventory_status_id
+       AND s.name = 'In Machine';
+  END IF;
+END
+$$;
+
+CREATE TRIGGER items_prevent_installed_component_status_change
+BEFORE UPDATE OF inventory_status_id ON public.items
+FOR EACH ROW
+EXECUTE FUNCTION public.prevent_installed_component_status_change();
+
+DO $$
+DECLARE
+  v_remaining integer;
+BEGIN
+  SELECT count(*)
+    INTO v_remaining
+    FROM public.items i
+    JOIN public.inventory_statuses s
+      ON s.id = i.inventory_status_id
+   WHERE s.name = 'In Machine';
+
+  IF v_remaining <> 0 THEN
+    RAISE EXCEPTION
+      'Phase 10B migration failed: % item(s) still reference "In Machine".',
+      v_remaining;
   END IF;
 END
 $$;
@@ -105,24 +128,6 @@ AS $function$
    WHERE item_id = p_item_id;
 $function$;
 
-DO $$
-DECLARE
-  v_remaining integer;
-BEGIN
-  SELECT count(*) INTO v_remaining
-    FROM public.items i
-    JOIN public.inventory_statuses s
-      ON s.id = i.inventory_status_id
-   WHERE s.name = 'In Machine';
-
-  IF v_remaining <> 0 THEN
-    RAISE EXCEPTION
-      'Phase 10B migration failed: % item(s) still reference "In Machine".',
-      v_remaining;
-  END IF;
-END
-$$;
-
 DELETE FROM public.inventory_statuses
  WHERE name = 'In Machine';
 
@@ -130,7 +135,8 @@ DO $$
 DECLARE
   v_remaining integer;
 BEGIN
-  SELECT count(*) INTO v_remaining
+  SELECT count(*)
+    INTO v_remaining
     FROM public.inventory_statuses
    WHERE name = 'In Machine';
 
