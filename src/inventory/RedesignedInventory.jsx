@@ -1355,7 +1355,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
             </div>
           ))}</div>
           <div className="item-detail-notes"><div><div className="item-detail-field-head"><span>Quality note</span>{canEdit && <button type="button" className="inline-edit-button" onClick={() => beginFieldEdit("quality_note")} disabled={editingField && editingField !== "quality_note"}>Edit</button>}</div>{editingField === "quality_note" ? <div className="item-inline-editor"><textarea value={editValue("quality_note")} onChange={(event) => setEditDraft({quality_note:event.target.value})} rows="4" /><div className="item-inline-editor-actions"><button type="button" className="secondary-button" onClick={cancelFieldEdit} disabled={savingField}>Cancel</button><button type="button" className="primary-button" onClick={saveFieldEdit} disabled={savingField}>{savingField ? "Saving..." : "Save"}</button></div></div> : <p>{item.quality_note || "No quality note."}</p>}</div></div>
-          <ItemTransitHistory supabase={supabase} itemId={item.id} />
+          <ItemTransitHistory supabase={supabase} itemId={item.id} canEdit={canEdit} />
           {error && <div className="error-message">{error}</div>}
         </div>
       </div>
