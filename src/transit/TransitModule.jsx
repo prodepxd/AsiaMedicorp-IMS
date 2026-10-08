@@ -56,10 +56,47 @@ function TransitForm({
   );
   const [note, setNote] = useState(editRecord?.note || "");
   const [itemSearch, setItemSearch] = useState("");
+  const [machineComponents, setMachineComponents] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const itemMap = useMemo(() => Object.fromEntries(items.map((item) => [item.id, item])), [items]);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function loadMachineComponents() {
+      const machineIds = items.filter((item) => item.item_type === "Machine").map((item) => item.id);
+      if (!machineIds.length) {
+        setMachineComponents({});
+        return;
+      }
+
+      const { data, error: componentError } = await supabase
+        .from("machine_components")
+        .select("machine_item_id,component_item_id")
+        .in("machine_item_id", machineIds);
+
+      if (!alive) return;
+      if (componentError) {
+        setError(componentError.message);
+        setMachineComponents({});
+        return;
+      }
+
+      const map = {};
+      (data || []).forEach((row) => {
+        if (!map[row.machine_item_id]) map[row.machine_item_id] = [];
+        if (!map[row.machine_item_id].includes(row.component_item_id)) {
+          map[row.machine_item_id].push(row.component_item_id);
+        }
+      });
+      setMachineComponents(map);
+    }
+
+    loadMachineComponents();
+    return () => { alive = false; };
+  }, [supabase, items]);
 
   const selectedDisplayItems = useMemo(
     () => selectedItemIds.map((id) => itemMap[id]).filter(Boolean),
@@ -91,11 +128,15 @@ function TransitForm({
   }, [selectedLocations, editRecord?.from_location_id]);
 
   function toggleItem(itemId) {
-    setSelectedItemIds((current) =>
-      current.includes(itemId)
-        ? current.filter((id) => id !== itemId)
-        : [...current, itemId]
-    );
+    setSelectedItemIds((current) => {
+      if (current.includes(itemId)) {
+        return current.filter((id) => id !== itemId);
+      }
+
+      const item = itemMap[itemId];
+      const idsToAdd = [itemId, ...(item?.item_type === "Machine" ? (machineComponents[itemId] || []) : [])];
+      return [...new Set([...current, ...idsToAdd])];
+    });
   }
 
   function removeSelected(itemId) {
@@ -249,7 +290,12 @@ function TransitForm({
                       <input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} />
                       <span>
                         <strong>{itemLabel(item)}</strong>
-                        <small>{item.inventory_status_name || "—"}</small>
+                        <small>
+                          {item.inventory_status_name || "—"}
+                          {item.item_type === "Machine" && (machineComponents[item.id] || []).length > 0
+                            ? ` · Includes ${machineComponents[item.id].length} installed component${machineComponents[item.id].length === 1 ? "" : "s"}`
+                            : ""}
+                        </small>
                       </span>
                     </label>
                   );
@@ -265,7 +311,12 @@ function TransitForm({
                     <div className="transit-selected-row" key={item.id}>
                       <div>
                         <strong>{itemLabel(item)}</strong>
-                        <span>{item.inventory_status_name || "—"}</span>
+                        <span>
+                          {item.inventory_status_name || "—"}
+                          {item.item_type === "Machine" && (machineComponents[item.id] || []).length > 0
+                            ? ` · ${machineComponents[item.id].length} installed component${machineComponents[item.id].length === 1 ? "" : "s"} included`
+                            : ""}
+                        </span>
                       </div>
                       <button type="button" className="table-button delete-button" onClick={() => removeSelected(item.id)}>
                         Remove
