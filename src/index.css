@@ -649,6 +649,7 @@ button { cursor: pointer; }
 .transit-history-row {
   display: grid;
   grid-template-columns: minmax(155px, .28fr) minmax(280px, .44fr) minmax(155px, .28fr);
+  align-items: stretch;
   gap: 24px;
   padding: 18px;
   border-top: 1px solid #172638;
@@ -657,9 +658,10 @@ button { cursor: pointer; }
 .transit-history-details,
 .transit-history-people {
   display: grid;
-  align-content: start;
+  align-content: space-between;
   gap: 14px;
   min-width: 0;
+  height: 100%;
 }
 .transit-history-field,
 .transit-history-created {
@@ -690,17 +692,21 @@ button { cursor: pointer; }
 }
 .transit-history-created strong { color: #aebed0; font-size: .68rem; }
 .transit-history-movement {
-  min-width: 0;
-}
-.transit-history-vertical-route {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 5px;
+  min-width: 0;
+  height: 100%;
+}
+.transit-history-horizontal-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
 }
 .transit-history-location {
   display: grid;
   gap: 4px;
+  min-width: 0;
   padding: 9px 11px;
   border: 1px solid;
   border-radius: 9px;
@@ -722,17 +728,15 @@ button { cursor: pointer; }
 .transit-history-location-from span { color: #d88b91; }
 .transit-history-location-from strong { color: #f0b6ba; }
 .transit-history-route-arrow {
-  align-self: center;
   color: #71859d;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   line-height: 1;
-  padding: 1px 0;
 }
 .transit-history-progress {
   margin-top: 12px;
 }
 .transit-history-note {
-  margin-top: 13px;
+  margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid #1b2a3d;
 }
@@ -785,6 +789,10 @@ button { cursor: pointer; }
 }
 @media (max-width: 700px) {
   .transit-history-row { grid-template-columns: 1fr; gap: 16px; }
+  .transit-history-details,
+  .transit-history-people,
+  .transit-history-movement { height: auto; }
+  .transit-history-note { margin-top: 13px; }
 }
 
 
