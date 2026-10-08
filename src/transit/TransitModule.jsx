@@ -277,11 +277,18 @@ function TransitForm({
 
         <form className="transit-form" onSubmit={save}>
           {mode !== "complete" && (
-            <div className="transit-form-grid transit-details-grid">
-              <label className="redesign-field transit-wide">
+            <div className="transit-form-grid transit-location-grid">
+              <label className="redesign-field">
                 <span>From location *</span>
                 <select value={fromLocationId} onChange={(event) => { setFromLocationId(event.target.value); setSelectedItemIds([]); setError(""); }} required>
                   <option value="">Select starting location first</option>
+                  {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+                </select>
+              </label>
+              <label className="redesign-field">
+                <span>To location *</span>
+                <select value={toLocationId} onChange={(event) => setToLocationId(event.target.value)} required>
+                  <option value="">Select destination</option>
                   {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
                 </select>
               </label>
@@ -328,14 +335,6 @@ function TransitForm({
             </div>
           )}
           <div className="transit-form-grid">
-            <label className="redesign-field">
-              <span>To location *</span>
-              <select value={toLocationId} onChange={(event) => setToLocationId(event.target.value)} required>
-                <option value="">Select destination</option>
-                {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-              </select>
-            </label>
-
             <label className="redesign-field">
               <span>From location *</span>
               <select value={fromLocationId} disabled={mode === "complete"} onChange={(event) => { setFromLocationId(event.target.value); setSelectedItemIds([]); setError(""); }} required>
