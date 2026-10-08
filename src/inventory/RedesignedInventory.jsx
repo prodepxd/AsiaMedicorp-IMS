@@ -1329,10 +1329,19 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
     if (!canEdit || !selectedComponentId || addingComponent) return;
     setAddingComponent(true);
     setComponentError("");
+
+    const selected = availableComponents.find((component) => component.id === selectedComponentId);
+    if (!selected) {
+      setComponentError("That component is no longer available for this Machine.");
+      setAddingComponent(false);
+      return;
+    }
+
     const result = await supabase.from("machine_components").insert({
       machine_item_id: item.id,
       component_item_id: selectedComponentId,
     });
+
     if (result.error) {
       setComponentError(result.error.code === "23505"
         ? "This component is already installed in a machine."
@@ -1340,13 +1349,13 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       setAddingComponent(false);
       return;
     }
+
     setSelectedComponentId("");
     setShowComponentPicker(false);
     setAddingComponent(false);
     await load();
     await loadComponents();
   }
-
   async function removeComponent(link) {
     if (!canEdit || removingComponentId) return;
     if (!window.confirm("Remove this component from the machine? Its status will become Idle.")) return;
