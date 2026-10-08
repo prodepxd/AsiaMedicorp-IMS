@@ -866,9 +866,10 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       return;
     }
 
+    const machineLocationId = item.current_location_id || null;
     const { data: itemRows, error: itemError } = await supabase
       .from("items")
-      .select("id,item_type,serial_number")
+      .select("id,item_type,serial_number,current_location_id")
       .eq("item_type", componentType)
       .eq("inventory_status_id", idleStatus.id)
       .order("serial_number");
@@ -936,13 +937,9 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
         return;
       }
 
-      const selectFields = componentType === "Hard Disk"
-        ? "item_id,compatible_machine_model_id"
-        : "item_id,compatible_machine_model_id";
-
       const { data: detailRows, error: detailError } = await supabase
         .from(detailTable)
-        .select(selectFields)
+        .select("item_id,compatible_machine_model_id")
         .in("item_id", rows.map((row) => row.id));
 
       if (detailError) {
@@ -961,8 +958,19 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       );
     }
 
+    const compatibleRows = rows
+      .filter((row) => compatibleIds.has(row.id))
+      .map((row) => ({
+        ...row,
+        locationMismatch: row.current_location_id !== machineLocationId,
+      }))
+      .sort((a, b) => {
+        if (a.locationMismatch !== b.locationMismatch) return a.locationMismatch ? 1 : -1;
+        return String(a.serial_number || "").localeCompare(String(b.serial_number || ""), undefined, { sensitivity: "base" });
+      });
+
     setComponentError("");
-    setAvailableComponents(rows.filter((row) => compatibleIds.has(row.id)));
+    setAvailableComponents(compatibleRows);
   }
   useEffect(() => { loadComponents(); }, [item?.id, item?.item_type]);
   useEffect(() => { loadAvailableComponents(); }, [item?.id, item?.item_type, componentType, showComponentPicker, masters.inventoryStatuses.length]);
@@ -1336,6 +1344,11 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       setAddingComponent(false);
       return;
     }
+    if (selected.locationMismatch) {
+      setComponentError("Machine component location mismatch.");
+      setAddingComponent(false);
+      return;
+    }
 
     const result = await supabase.from("machine_components").insert({
       machine_item_id: item.id,
@@ -1437,7 +1450,16 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
                   <label className="redesign-field"><span>Global stock component</span>
                     <select value={selectedComponentId} onChange={(e) => setSelectedComponentId(e.target.value)} disabled={componentsLoading || singleAlreadyInstalled}>
                       <option value="">{componentsLoading ? "Loading..." : singleAlreadyInstalled ? "Already installed" : availableComponents.length ? "Select component" : "No Idle components available"}</option>
-                      {availableComponents.map((component) => <option key={component.id} value={component.id}>{component.serial_number || "No serial number"} · {component.item_type}</option>)}
+                      {availableComponents.map((component) => (
+                        <option
+                          key={component.id}
+                          value={component.id}
+                          disabled={component.locationMismatch}
+                          title={component.locationMismatch ? "Machine component location mismatch" : undefined}
+                        >
+                          {component.serial_number || "No serial number"} · {component.item_type}{component.locationMismatch ? " · Machine component location mismatch" : ""}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 </div>
