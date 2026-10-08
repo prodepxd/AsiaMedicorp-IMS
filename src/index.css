@@ -1340,6 +1340,7 @@ button { cursor: pointer; }
 .transit-box-note { margin-top: 14px; border-top: 1px solid #1b2a3d; padding-top: 12px; }
 .transit-box-note p { margin: 5px 0 0; color: #9fb0c4; font-size: .72rem; line-height: 1.45; white-space: pre-wrap; }
 .transit-box-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.transit-infinite-sentinel { height: 1px; width: 100%; }
 .transit-empty-section {
   border: 1px dashed #26384e;
   border-radius: 10px;
