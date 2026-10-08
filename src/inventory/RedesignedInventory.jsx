@@ -716,7 +716,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       setLoading(false);
       return;
     }
-    const { data: detail, error: detailError } = await supabase.from(table).select("*").eq("item_id", itemId).single();
+    const { data: detail, error: detailError } = await supabase.from(table).select("*").eq("item_id", itemId).maybeSingle();
     if (requestId !== loadRequestRef.current) return;
     if (detailError) {
       setError(detailError.message);
