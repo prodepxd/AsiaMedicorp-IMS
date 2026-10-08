@@ -32,6 +32,17 @@ function progressClass(progress) {
   return String(progress || "").replace(/[^a-z]+/g, "-");
 }
 
+async function loadInventoryStateMap(supabase, itemIds) {
+  const ids = [...new Set((itemIds || []).filter(Boolean))];
+  if (!ids.length) return {};
+  const { data, error } = await supabase
+    .from("item_inventory_state")
+    .select("item_id,inventory_state")
+    .in("item_id", ids);
+  if (error) throw error;
+  return Object.fromEntries((data || []).map((row) => [row.item_id, row.inventory_state]));
+}
+
 function TransitForm({
   supabase,
   items,
@@ -64,17 +75,6 @@ function TransitForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  async function loadInventoryStateMap(supabase, itemIds) {
-  const ids = [...new Set((itemIds || []).filter(Boolean))];
-  if (!ids.length) return {};
-  const { data, error } = await supabase
-    .from("item_inventory_state")
-    .select("item_id,inventory_state")
-    .in("item_id", ids);
-  if (error) throw error;
-  return Object.fromEntries((data || []).map((row) => [row.item_id, row.inventory_state]));
-}
-
   const itemMap = useMemo(() => Object.fromEntries(availableItems.map((item) => [item.id, item])), [availableItems]);
   const movingItemIdSet = useMemo(() => new Set(movingItemIds), [movingItemIds]);
 
@@ -97,7 +97,7 @@ function TransitForm({
       }
       let inventoryStateMap = {};
       try {
-        inventoryStateMap = await loadInventoryStateMap((data || []).map((item) => item.id));
+        inventoryStateMap = await loadInventoryStateMap(supabase, (data || []).map((item) => item.id));
       } catch (stateError) {
         if (!alive) return;
         setAvailableItems([]);
