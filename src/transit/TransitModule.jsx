@@ -489,22 +489,48 @@ export function ItemTransitHistory({ supabase, itemId }) {
             if (!transit) return null;
             return (
               <div className="transit-history-row" key={row.id}>
-                <div className="transit-history-date"><strong>{formatDate(transit.sent_at || transit.created_at)}</strong></div>
+                <div className="transit-history-details">
+                  <div className="transit-history-field">
+                    <span>Sent</span>
+                    <strong>{formatDate(transit.sent_at)}</strong>
+                  </div>
+                  <div className="transit-history-field">
+                    <span>Sender</span>
+                    <strong>{transit.sender || "—"}</strong>
+                  </div>
+                  <div className="transit-history-field">
+                    <span>Received</span>
+                    <strong>{formatDate(row.received_at)}</strong>
+                  </div>
+                  <div className="transit-history-field">
+                    <span>Receiver</span>
+                    <strong>{transit.receiver || "—"}</strong>
+                  </div>
+                  <div className="transit-history-created">
+                    <span>Created</span>
+                    <strong>{formatDate(transit.created_at)}</strong>
+                  </div>
+                </div>
                 <div className="transit-history-route">
                   <div className="transit-history-route-line">
                     <strong>{locationMap[transit.from_location_id] || "—"}</strong>
                     <span>→</span>
                     <strong>{locationMap[transit.to_location_id] || "—"}</strong>
                   </div>
-                  <div className="transit-history-meta">
+                  <div className="transit-history-progress">
                     <span className={`status-pill transit-progress-pill transit-progress-${progressClass(transit.transit_progress)}`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
-                    <span>Sender: {transit.sender || "—"}</span>
-                    <span>Carrier: {transit.carrier || "—"}</span>
                   </div>
-                  {transit.sent_at && <p>Sent: {formatDate(transit.sent_at)}</p>}
-                  {row.received_at && <p>Received by {transit.receiver || "—"}: {formatDate(row.received_at)}</p>}
-                  {transit.note && <p><strong>Transit note:</strong> {transit.note}</p>}
-                  {row.note && <p><strong>Item note:</strong> {row.note}</p>}
+                  <div className="transit-history-section">
+                    <span>Carrier</span>
+                    <strong>{transit.carrier || "—"}</strong>
+                  </div>
+                  {(transit.note || row.note) && (
+                    <div className="transit-history-section transit-history-note">
+                      <span>Note</span>
+                      {transit.note && <p><strong>Transit:</strong> {transit.note}</p>}
+                      {row.note && <p><strong>Item:</strong> {row.note}</p>}
+                    </div>
+                  )}
                 </div>
               </div>
             );
