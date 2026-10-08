@@ -648,15 +648,17 @@ button { cursor: pointer; }
 .transit-history-list { display: grid; }
 .transit-history-row {
   display: grid;
-  grid-template-columns: minmax(180px, .42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(155px, .28fr) minmax(280px, .44fr) minmax(155px, .28fr);
   gap: 24px;
   padding: 18px;
   border-top: 1px solid #172638;
 }
 .transit-history-row:first-child { border-top: 0; }
-.transit-history-details {
+.transit-history-details,
+.transit-history-people {
   display: grid;
-  gap: 10px;
+  align-content: start;
+  gap: 14px;
   min-width: 0;
 }
 .transit-history-field,
@@ -667,66 +669,122 @@ button { cursor: pointer; }
 }
 .transit-history-field span,
 .transit-history-created span,
-.transit-history-section > span {
+.transit-history-section-heading > span,
+.transit-history-location span {
   color: #61758c;
   font-size: .61rem;
   text-transform: uppercase;
   letter-spacing: .07em;
   font-weight: 700;
 }
-.transit-history-field strong {
+.transit-history-field strong,
+.transit-history-created strong {
   color: #dbe7f5;
   font-size: .72rem;
   overflow-wrap: anywhere;
 }
 .transit-history-created {
-  margin-top: 4px;
+  margin-top: 2px;
   padding-top: 12px;
   border-top: 1px solid #1b2a3d;
 }
-.transit-history-created strong {
-  color: #aebed0;
-  font-size: .68rem;
-  overflow-wrap: anywhere;
-}
-.transit-history-route {
+.transit-history-created strong { color: #aebed0; font-size: .68rem; }
+.transit-history-movement {
   min-width: 0;
 }
-.transit-history-route-line {
+.transit-history-vertical-route {
   display: flex;
-  align-items: center;
-  gap: 9px;
-  flex-wrap: wrap;
-  color: #dbe7f5;
-  font-size: .78rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
 }
-.transit-history-route-line span { color: #526f8d; }
-.transit-history-progress {
-  margin-top: 8px;
-}
-.transit-history-section {
+.transit-history-location {
   display: grid;
   gap: 4px;
+  padding: 9px 11px;
+  border: 1px solid;
+  border-radius: 9px;
+}
+.transit-history-location strong {
+  font-size: .74rem;
+  overflow-wrap: anywhere;
+}
+.transit-history-location-to {
+  border-color: #285b3b;
+  background: rgba(34, 197, 94, .08);
+}
+.transit-history-location-to span { color: #70b989; }
+.transit-history-location-to strong { color: #b7e6c5; }
+.transit-history-location-from {
+  border-color: #713b42;
+  background: rgba(239, 68, 68, .08);
+}
+.transit-history-location-from span { color: #d88b91; }
+.transit-history-location-from strong { color: #f0b6ba; }
+.transit-history-route-arrow {
+  align-self: center;
+  color: #71859d;
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 1px 0;
+}
+.transit-history-progress {
+  margin-top: 12px;
+}
+.transit-history-note {
   margin-top: 13px;
   padding-top: 12px;
   border-top: 1px solid #1b2a3d;
 }
-.transit-history-section strong {
-  color: #dbe7f5;
-  font-size: .72rem;
-  overflow-wrap: anywhere;
+.transit-history-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 .transit-history-note p {
-  margin: 2px 0 0;
+  margin: 7px 0 0;
   color: #8fa4ba;
   font-size: .72rem;
   line-height: 1.5;
   white-space: pre-wrap;
 }
-.transit-history-note p + p { margin-top: 6px; }
+.transit-history-note-editor {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.transit-history-note-editor textarea {
+  width: 100%;
+  min-height: 70px;
+  padding: 9px 10px;
+  border: 1px solid #2a3d54;
+  border-radius: 8px;
+  outline: none;
+  resize: vertical;
+  color: #dbe7f5;
+  background: #081522;
+  font: inherit;
+  font-size: .72rem;
+  box-sizing: border-box;
+}
+.transit-history-note-editor textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.1);
+}
+.transit-history-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+@media (max-width: 850px) {
+  .transit-history-row {
+    grid-template-columns: minmax(145px, .3fr) minmax(230px, .4fr) minmax(145px, .3fr);
+    gap: 16px;
+  }
+}
 @media (max-width: 700px) {
   .transit-history-row { grid-template-columns: 1fr; gap: 16px; }
-  .transit-history-created { margin-top: 2px; }
 }
 
 
