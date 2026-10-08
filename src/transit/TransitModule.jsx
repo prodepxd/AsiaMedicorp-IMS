@@ -511,49 +511,63 @@ export function ItemTransitHistory({ supabase, itemId, canEdit }) {
                   <div className="transit-history-horizontal-route" aria-label={`Movement from ${locationMap[transit.from_location_id] || "unknown location"} to ${locationMap[transit.to_location_id] || "unknown location"}`}>
                     <div className="transit-history-location transit-history-location-from">
                       <span>FROM</span>
-                      <strong>{locationMap[transit.from_location_id] || "—"}</strong>
+                      <strong>
+                        {(() => {
+                          const value = locationMap[transit.from_location_id] || "—";
+                          const bracketIndex = value.indexOf("(");
+                          return bracketIndex > 0 ? <>{value.slice(0, bracketIndex).trim()}<br />{value.slice(bracketIndex).trim()}</> : value;
+                        })()}
+                      </strong>
                     </div>
                     <div className="transit-history-route-arrow" aria-hidden="true">→</div>
                     <div className="transit-history-location transit-history-location-to">
                       <span>TO</span>
-                      <strong>{locationMap[transit.to_location_id] || "—"}</strong>
+                      <strong>
+                        {(() => {
+                          const value = locationMap[transit.to_location_id] || "—";
+                          const bracketIndex = value.indexOf("(");
+                          return bracketIndex > 0 ? <>{value.slice(0, bracketIndex).trim()}<br />{value.slice(bracketIndex).trim()}</> : value;
+                        })()}
+                      </strong>
                     </div>
                   </div>
-                  <div className="transit-history-progress">
-                    <span className={`status-pill transit-progress-pill transit-progress-${progressClass(transit.transit_progress)}`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
-                  </div>
-                  <div className="transit-history-note">
-                    <div className="transit-history-section-heading">
-                      <span>Note</span>
-                      {canEdit && editingNoteId !== row.id && (
-                        <button type="button" className="inline-edit-button" onClick={() => { setEditingNoteId(row.id); setNoteDraft(row.note || ""); setError(""); }}>
-                          {row.note ? "Edit" : "Add"}
-                        </button>
+                  <div className="transit-history-movement-meta">
+                    <div className="transit-history-progress">
+                      <span className={`status-pill transit-progress-pill transit-progress-${progressClass(transit.transit_progress)}`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
+                    </div>
+                    <div className="transit-history-note">
+                      <div className="transit-history-section-heading">
+                        <span>Note</span>
+                        {canEdit && editingNoteId !== row.id && (
+                          <button type="button" className="inline-edit-button" onClick={() => { setEditingNoteId(row.id); setNoteDraft(row.note || ""); setError(""); }}>
+                            {row.note ? "Edit" : "Add"}
+                          </button>
+                        )}
+                      </div>
+                      {editingNoteId === row.id ? (
+                        <div className="transit-history-note-editor">
+                          <textarea value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} rows="3" placeholder="Add a note for this item..." />
+                          <div className="transit-history-note-actions">
+                            <button type="button" className="secondary-button" onClick={() => { setEditingNoteId(null); setNoteDraft(""); }} disabled={savingNoteId === row.id}>Cancel</button>
+                            <button type="button" className="primary-button" onClick={async () => {
+                              setSavingNoteId(row.id);
+                              setError("");
+                              const { error: noteError } = await supabase.from("transit_items").update({ note: noteDraft.trim() || null }).eq("id", row.id);
+                              if (noteError) {
+                                setError(noteError.message);
+                              } else {
+                                setRows((current) => current.map((item) => item.id === row.id ? { ...item, note: noteDraft.trim() || null } : item));
+                                setEditingNoteId(null);
+                                setNoteDraft("");
+                              }
+                              setSavingNoteId(null);
+                            }} disabled={savingNoteId === row.id}>{savingNoteId === row.id ? "Saving..." : "Save"}</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p>{row.note || "No item note."}</p>
                       )}
                     </div>
-                    {editingNoteId === row.id ? (
-                      <div className="transit-history-note-editor">
-                        <textarea value={noteDraft} onChange={(event) => setNoteDraft(event.target.value)} rows="3" placeholder="Add a note for this item..." />
-                        <div className="transit-history-note-actions">
-                          <button type="button" className="secondary-button" onClick={() => { setEditingNoteId(null); setNoteDraft(""); }} disabled={savingNoteId === row.id}>Cancel</button>
-                          <button type="button" className="primary-button" onClick={async () => {
-                            setSavingNoteId(row.id);
-                            setError("");
-                            const { error: noteError } = await supabase.from("transit_items").update({ note: noteDraft.trim() || null }).eq("id", row.id);
-                            if (noteError) {
-                              setError(noteError.message);
-                            } else {
-                              setRows((current) => current.map((item) => item.id === row.id ? { ...item, note: noteDraft.trim() || null } : item));
-                              setEditingNoteId(null);
-                              setNoteDraft("");
-                            }
-                            setSavingNoteId(null);
-                          }} disabled={savingNoteId === row.id}>{savingNoteId === row.id ? "Saving..." : "Save"}</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p>{row.note || "No item note."}</p>
-                    )}
                   </div>
                 </div>
 
