@@ -617,6 +617,31 @@ button { cursor: pointer; }
 }
 
 
+.item-moving-link {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #70b8ff;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.item-moving-link:hover { color: #b5dcff; }
+.item-moving-link:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.transit-history-row-moving { scroll-margin-top: 24px; }
+.transit-history-row-moving .transit-history-location-from {
+  box-shadow: 0 0 0 1px rgba(56, 165, 245, .08);
+}
+
 .item-transit-history {
   margin-top: 24px;
   border: 1px solid #1b2a3d;
