@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
 
 const PROGRESS = {
-  standby: "Stand-By",
+  standby: "stand-by",
+  moving: "moving",
+  completed: "completed",
+};
+
+const PROGRESS_LABEL = {
+  "stand-by": "Stand-By",
   moving: "Moving",
   completed: "Completed",
 };
 
 function localDateTimeValue(date = new Date()) {
   const pad = (value) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return \`\${date.getFullYear()}-\${pad(date.getMonth() + 1)}-\${pad(date.getDate())}T\${pad(date.getHours())}:\${pad(date.getMinutes())}\`;
 }
 
 function formatDate(value) {
@@ -19,15 +25,17 @@ function formatDate(value) {
 
 function itemLabel(item) {
   if (!item) return "Unknown item";
-  return `${item.serial_number || "No serial number"} · ${item.item_type || "Item"}`;
+  return \`\${item.serial_number || "No serial number"} · \${item.item_type || "Item"}\`;
+}
+
+function progressClass(progress) {
+  return String(progress || "").replace(/[^a-z]+/g, "-");
 }
 
 function TransitForm({
   supabase,
   items,
-  eligibleItems,
   locations,
-  machineComponents,
   editRecord,
   initialItemIds,
   onClose,
@@ -39,63 +47,58 @@ function TransitForm({
   const [toLocationId, setToLocationId] = useState(editRecord?.to_location_id || "");
   const [sender, setSender] = useState(editRecord?.sender || "");
   const [carrier, setCarrier] = useState(editRecord?.carrier || "");
-  const [sendAt, setSendAt] = useState(
-    editRecord?.send_at ? localDateTimeValue(new Date(editRecord.send_at)) : localDateTimeValue()
+  const [sentAt, setSentAt] = useState(
+    editRecord?.sent_at ? localDateTimeValue(new Date(editRecord.sent_at)) : localDateTimeValue()
   );
   const [receiver, setReceiver] = useState(editRecord?.receiver || "");
-  const [receiveAt, setReceiveAt] = useState(
-    editRecord?.receive_at ? localDateTimeValue(new Date(editRecord.receive_at)) : ""
+  const [receivedAt, setReceivedAt] = useState(
+    editRecord?.received_at ? localDateTimeValue(new Date(editRecord.received_at)) : ""
   );
-  const [notes, setNotes] = useState(editRecord?.notes || "");
+  const [note, setNote] = useState(editRecord?.note || "");
   const [itemSearch, setItemSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const itemMap = useMemo(() => Object.fromEntries(items.map((item) => [item.id, item])), [items]);
-  const componentMap = useMemo(() => {
-    const map = {};
-    machineComponents.forEach((row) => {
-      if (!map[row.machine_item_id]) map[row.machine_item_id] = [];
-      map[row.machine_item_id].push(row.component_item_id);
-    });
-    return map;
-  }, [machineComponents]);
-
-  const lockedChildIds = useMemo(() => {
-    const ids = new Set();
-    selectedItemIds.forEach((id) => {
-      (componentMap[id] || []).forEach((childId) => ids.add(childId));
-    });
-    return ids;
-  }, [selectedItemIds, componentMap]);
 
   const selectedDisplayItems = useMemo(
     () => selectedItemIds.map((id) => itemMap[id]).filter(Boolean),
     [selectedItemIds, itemMap]
   );
 
-  const filteredEligibleItems = useMemo(() => {
+  const selectedLocations = useMemo(
+    () => [...new Set(selectedDisplayItems.map((item) => item.current_location_id).filter(Boolean))],
+    [selectedDisplayItems]
+  );
+
+  const filteredItems = useMemo(() => {
     const query = itemSearch.trim().toLowerCase();
-    return eligibleItems.filter((item) => {
+    return items.filter((item) => {
+      if (!item.current_location_id) return false;
       if (!query) return true;
       return itemLabel(item).toLowerCase().includes(query);
     });
-  }, [eligibleItems, itemSearch]);
+  }, [items, itemSearch]);
+
+  useEffect(() => {
+    if (selectedLocations.length === 1) {
+      setFromLocationId(selectedLocations[0]);
+    } else if (selectedLocations.length === 0 && editRecord?.from_location_id) {
+      setFromLocationId(editRecord.from_location_id);
+    } else if (selectedLocations.length > 1) {
+      setFromLocationId("");
+    }
+  }, [selectedLocations, editRecord?.from_location_id]);
 
   function toggleItem(itemId) {
-    setSelectedItemIds((current) => {
-      if (current.includes(itemId)) {
-        const next = current.filter((id) => id !== itemId);
-        const childIds = new Set(componentMap[itemId] || []);
-        return next.filter((id) => !childIds.has(id));
-      }
-
-      return [...current, itemId, ...(componentMap[itemId] || []).filter((id) => !current.includes(id))];
-    });
+    setSelectedItemIds((current) =>
+      current.includes(itemId)
+        ? current.filter((id) => id !== itemId)
+        : [...current, itemId]
+    );
   }
 
   function removeSelected(itemId) {
-    if (lockedChildIds.has(itemId)) return;
     setSelectedItemIds((current) => current.filter((id) => id !== itemId));
   }
 
@@ -103,19 +106,17 @@ function TransitForm({
     event.preventDefault();
     setError("");
 
-    if (!fromLocationId) return setError("From location is required.");
+    if (selectedItemIds.length === 0) return setError("Select at least one Global Stock item.");
+    if (selectedLocations.length > 1) return setError("All selected items must currently be at the same location.");
+    if (selectedLocations.length === 0) return setError("Selected items must have a current location.");
+    if (!fromLocationId) return setError("The source location could not be determined from the selected items.");
     if (!toLocationId) return setError("To location is required.");
     if (fromLocationId === toLocationId) return setError("From and To locations must be different.");
     if (!sender.trim()) return setError("Sender is required.");
     if (!carrier.trim()) return setError("Carrier is required.");
-    if (!sendAt) return setError("Send date/time is required.");
-
-    if (mode !== "complete" && selectedItemIds.length === 0) {
-      return setError("Select at least one Global Stock item.");
-    }
-
-    if (mode === "complete" && (!receiver.trim() || !receiveAt)) {
-      return setError("Receiver and receive date/time are required to complete the Transit.");
+    if (!sentAt) return setError("Sent date/time is required.");
+    if (mode === "complete" && (!receiver.trim() || !receivedAt)) {
+      return setError("Receiver and received date/time are required to complete the Transit.");
     }
 
     setSaving(true);
@@ -124,20 +125,26 @@ function TransitForm({
       const payload = {
         from_location_id: fromLocationId,
         to_location_id: toLocationId,
+        sent_at: new Date(sentAt).toISOString(),
+        received_at: receivedAt ? new Date(receivedAt).toISOString() : null,
         sender: sender.trim(),
-        carrier: carrier.trim(),
-        send_at: new Date(sendAt).toISOString(),
         receiver: receiver.trim() || null,
-        receive_at: receiveAt ? new Date(receiveAt).toISOString() : null,
-        notes: notes.trim() || null,
+        carrier: carrier.trim(),
+        note: note.trim() || null,
       };
 
       if (mode === "complete") {
         const { error: updateError } = await supabase
           .from("transits")
-          .update({ ...payload, progress: PROGRESS.completed })
+          .update({ ...payload, transit_progress: PROGRESS.completed })
           .eq("id", editRecord.id);
         if (updateError) throw updateError;
+
+        const { error: itemUpdateError } = await supabase
+          .from("transit_items")
+          .update({ received_at: new Date(receivedAt).toISOString() })
+          .eq("transit_id", editRecord.id);
+        if (itemUpdateError) throw itemUpdateError;
       } else if (editRecord) {
         const { error: updateError } = await supabase
           .from("transits")
@@ -154,28 +161,13 @@ function TransitForm({
         const existingRows = existingResult.data || [];
         const desired = new Set(selectedItemIds);
         const existing = new Set(existingRows.map((row) => row.item_id));
-        const removedRows = existingRows.filter((row) => !desired.has(row.item_id));
 
-        // Remove a parent Machine before its auto-added children so the
-        // database guard permits those child rows to disappear with the parent.
-        const removedParentRows = removedRows.filter((row) =>
-          machineComponents.some((mc) => mc.machine_item_id === row.item_id && !desired.has(row.item_id))
-        );
-        const removedChildRows = removedRows.filter((row) =>
-          machineComponents.some((mc) => mc.component_item_id === row.item_id && !desired.has(mc.machine_item_id))
-        );
-        const removedOtherRows = removedRows.filter((row) =>
-          !removedParentRows.some((parent) => parent.id === row.id)
-          && !removedChildRows.some((child) => child.id === row.id)
-        );
-
-        for (const row of [...removedParentRows, ...removedOtherRows, ...removedChildRows]) {
+        for (const row of existingRows.filter((row) => !desired.has(row.item_id))) {
           const { error: deleteError } = await supabase.from("transit_items").delete().eq("id", row.id);
           if (deleteError) throw deleteError;
         }
 
-        const additions = selectedItemIds.filter((id) => !existing.has(id) && !lockedChildIds.has(id));
-        for (const itemId of additions) {
+        for (const itemId of selectedItemIds.filter((id) => !existing.has(id))) {
           const { error: insertError } = await supabase.from("transit_items").insert({
             transit_id: editRecord.id,
             item_id: itemId,
@@ -188,23 +180,19 @@ function TransitForm({
           .from("transits")
           .insert({
             ...payload,
-            progress: PROGRESS.standby,
+            transit_progress: PROGRESS.standby,
             created_by: userData?.user?.id || null,
           })
           .select("id")
           .single();
-
         if (insertError) throw insertError;
 
-        for (const itemId of selectedItemIds.filter((id) => !lockedChildIds.has(id))) {
-          const { error: itemError } = await supabase.from("transit_items").insert({
-            transit_id: transit.id,
-            item_id: itemId,
-          });
-          if (itemError) {
-            await supabase.from("transits").delete().eq("id", transit.id);
-            throw itemError;
-          }
+        const { error: itemError } = await supabase.from("transit_items").insert(
+          selectedItemIds.map((itemId) => ({ transit_id: transit.id, item_id: itemId }))
+        );
+        if (itemError) {
+          await supabase.from("transits").delete().eq("id", transit.id);
+          throw itemError;
         }
       }
 
@@ -216,11 +204,7 @@ function TransitForm({
     }
   }
 
-  const title = mode === "complete"
-    ? "Complete Transit"
-    : editRecord
-      ? "Edit Transit"
-      : "Create Transit";
+  const title = mode === "complete" ? "Complete Transit" : editRecord ? "Edit Transit" : "Create Transit";
 
   return (
     <div className="modal-backdrop">
@@ -229,7 +213,11 @@ function TransitForm({
           <div>
             <p className="section-kicker">{mode === "complete" ? "COMPLETE TRANSIT" : editRecord ? "EDIT TRANSIT" : "NEW TRANSIT"}</p>
             <h2>{title}</h2>
-            <p>{mode === "complete" ? "Receiver and receive date/time are required before completion." : "A Transit starts in Stand-By and can contain one or more Global Stock items."}</p>
+            <p>
+              {mode === "complete"
+                ? "Record the receiver and received date/time before completion."
+                : "A Transit can contain one or more Global Stock items. The source location is determined from the selected items."}
+            </p>
           </div>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
@@ -240,7 +228,7 @@ function TransitForm({
               <div className="transit-field-heading">
                 <div>
                   <strong>Global Stock items *</strong>
-                  <span>Select at least one item.</span>
+                  <span>Select one or more items.</span>
                 </div>
                 <span className="history-count">{selectedItemIds.length} selected</span>
               </div>
@@ -252,17 +240,16 @@ function TransitForm({
               />
 
               <div className="transit-item-options">
-                {filteredEligibleItems.length === 0 ? (
-                  <div className="history-empty">No eligible items found.</div>
-                ) : filteredEligibleItems.map((item) => {
+                {filteredItems.length === 0 ? (
+                  <div className="history-empty">No Global Stock items found.</div>
+                ) : filteredItems.map((item) => {
                   const checked = selectedItemIds.includes(item.id);
-                  const hasComponents = (componentMap[item.id] || []).length > 0;
                   return (
                     <label key={item.id} className={checked ? "transit-item-option selected" : "transit-item-option"}>
                       <input type="checkbox" checked={checked} onChange={() => toggleItem(item.id)} />
                       <span>
                         <strong>{itemLabel(item)}</strong>
-                        <small>{item.inventory_status_name || "—"}{hasComponents ? ` · ${componentMap[item.id].length} installed component${componentMap[item.id].length === 1 ? "" : "s"} auto-added` : ""}</small>
+                        <small>{item.inventory_status_name || "—"}</small>
                       </span>
                     </label>
                   );
@@ -272,24 +259,19 @@ function TransitForm({
               {selectedDisplayItems.length > 0 && (
                 <div className="transit-selected-items">
                   <div className="transit-field-heading">
-                    <div><strong>Selected items</strong><span>Installed components are locked to their parent Machine.</span></div>
+                    <div><strong>Selected items</strong><span>All selected items must share the same current location.</span></div>
                   </div>
-                  {selectedDisplayItems.map((item) => {
-                    const locked = lockedChildIds.has(item.id);
-                    return (
-                      <div className="transit-selected-row" key={item.id}>
-                        <div>
-                          <strong>{itemLabel(item)}</strong>
-                          <span>{locked ? "Installed component · removed with parent Machine" : item.item_type}</span>
-                        </div>
-                        {!locked && (
-                          <button type="button" className="table-button delete-button" onClick={() => removeSelected(item.id)}>
-                            Remove
-                          </button>
-                        )}
+                  {selectedDisplayItems.map((item) => (
+                    <div className="transit-selected-row" key={item.id}>
+                      <div>
+                        <strong>{itemLabel(item)}</strong>
+                        <span>{item.inventory_status_name || "—"}</span>
                       </div>
-                    );
-                  })}
+                      <button type="button" className="table-button delete-button" onClick={() => removeSelected(item.id)}>
+                        Remove
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -298,8 +280,8 @@ function TransitForm({
           <div className="transit-form-grid">
             <label className="redesign-field">
               <span>From location *</span>
-              <select value={fromLocationId} onChange={(event) => setFromLocationId(event.target.value)} required>
-                <option value="">Select location</option>
+              <select value={fromLocationId} disabled required>
+                <option value="">Select items first</option>
                 {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
               </select>
             </label>
@@ -323,8 +305,8 @@ function TransitForm({
             </label>
 
             <label className="redesign-field">
-              <span>Send date & time *</span>
-              <input type="datetime-local" value={sendAt} onChange={(event) => setSendAt(event.target.value)} required />
+              <span>Sent date & time *</span>
+              <input type="datetime-local" value={sentAt} onChange={(event) => setSentAt(event.target.value)} required />
             </label>
 
             <label className="redesign-field">
@@ -333,13 +315,13 @@ function TransitForm({
             </label>
 
             <label className="redesign-field">
-              <span>Receive date & time{mode === "complete" ? " *" : ""}</span>
-              <input type="datetime-local" value={receiveAt} onChange={(event) => setReceiveAt(event.target.value)} required={mode === "complete"} />
+              <span>Received date & time{mode === "complete" ? " *" : ""}</span>
+              <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} required={mode === "complete"} />
             </label>
 
             <label className="redesign-field transit-wide">
-              <span>Note <em>· Optional</em></span>
-              <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows="4" placeholder="Optional Transit note" />
+              <span>Transit note <em>· Optional</em></span>
+              <textarea value={note} onChange={(event) => setNote(event.target.value)} rows="4" placeholder="Optional note for the overall Transit" />
             </label>
           </div>
 
@@ -358,7 +340,8 @@ function TransitForm({
 }
 
 export function ItemTransitHistory({ supabase, itemId }) {
-  const [transits, setTransits] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -369,35 +352,19 @@ export function ItemTransitHistory({ supabase, itemId }) {
       setLoading(true);
       setError("");
 
-      const itemsResult = await supabase
+      const { data, error: historyError } = await supabase
         .from("transit_items")
-        .select("transit_id,transit_status_id,transit_statuses(name)")
-        .eq("item_id", itemId);
-
-      if (!alive) return;
-      if (itemsResult.error) {
-        setError(itemsResult.error.message);
-        setLoading(false);
-        return;
-      }
-
-      const statusByTransit = Object.fromEntries((itemsResult.data || []).map((row) => [row.transit_id, row.transit_statuses?.name || "—"]));
-      const transitIds = (itemsResult.data || []).map((row) => row.transit_id);
-      if (transitIds.length === 0) {
-        setTransits([]);
-        setLoading(false);
-        return;
-      }
-
-      const { data, error: transitError } = await supabase
-        .from("transits")
-        .select("id,from_location_id,to_location_id,sender,carrier,send_at,receiver,receive_at,progress,notes,created_at")
-        .in("id", transitIds)
+        .select("id,received_at,note,created_at,transit_id,transits(id,from_location_id,to_location_id,sent_at,received_at,transit_progress,sender,receiver,carrier,note,created_at)")
+        .eq("item_id", itemId)
         .order("created_at", { ascending: false });
 
       if (!alive) return;
-      if (transitError) setError(transitError.message);
-      else setTransits(data || []);
+      if (historyError) {
+        setError(historyError.message);
+        setRows([]);
+      } else {
+        setRows(data || []);
+      }
       setLoading(false);
     }
 
@@ -405,7 +372,6 @@ export function ItemTransitHistory({ supabase, itemId }) {
     return () => { alive = false; };
   }, [supabase, itemId]);
 
-  const [locations, setLocations] = useState([]);
   useEffect(() => {
     supabase.from("locations").select("id,name").order("name").then(({ data }) => setLocations(data || []));
   }, [supabase]);
@@ -418,71 +384,78 @@ export function ItemTransitHistory({ supabase, itemId }) {
         <div>
           <p className="section-kicker">MOVEMENT HISTORY</p>
           <h3>Transit / Movement History</h3>
-          <p>Transits containing this individual inventory item.</p>
+          <p>Transit movement and item-specific receiving notes for this inventory item.</p>
         </div>
-        {transits.length > 0 && <span className="history-count">{transits.length} Transit{transits.length === 1 ? "" : "s"}</span>}
+        {rows.length > 0 && <span className="history-count">{rows.length} Transit{rows.length === 1 ? "" : "s"}</span>}
       </div>
 
       {loading ? (
         <div className="history-empty">Loading movement history...</div>
       ) : error ? (
         <div className="error-message history-error">{error}</div>
-      ) : transits.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div className="history-empty">No transit history recorded for this item.</div>
       ) : (
         <div className="transit-history-list">
-          {transits.map((transit) => (
-            <div className="transit-history-row" key={transit.id}>
-              <div className="transit-history-date"><strong>{formatDate(transit.created_at)}</strong></div>
-              <div className="transit-history-route">
-                <div className="transit-history-route-line">
-                  <strong>{locationMap[transit.from_location_id] || "—"}</strong>
-                  <span>→</span>
-                  <strong>{locationMap[transit.to_location_id] || "—"}</strong>
+          {rows.map((row) => {
+            const transit = row.transits;
+            if (!transit) return null;
+            return (
+              <div className="transit-history-row" key={row.id}>
+                <div className="transit-history-date"><strong>{formatDate(transit.sent_at || transit.created_at)}</strong></div>
+                <div className="transit-history-route">
+                  <div className="transit-history-route-line">
+                    <strong>{locationMap[transit.from_location_id] || "—"}</strong>
+                    <span>→</span>
+                    <strong>{locationMap[transit.to_location_id] || "—"}</strong>
+                  </div>
+                  <div className="transit-history-meta">
+                    <span className={\`status-pill transit-progress-pill transit-progress-\${progressClass(transit.transit_progress)}\`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
+                    <span>Sender: {transit.sender || "—"}</span>
+                    <span>Carrier: {transit.carrier || "—"}</span>
+                  </div>
+                  {transit.sent_at && <p>Sent: {formatDate(transit.sent_at)}</p>}
+                  {transit.received_at && <p>Received by {transit.receiver || "—"}: {formatDate(transit.received_at)}</p>}
+                  {transit.note && <p><strong>Transit note:</strong> {transit.note}</p>}
+                  {row.note && <p><strong>Item note:</strong> {row.note}</p>}
                 </div>
-                <div className="transit-history-meta">
-                  <span className={`status-pill transit-progress-pill transit-progress-${transit.progress.toLowerCase().replace(/[^a-z]+/g, "-")}`}>{transit.progress}</span>
-                  {statusByTransit[transit.id] && <span>Item Transit Status: {statusByTransit[transit.id]}</span>}
-                  <span>Sender: {transit.sender}</span>
-                  <span>Carrier: {transit.carrier}</span>
-                </div>
-                {transit.receive_at && <p>Received by {transit.receiver || "—"} on {formatDate(transit.receive_at)}</p>}
-                {transit.notes && <p>{transit.notes}</p>}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMoving, onComplete }) {
+function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMoving }) {
   const transitItems = transit.item_ids.map((id) => itemMap[id]).filter(Boolean);
 
   return (
-    <article className={`transit-box transit-box-${transit.progress.toLowerCase().replace(/[^a-z]+/g, "-")}`}>
+    <article className={\`transit-box transit-box-\${progressClass(transit.transit_progress)}\`}>
       <div className="transit-box-header">
         <div>
           <p className="section-kicker">TRANSIT</p>
           <h3>{locationMap[transit.from_location_id] || "—"} <span>→</span> {locationMap[transit.to_location_id] || "—"}</h3>
           <p>Created {formatDate(transit.created_at)}</p>
         </div>
-        <span className={`transit-progress-badge transit-progress-${transit.progress.toLowerCase().replace(/[^a-z]+/g, "-")}`}>{transit.progress}</span>
+        <span className={\`transit-progress-badge transit-progress-\${progressClass(transit.transit_progress)}\`}>
+          {PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}
+        </span>
       </div>
 
       <div className="transit-box-grid">
         <div>
           <span className="transit-label">Sender</span>
-          <strong>{transit.sender}</strong>
+          <strong>{transit.sender || "—"}</strong>
         </div>
         <div>
           <span className="transit-label">Carrier</span>
-          <strong>{transit.carrier}</strong>
+          <strong>{transit.carrier || "—"}</strong>
         </div>
         <div>
-          <span className="transit-label">Send date & time</span>
-          <strong>{formatDate(transit.send_at)}</strong>
+          <span className="transit-label">Sent date & time</span>
+          <strong>{formatDate(transit.sent_at)}</strong>
         </div>
         {transit.receiver && (
           <div>
@@ -490,10 +463,10 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMo
             <strong>{transit.receiver}</strong>
           </div>
         )}
-        {transit.receive_at && (
+        {transit.received_at && (
           <div>
-            <span className="transit-label">Receive date & time</span>
-            <strong>{formatDate(transit.receive_at)}</strong>
+            <span className="transit-label">Received date & time</span>
+            <strong>{formatDate(transit.received_at)}</strong>
           </div>
         )}
       </div>
@@ -503,21 +476,30 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMo
           <div><strong>Items</strong><span>{transitItems.length} item{transitItems.length === 1 ? "" : "s"}</span></div>
         </div>
         <div className="transit-box-item-list">
-          {transitItems.map((item) => <button key={item.id} type="button" className="inline-machine-link" onClick={() => onEdit?.("item", item.id)}>{itemLabel(item)}</button>)}
+          {transitItems.map((item) => (
+            <button key={item.id} type="button" className="inline-machine-link" onClick={() => onEdit?.("item", item.id)}>
+              {itemLabel(item)}
+            </button>
+          ))}
         </div>
       </div>
 
-      {transit.notes && <div className="transit-box-note"><span className="transit-label">Note</span><p>{transit.notes}</p></div>}
+      {transit.note && (
+        <div className="transit-box-note">
+          <span className="transit-label">Transit note</span>
+          <p>{transit.note}</p>
+        </div>
+      )}
 
       {canEdit && (
         <div className="transit-box-actions">
-          {transit.progress === PROGRESS.standby && (
+          {transit.transit_progress === PROGRESS.standby && (
             <>
               <button className="secondary-button" onClick={() => onEdit?.("edit", transit)}>Edit</button>
               <button className="primary-button" onClick={() => onStartMoving(transit)}>Start Moving</button>
             </>
           )}
-          {transit.progress === PROGRESS.moving && (
+          {transit.transit_progress === PROGRESS.moving && (
             <button className="primary-button" onClick={() => onEdit?.("complete", transit)}>Receive & Complete</button>
           )}
         </div>
@@ -529,7 +511,6 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, onEdit, onStartMo
 export default function TransitModule({ supabase, canEdit, onItemClick }) {
   const [items, setItems] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [machineComponents, setMachineComponents] = useState([]);
   const [transits, setTransits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -545,15 +526,14 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
     setLoading(true);
     setError("");
 
-    const [itemsResult, locationsResult, componentsResult, transitResult, transitItemsResult] = await Promise.all([
+    const [itemsResult, locationsResult, transitResult, transitItemsResult] = await Promise.all([
       supabase.from("items").select("id,serial_number,item_type,current_location_id,inventory_status_id,inventory_statuses(name)").order("serial_number"),
       supabase.from("locations").select("id,name,is_active").order("name"),
-      supabase.from("machine_components").select("machine_item_id,component_item_id"),
-      supabase.from("transits").select("id,from_location_id,to_location_id,sender,carrier,send_at,receiver,receive_at,notes,progress,created_at,updated_at").order("created_at", { ascending: false }),
-      supabase.from("transit_items").select("id,transit_id,item_id").order("created_at"),
+      supabase.from("transits").select("id,from_location_id,to_location_id,sent_at,received_at,transit_progress,sender,receiver,carrier,note,created_by,created_at,updated_at").order("created_at", { ascending: false }),
+      supabase.from("transit_items").select("id,transit_id,item_id,received_at,note,created_at,updated_at").order("created_at"),
     ]);
 
-    const failed = [itemsResult, locationsResult, componentsResult, transitResult, transitItemsResult].find((result) => result.error);
+    const failed = [itemsResult, locationsResult, transitResult, transitItemsResult].find((result) => result.error);
     if (failed) {
       setError(failed.error.message);
       setLoading(false);
@@ -574,7 +554,6 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
 
     setItems(itemRows);
     setLocations((locationsResult.data || []).filter((row) => row.is_active !== false));
-    setMachineComponents(componentsResult.data || []);
     setTransits((transitResult.data || []).map((transit) => ({
       ...transit,
       item_ids: itemIdsByTransit[transit.id] || [],
@@ -589,24 +568,19 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
   const itemMap = useMemo(() => Object.fromEntries(items.map((item) => [item.id, item])), [items]);
   const locationMap = useMemo(() => Object.fromEntries(locations.map((row) => [row.id, row.name])), [locations]);
 
-  const eligibleItems = useMemo(
-    () => items.filter((item) => ["Idle", "In Repair", "SOLD"].includes(item.inventory_status_name)),
-    [items]
-  );
-
   const filteredTransits = useMemo(() => {
     const query = search.trim().toLowerCase();
     return transits.filter((transit) => {
-      const transitItemValues = transit.item_ids.map((id) => itemMap[id]).filter(Boolean);
+      const transitItems = transit.item_ids.map((id) => itemMap[id]).filter(Boolean);
       const matchesSearch = !query || [
         transit.sender,
         transit.carrier,
         transit.receiver,
-        transit.notes,
+        transit.note,
         locationMap[transit.from_location_id],
         locationMap[transit.to_location_id],
-        transit.progress,
-        ...transitItemValues.flatMap((item) => [item.serial_number, item.item_type]),
+        transit.transit_progress,
+        ...transitItems.flatMap((item) => [item.serial_number, item.item_type]),
       ].filter(Boolean).some((value) => String(value).toLowerCase().includes(query));
 
       const matchesLocation = locationFilter === "all"
@@ -618,9 +592,9 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
   }, [transits, itemMap, locationMap, search, locationFilter]);
 
   const grouped = useMemo(() => ({
-    [PROGRESS.moving]: filteredTransits.filter((x) => x.progress === PROGRESS.moving),
-    [PROGRESS.standby]: filteredTransits.filter((x) => x.progress === PROGRESS.standby),
-    [PROGRESS.completed]: filteredTransits.filter((x) => x.progress === PROGRESS.completed),
+    [PROGRESS.moving]: filteredTransits.filter((x) => x.transit_progress === PROGRESS.moving),
+    [PROGRESS.standby]: filteredTransits.filter((x) => x.transit_progress === PROGRESS.standby),
+    [PROGRESS.completed]: filteredTransits.filter((x) => x.transit_progress === PROGRESS.completed),
   }), [filteredTransits]);
 
   function openCreate() {
@@ -658,7 +632,10 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
     setError("");
     const { error: updateError } = await supabase
       .from("transits")
-      .update({ progress: PROGRESS.moving })
+      .update({
+        transit_progress: PROGRESS.moving,
+        sent_at: transit.sent_at || new Date().toISOString(),
+      })
       .eq("id", transit.id);
 
     if (updateError) {
@@ -677,7 +654,7 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
 
   function renderSection(title, key, className, list) {
     return (
-      <section className={`transit-section transit-section-${className}`}>
+      <section className={\`transit-section transit-section-\${className}\`}>
         <div className="transit-section-heading">
           <div>
             <p className="section-kicker">TRANSIT</p>
@@ -702,7 +679,6 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
                   else openEdit(value);
                 }}
                 onStartMoving={startMoving}
-                onComplete={openComplete}
               />
             ))}
           </div>
@@ -754,9 +730,7 @@ export default function TransitModule({ supabase, canEdit, onItemClick }) {
         <TransitForm
           supabase={supabase}
           items={items}
-          eligibleItems={eligibleItems}
           locations={locations}
-          machineComponents={machineComponents}
           editRecord={editingTransit}
           initialItemIds={editingItemIds}
           mode={formMode}
