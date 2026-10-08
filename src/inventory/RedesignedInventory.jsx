@@ -682,6 +682,8 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
   const [selectedComponentId, setSelectedComponentId] = useState("");
   const [addingComponent, setAddingComponent] = useState(false);
   const [removingComponentId, setRemovingComponentId] = useState("");
+  const [movingTransit, setMovingTransit] = useState(null);
+  const [focusMovingHistory, setFocusMovingHistory] = useState(0);
   const loadRequestRef = useRef(0);
 
   const detailTable = (type) => ({
@@ -752,6 +754,20 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       boardTypes:bt.data||[],
     });
     if (requestId !== loadRequestRef.current) return;
+    const { data: transitRows, error: transitError } = await supabase
+      .from("transit_items")
+      .select("transit_id,transits(id,transit_progress,created_at)")
+      .eq("item_id", row.id);
+    if (requestId !== loadRequestRef.current) return;
+    if (transitError) {
+      setMovingTransit(null);
+    } else {
+      const latestMoving = (transitRows || [])
+        .map((entry) => entry.transits)
+        .filter((transit) => transit?.transit_progress === "moving")
+        .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())[0] || null;
+      setMovingTransit(latestMoving);
+    }
     setItem({...row, detail:detail||{}});
     if (row.item_type !== "Machine") {
       const { data: relationship } = await supabase
@@ -1160,7 +1176,16 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       { key:"inventory_status_id", label:"Inventory Status", value:statusValue, readOnly:Boolean(parentMachine) },
       ...(parentMachine ? [{ key:"parent_machine", label:"Parent machine", value:<button type="button" className="inline-machine-link" onClick={() => onItemClick?.(parentMachine.id)}>{parentMachine.serial_number || "Machine"}</button>, readOnly:true }] : []),
       { key:"quality_status_id", label:"Quality", value:name(masters.qualities, item.quality_status_id) },
-      { key:"current_location_id", label:"Location", value:name(masters.locations, item.current_location_id) },
+      { key:"current_location_id", label:"Location", value:movingTransit ? (
+        <button
+          type="button"
+          className="item-moving-link"
+          onClick={() => setFocusMovingHistory((value) => value + 1)}
+          title="Jump to the latest moving Transit history"
+        >
+          Moving
+        </button>
+      ) : name(masters.locations, item.current_location_id) },
     ];
     const specific = {
       Machine: [
@@ -1355,7 +1380,12 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
             </div>
           ))}</div>
           <div className="item-detail-notes"><div><div className="item-detail-field-head"><span>Quality note</span>{canEdit && <button type="button" className="inline-edit-button" onClick={() => beginFieldEdit("quality_note")} disabled={editingField && editingField !== "quality_note"}>Edit</button>}</div>{editingField === "quality_note" ? <div className="item-inline-editor"><textarea value={editValue("quality_note")} onChange={(event) => setEditDraft({quality_note:event.target.value})} rows="4" /><div className="item-inline-editor-actions"><button type="button" className="secondary-button" onClick={cancelFieldEdit} disabled={savingField}>Cancel</button><button type="button" className="primary-button" onClick={saveFieldEdit} disabled={savingField}>{savingField ? "Saving..." : "Save"}</button></div></div> : <p>{item.quality_note || "No quality note."}</p>}</div></div>
-          <ItemTransitHistory supabase={supabase} itemId={item.id} canEdit={canEdit} />
+          <ItemTransitHistory
+            supabase={supabase}
+            itemId={item.id}
+            canEdit={canEdit}
+            focusLatestMoving={focusMovingHistory}
+          />
           {error && <div className="error-message">{error}</div>}
         </div>
       </div>
