@@ -502,7 +502,7 @@ export function ItemTransitHistory({ supabase, itemId }) {
                     <span>Carrier: {transit.carrier || "—"}</span>
                   </div>
                   {transit.sent_at && <p>Sent: {formatDate(transit.sent_at)}</p>}
-                  {transit.received_at && <p>Received by {transit.receiver || "—"}: {formatDate(transit.received_at)}</p>}
+                  {row.received_at && <p>Received by {transit.receiver || "—"}: {formatDate(row.received_at)}</p>}
                   {transit.note && <p><strong>Transit note:</strong> {transit.note}</p>}
                   {row.note && <p><strong>Item note:</strong> {row.note}</p>}
                 </div>
