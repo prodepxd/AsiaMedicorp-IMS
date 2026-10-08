@@ -48,7 +48,7 @@ function TransitForm({
   const [sender, setSender] = useState(editRecord?.sender || "");
   const [carrier, setCarrier] = useState(editRecord?.carrier || "");
   const [sentAt, setSentAt] = useState(
-    editRecord?.sent_at ? localDateTimeValue(new Date(editRecord.sent_at)) : localDateTimeValue()
+    editRecord?.sent_at ? localDateTimeValue(new Date(editRecord.sent_at)) : ""
   );
   const [receiver, setReceiver] = useState(editRecord?.receiver || "");
   const [receivedAt, setReceivedAt] = useState(
