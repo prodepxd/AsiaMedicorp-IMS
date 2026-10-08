@@ -44,6 +44,8 @@ function TransitForm({
 }) {
   const [selectedItemIds, setSelectedItemIds] = useState(initialItemIds || []);
   const [fromLocationId, setFromLocationId] = useState(editRecord?.from_location_id || "");
+  const [availableItems, setAvailableItems] = useState([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
   const [toLocationId, setToLocationId] = useState(editRecord?.to_location_id || "");
   const [sender, setSender] = useState(editRecord?.sender || "");
   const [carrier, setCarrier] = useState(editRecord?.carrier || "");
@@ -60,72 +62,49 @@ function TransitForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const itemMap = useMemo(() => Object.fromEntries(items.map((item) => [item.id, item])), [items]);
+  const itemMap = useMemo(() => Object.fromEntries(availableItems.map((item) => [item.id, item])), [availableItems]);
 
   useEffect(() => {
     let alive = true;
-
-    async function loadMachineComponents() {
-      const machineIds = items.filter((item) => item.item_type === "Machine").map((item) => item.id);
-      if (!machineIds.length) {
-        setMachineComponents({});
-        return;
-      }
-
-      const { data, error: componentError } = await supabase
-        .from("machine_components")
-        .select("machine_item_id,component_item_id")
-        .in("machine_item_id", machineIds);
-
+    async function loadItemsAtLocation() {
+      setItemSearch("");
+      if (!fromLocationId) { setSelectedItemIds([]); setAvailableItems([]); setMachineComponents({}); return; }
+      setItemsLoading(true);
+      const { data, error: itemError } = await supabase.from("items").select("id,serial_number,item_type,current_location_id,inventory_status_id").eq("current_location_id", fromLocationId).order("serial_number");
       if (!alive) return;
-      if (componentError) {
-        setError(componentError.message);
-        setMachineComponents({});
-        return;
+      if (itemError) { setAvailableItems([]); setMachineComponents({}); setError(itemError.message); setItemsLoading(false); return; }
+      const statusIds = [...new Set((data || []).map((item) => item.inventory_status_id).filter(Boolean))];
+      let statusMap = {};
+      if (statusIds.length) {
+        const { data: statuses, error: statusError } = await supabase.from("inventory_statuses").select("id,name").in("id", statusIds);
+        if (!alive) return;
+        if (statusError) { setAvailableItems([]); setMachineComponents({}); setError(statusError.message); setItemsLoading(false); return; }
+        statusMap = Object.fromEntries((statuses || []).map((status) => [status.id, status.name]));
       }
-
-      const map = {};
-      (data || []).forEach((row) => {
-        if (!map[row.machine_item_id]) map[row.machine_item_id] = [];
-        if (!map[row.machine_item_id].includes(row.component_item_id)) {
-          map[row.machine_item_id].push(row.component_item_id);
-        }
-      });
-      setMachineComponents(map);
+      const rows = (data || []).map((item) => ({ ...item, inventory_status_name: statusMap[item.inventory_status_id] || "—" }));
+      setAvailableItems(rows);
+      const machineIds = rows.filter((item) => item.item_type === "Machine").map((item) => item.id);
+      if (!machineIds.length) { setMachineComponents({}); setItemsLoading(false); return; }
+      const { data: components, error: componentError } = await supabase.from("machine_components").select("machine_item_id,component_item_id").in("machine_item_id", machineIds);
+      if (!alive) return;
+      if (componentError) { setError(componentError.message); setMachineComponents({}); }
+      else { const map = {}; (components || []).forEach((row) => { if (!map[row.machine_item_id]) map[row.machine_item_id] = []; if (!map[row.machine_item_id].includes(row.component_item_id)) map[row.machine_item_id].push(row.component_item_id); }); setMachineComponents(map); }
+      setItemsLoading(false);
     }
-
-    loadMachineComponents();
+    loadItemsAtLocation();
     return () => { alive = false; };
-  }, [supabase, items]);
+  }, [supabase, fromLocationId]);
 
   const selectedDisplayItems = useMemo(
     () => selectedItemIds.map((id) => itemMap[id]).filter(Boolean),
     [selectedItemIds, itemMap]
   );
 
-  const selectedLocations = useMemo(
-    () => [...new Set(selectedDisplayItems.map((item) => item.current_location_id).filter(Boolean))],
-    [selectedDisplayItems]
-  );
-
   const filteredItems = useMemo(() => {
     const query = itemSearch.trim().toLowerCase();
-    return items.filter((item) => {
-      if (!item.current_location_id) return false;
-      if (!query) return true;
-      return itemLabel(item).toLowerCase().includes(query);
-    });
-  }, [items, itemSearch]);
-
-  useEffect(() => {
-    if (selectedLocations.length === 1) {
-      setFromLocationId(selectedLocations[0]);
-    } else if (selectedLocations.length === 0 && editRecord?.from_location_id) {
-      setFromLocationId(editRecord.from_location_id);
-    } else if (selectedLocations.length > 1) {
-      setFromLocationId("");
-    }
-  }, [selectedLocations, editRecord?.from_location_id]);
+    if (!fromLocationId) return [];
+    return availableItems.filter((item) => !query || itemLabel(item).toLowerCase().includes(query));
+  }, [availableItems, fromLocationId, itemSearch]);
 
   function toggleItem(itemId) {
     setSelectedItemIds((current) => {
@@ -163,10 +142,8 @@ function TransitForm({
     event.preventDefault();
     setError("");
 
-    if (selectedItemIds.length === 0) return setError("Select at least one Global Stock item.");
-    if (selectedLocations.length > 1) return setError("All selected items must currently be at the same location.");
-    if (selectedLocations.length === 0) return setError("Selected items must have a current location.");
-    if (!fromLocationId) return setError("The source location could not be determined from the selected items.");
+    if (!fromLocationId) return setError("Select the source location first.");
+    if (selectedItemIds.length === 0) return setError("Select at least one Global Stock item from the selected source location.");
     if (!toLocationId) return setError("To location is required.");
     if (fromLocationId === toLocationId) return setError("From and To locations must be different.");
     if (!sender.trim()) return setError("Sender is required.");
@@ -281,6 +258,18 @@ function TransitForm({
 
         <form className="transit-form" onSubmit={save}>
           {mode !== "complete" && (
+            <div className="transit-form-grid">
+              <label className="redesign-field transit-wide">
+                <span>From location *</span>
+                <select value={fromLocationId} onChange={(event) => { setFromLocationId(event.target.value); setSelectedItemIds([]); setError(""); }} required>
+                  <option value="">Select starting location first</option>
+                  {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+
+          {mode !== "complete" && (
             <div className="transit-item-picker">
               <div className="transit-field-heading">
                 <div>
@@ -297,8 +286,12 @@ function TransitForm({
               />
 
               <div className="transit-item-options">
-                {filteredItems.length === 0 ? (
-                  <div className="history-empty">No Global Stock items found.</div>
+                {!fromLocationId ? (
+                  <div className="history-empty">Select a starting location to see Global Stock items available there.</div>
+                ) : itemsLoading ? (
+                  <div className="history-empty">Loading Global Stock items at this location...</div>
+                ) : filteredItems.length === 0 ? (
+                  <div className="history-empty">No Global Stock items are currently at this location.</div>
                 ) : filteredItems.map((item) => {
                   const checked = selectedItemIds.includes(item.id);
                   const installedParentIds = Object.entries(machineComponents)
@@ -361,14 +354,6 @@ function TransitForm({
           )}
 
           <div className="transit-form-grid">
-            <label className="redesign-field">
-              <span>From location *</span>
-              <select value={fromLocationId} disabled required>
-                <option value="">Select items first</option>
-                {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-              </select>
-            </label>
-
             <label className="redesign-field">
               <span>To location *</span>
               <select value={toLocationId} onChange={(event) => setToLocationId(event.target.value)} required>
