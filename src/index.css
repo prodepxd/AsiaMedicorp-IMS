@@ -655,6 +655,7 @@ button { cursor: pointer; }
   border-top: 1px solid #172638;
 }
 .transit-history-row:first-child { border-top: 0; }
+.transit-history-row + .transit-history-row { border-top: 1px solid #2a3a4d; }
 .transit-history-details,
 .transit-history-people {
   display: grid;
@@ -1286,7 +1287,7 @@ button { cursor: pointer; }
   background: #111c2b;
   color: #cbd5e1;
 }
-.transit-progress-moving { border-color: #166534; background: #052e16; color: #86efac; }
+.transit-progress-moving { border-color: #2563a6; background: #0b2942; color: #9bd5ff; }
 .transit-progress-stand-by { border-color: #854d0e; background: #422006; color: #fde68a; }
 .transit-progress-completed { border-color: #475569; background: #1e293b; color: #cbd5e1; }
 .transit-box-grid {
