@@ -1592,7 +1592,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
 export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   const [activeType, setActiveType] = useState("Machine");
   const [items, setItems] = useState([]);
-  const [masters, setMasters] = useState({ inventoryStatuses: [], qualities: [], locations: [], equipmentManufacturers: [], hardDiskManufacturers: [] });
+  const [masters, setMasters] = useState({ inventoryStatuses: [], qualities: [], locations: [], equipmentManufacturers: [], hardDiskManufacturers: [], machineModels: [], probeModels: [], probeTypes: [], boardTypes: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -1694,7 +1694,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   }
 
   const columns = machineSpecificColumns();
-  const filterModelOptions = (activeType === "Probe" ? masters.probeModels : masters.machineModels).map((model) => {
+  const filterModelOptions = (activeType === "Probe" ? (masters.probeModels || []) : (masters.machineModels || [])).map((model) => {
     const manufacturer = (masters.equipmentManufacturers || []).find((entry) => entry.id === model.manufacturer_id)?.name || "";
     return { value: model.id, label: [manufacturer, model.name].filter(Boolean).join(" ") };
   });
