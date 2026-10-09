@@ -189,8 +189,16 @@ begin
         and t.transit_progress in ('stand-by', 'moving')
     ) then raise exception 'One or more selected items already belong to another active Transit'; end if;
 
-    -- Keep source location fixed. Remove no-longer-selected rows only after
-    -- locking and validating the complete replacement selection.
+    -- Keep source location fixed. Remove deselected Machines first because
+    -- the existing child-removal guard may require the parent transit row gone
+    -- before its installed-component transit rows can be removed.
+    delete from public.transit_items ti
+     using public.items i
+     where ti.transit_id = v_transit_id
+       and i.id = ti.item_id
+       and i.item_type = 'Machine'
+       and not (ti.item_id = any(p_item_ids));
+
     delete from public.transit_items ti
      where ti.transit_id = v_transit_id
        and not (ti.item_id = any(p_item_ids));
