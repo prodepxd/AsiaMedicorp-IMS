@@ -269,74 +269,22 @@ function TransitForm({
         note: note.trim() || null,
       };
 
-      if (mode === "complete") {
-        const { error: updateError } = await supabase
-          .from("transits")
-          .update({ ...payload, transit_progress: PROGRESS.completed })
-          .eq("id", editRecord.id);
-        if (updateError) throw updateError;
+      const operation = mode === "complete"
+        ? "complete_transit"
+        : editRecord
+          ? "edit_transit"
+          : "create_transit";
 
-        const { error: itemUpdateError } = await supabase
-          .from("transit_items")
-          .update({ received_at: new Date(receivedAt).toISOString() })
-          .eq("transit_id", editRecord.id);
-        if (itemUpdateError) throw itemUpdateError;
-
-        const { error: locationUpdateError } = await supabase
-          .from("items")
-          .update({ current_location_id: toLocationId })
-          .in("id", selectedItemIds);
-        if (locationUpdateError) throw locationUpdateError;
-      } else if (editRecord) {
-        const { error: updateError } = await supabase
-          .from("transits")
-          .update(payload)
-          .eq("id", editRecord.id);
-        if (updateError) throw updateError;
-
-        const existingResult = await supabase
-          .from("transit_items")
-          .select("id,item_id")
-          .eq("transit_id", editRecord.id);
-        if (existingResult.error) throw existingResult.error;
-
-        const existingRows = existingResult.data || [];
-        const desired = new Set(selectedItemIds);
-        const existing = new Set(existingRows.map((row) => row.item_id));
-
-        for (const row of existingRows.filter((row) => !desired.has(row.item_id))) {
-          const { error: deleteError } = await supabase.from("transit_items").delete().eq("id", row.id);
-          if (deleteError) throw deleteError;
+      const { error: operationError } = await supabase.rpc(
+        "atomic_inventory_transit_operation",
+        {
+          p_operation: operation,
+          p_transit_id: editRecord?.id || null,
+          p_payload: payload,
+          p_item_ids: selectedItemIds,
         }
-
-        for (const itemId of selectedItemIds.filter((id) => !existing.has(id))) {
-          const { error: insertError } = await supabase.from("transit_items").insert({
-            transit_id: editRecord.id,
-            item_id: itemId,
-          });
-          if (insertError) throw insertError;
-        }
-      } else {
-        const { data: userData } = await supabase.auth.getUser();
-        const { data: transit, error: insertError } = await supabase
-          .from("transits")
-          .insert({
-            ...payload,
-            transit_progress: PROGRESS.standby,
-            created_by: userData?.user?.id || null,
-          })
-          .select("id")
-          .single();
-        if (insertError) throw insertError;
-
-        const { error: itemError } = await supabase.from("transit_items").insert(
-          selectedItemIds.map((itemId) => ({ transit_id: transit.id, item_id: itemId }))
-        );
-        if (itemError) {
-          await supabase.from("transits").delete().eq("id", transit.id);
-          throw itemError;
-        }
-      }
+      );
+      if (operationError) throw operationError;
 
       await onSaved();
     } catch (saveError) {
