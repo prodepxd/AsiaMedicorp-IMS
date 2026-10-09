@@ -1567,6 +1567,8 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState({ model: "", location: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
+  const [modelSearch, setModelSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
 
   async function loadMasters() {
@@ -1625,10 +1627,32 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   useEffect(() => { loadItems(); }, [activeType]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(x => JSON.stringify(x).toLowerCase().includes(q));
-  }, [items, search]);
+    const serialQuery = search.trim().toLowerCase();
+    const selectedModel = filters.model;
+    const selectedLocation = filters.location;
+    return items.filter((item) => {
+      const d = item.detail || {};
+      if (serialQuery && !String(item.serial_number || "").toLowerCase().includes(serialQuery)) return false;
+      if (selectedLocation && item.current_location_id !== selectedLocation) return false;
+      if (selectedModel) {
+        const modelId = activeType === "Machine" || activeType === "Probe"
+          ? d.model_id
+          : d.compatible_machine_model_id;
+        if (modelId !== selectedModel) return false;
+      }
+      if (activeType === "Board") {
+        if (filters.boardType && d.board_type_id !== filters.boardType) return false;
+        if (filters.partNumber && !String(d.part_number || "").toLowerCase().includes(filters.partNumber.trim().toLowerCase())) return false;
+      }
+      if (activeType === "Hard Disk") {
+        if (filters.softwareVersion && !String(d.software_version || "").toLowerCase().includes(filters.softwareVersion.trim().toLowerCase())) return false;
+        if (filters.hardDiskType && d.disk_type !== filters.hardDiskType) return false;
+        if (filters.size && String(d.size_inches ?? "") !== filters.size) return false;
+        if (filters.capacity && String(d.capacity_gb ?? "") !== filters.capacity) return false;
+      }
+      return true;
+    });
+  }, [items, search, filters, activeType]);
 
   function manufacturerName(item) {
     const id = item.detail?.manufacturer_id;
@@ -1679,7 +1703,35 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
     <section className="content-card redesign-stock">
       <div className="section-heading"><div><p className="section-kicker">GLOBAL STOCK</p><h2>Inventory by item type</h2><p>Item types are fixed by the IMS design. Select a type to see only its relevant characteristics.</p></div><button className="primary-button" onClick={()=>setShowAdd(true)} disabled={!canEdit}>+ Add item</button></div>
       <div className="redesign-tabs">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{setActiveType(type);setSearch("");}}>{type}</button>)}</div>
-      <div className="redesign-toolbar"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={"Search "+activeType+"..."} /><button className="secondary-button" onClick={loadItems}>Refresh</button></div>
+      <div className="redesign-toolbar redesign-stock-filters">
+        <label className="stock-filter-field"><span>Serial number</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search serial number..." /></label>
+        {(["Machine", "Probe"].includes(activeType) || ["Board", "PSU", "Monitor", "Hard Disk", "Keyboard"].includes(activeType)) && <label className="stock-filter-field stock-model-filter"><span>{["Machine", "Probe"].includes(activeType) ? "Model" : "Compatible machine"}</span>
+          <input value={modelSearch} onChange={e=>setModelSearch(e.target.value)} placeholder="Search Manufacturer Model..." />
+          <select value={filters.model} onChange={e=>setFilters(current=>({...current,model:e.target.value}))}>
+            <option value="">All models</option>
+            {(masters.machineModels || []).filter(model => {
+              const manufacturer = (masters.equipmentManufacturers || []).find(x=>x.id===model.manufacturer_id)?.name || "";
+              const label = manufacturer + " " + model.name;
+              return label.toLowerCase().includes(modelSearch.trim().toLowerCase());
+            }).map(model => {
+              const manufacturer = (masters.equipmentManufacturers || []).find(x=>x.id===model.manufacturer_id)?.name || "";
+              return <option key={model.id} value={model.id}>{(manufacturer ? manufacturer + " " : "") + model.name}</option>;
+            })}
+          </select>
+        </label>}
+        {activeType === "Board" && <>
+          <label className="stock-filter-field"><span>Board type</span><select value={filters.boardType} onChange={e=>setFilters(current=>({...current,boardType:e.target.value}))}><option value="">All board types</option>{(masters.boardTypes||[]).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+          <label className="stock-filter-field"><span>Part number</span><input value={filters.partNumber} onChange={e=>setFilters(current=>({...current,partNumber:e.target.value}))} placeholder="Search part number..." /></label>
+        </>}
+        {activeType === "Hard Disk" && <>
+          <label className="stock-filter-field"><span>Software version</span><input value={filters.softwareVersion} onChange={e=>setFilters(current=>({...current,softwareVersion:e.target.value}))} placeholder="Search software version..." /></label>
+          <label className="stock-filter-field"><span>Hard disk type</span><select value={filters.hardDiskType} onChange={e=>setFilters(current=>({...current,hardDiskType:e.target.value}))}><option value="">All types</option>{["IDE","SATA","SSD"].map(x=><option key={x} value={x}>{x}</option>)}</select></label>
+          <label className="stock-filter-field"><span>Size</span><select value={filters.size} onChange={e=>setFilters(current=>({...current,size:e.target.value}))}><option value="">All sizes</option>{['2.5','3.5','2.5"','3.5"'].map(x=><option key={x} value={x}>{x.replace('"','')}"</option>)}</select></label>
+          <label className="stock-filter-field"><span>Capacity (GB)</span><input type="number" min="0" value={filters.capacity} onChange={e=>setFilters(current=>({...current,capacity:e.target.value}))} placeholder="Any capacity" /></label>
+        </>}
+        <label className="stock-filter-field"><span>Location</span><select value={filters.location} onChange={e=>setFilters(current=>({...current,location:e.target.value}))}><option value="">All locations</option>{(masters.locations||[]).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+        <div className="stock-filter-actions"><button className="secondary-button" onClick={()=>{setSearch("");setModelSearch("");setFilters({model:"",location:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>Clear filters</button><button className="secondary-button" onClick={loadItems}>Refresh</button></div>
+      </div>
       {error && <div className="error-message">{error}</div>}
       <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>Serial number</th>{columns.map(c=><th key={c}>{FIELD_LABELS[c]}</th>)}<th>Inventory Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
         {!loading && filtered.length===0 && <tr><td colSpan={columns.length+4} className="empty-cell">{items.length?"No matching items.":"No items of this type yet."}</td></tr>}
