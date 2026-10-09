@@ -316,7 +316,7 @@ function TransitForm({
           <div className="transit-form-grid transit-location-grid">
               <label className="redesign-field">
                 <span>From location *</span>
-                <select value={fromLocationId} disabled={mode === "complete"} onChange={(event) => { setFromLocationId(event.target.value); setSelectedItemIds([]); setError(""); }} required>
+                <select value={fromLocationId} disabled={mode === "complete" || Boolean(editRecord)} onChange={(event) => { setFromLocationId(event.target.value); setSelectedItemIds([]); setError(""); }} required>
                   <option value="">Select starting location first</option>
                   {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
                 </select>
@@ -601,7 +601,12 @@ export function ItemTransitHistory({ supabase, itemId, canEdit, focusLatestMovin
                             <button type="button" className="primary-button" onClick={async () => {
                               setSavingNoteId(row.id);
                               setError("");
-                              const { error: noteError } = await supabase.from("transit_items").update({ note: noteDraft.trim() || null }).eq("id", row.id);
+                              const { error: noteError } = await supabase.rpc("atomic_inventory_transit_operation", {
+                                p_operation: "save_item_note",
+                                p_transit_id: transit.id,
+                                p_payload: { transit_item_id: row.id, note: noteDraft.trim() || null },
+                                p_item_ids: [],
+                              });
                               if (noteError) {
                                 setError(noteError.message);
                               } else {
@@ -891,13 +896,12 @@ export default function TransitModule({ supabase, canEdit, canDelete, onItemClic
 
   async function startMoving(transit) {
     setError("");
-    const { error: updateError } = await supabase
-      .from("transits")
-      .update({
-        transit_progress: PROGRESS.moving,
-        sent_at: transit.sent_at || new Date().toISOString(),
-      })
-      .eq("id", transit.id);
+    const { error: updateError } = await supabase.rpc("atomic_inventory_transit_operation", {
+      p_operation: "start_transit",
+      p_transit_id: transit.id,
+      p_payload: { sent_at: transit.sent_at || new Date().toISOString() },
+      p_item_ids: [],
+    });
 
     if (updateError) {
       setError(updateError.message);
@@ -916,10 +920,12 @@ export default function TransitModule({ supabase, canEdit, canDelete, onItemClic
     );
     if (!confirmed) return;
 
-    const { error: deleteError } = await supabase
-      .from("transits")
-      .delete()
-      .eq("id", transit.id);
+    const { error: deleteError } = await supabase.rpc("atomic_inventory_transit_operation", {
+      p_operation: "delete_transit",
+      p_transit_id: transit.id,
+      p_payload: {},
+      p_item_ids: [],
+    });
 
     if (deleteError) {
       setError(deleteError.message);
