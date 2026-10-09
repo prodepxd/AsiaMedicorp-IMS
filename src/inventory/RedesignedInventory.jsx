@@ -1675,7 +1675,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
       if (activeType === "Hard Disk") {
         if (filters.softwareVersion && !String(d.software_version || "").toLowerCase().includes(filters.softwareVersion.trim().toLowerCase())) return false;
         if (filters.hardDiskType && d.disk_type !== filters.hardDiskType) return false;
-        if (filters.size && String(d.size_inches ?? "") !== filters.size) return false;
+        if (filters.size && String(d.size_inches ?? "").replace(/"/g, "") !== filters.size) return false;
         if (filters.capacity && String(d.capacity_gb ?? "") !== filters.capacity) return false;
       }
       return true;
@@ -1701,7 +1701,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   const locationOptions = [{ value: "", label: "All locations" }, ...(masters.locations || []).map((location) => ({ value: location.id, label: location.name }))];
   const boardTypeOptions = [{ value: "", label: "All board types" }, ...(masters.boardTypes || []).map((boardType) => ({ value: boardType.id, label: boardType.name }))];
   const hardDiskTypeOptions = [{ value: "", label: "All types" }, ...["IDE", "SATA", "SSD"].map((type) => ({ value: type, label: type }))];
-  const hardDiskSizeOptions = [{ value: "", label: "All sizes" }, ...['2.5', '3.5', '2.5"', '3.5"'].map((size) => ({ value: size, label: size.replace('"', '') + '"' }))];
+  const hardDiskSizeOptions = [{ value: "", label: "All sizes" }, { value: "2.5", label: '2.5"' }, { value: "3.5", label: '3.5"' }];
 
   function display(item, key) {
     const d=item.detail||{};
