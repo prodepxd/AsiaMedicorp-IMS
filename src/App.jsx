@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
+import asiaMedicorpLogo from "./assets/asia-medicorp-logo.png";
 
 const navItems = [
   { label: "Global Stock", icon: "▦" },
@@ -1323,7 +1324,7 @@ function App() {
     <div className="ims-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">AM</div>
+          <img className="brand-logo" src={asiaMedicorpLogo} alt="Asia Medicorp logo" />
           <div>
             <strong>ASIA MEDICORP</strong>
             <span>Inventory Management</span>
