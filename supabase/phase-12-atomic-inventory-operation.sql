@@ -81,20 +81,24 @@ begin
       note = nullif(btrim(p_payload->>'note'), '')
     where id = v_transit_id;
 
-    -- Delete parent machines first; the existing guard then permits their
-    -- auto-included installed components to be removed from this transit.
+    -- Remove deselected parent Machines first. The child-removal guard
+    -- then permits their auto-included components to be removed.
+    delete from public.transit_items ti
+    using public.items i
+    where ti.transit_id = v_transit_id
+      and i.id = ti.item_id
+      and i.item_type = 'Machine'
+      and not (ti.item_id = any(p_item_ids));
+
     delete from public.transit_items ti
     where ti.transit_id = v_transit_id
       and not (ti.item_id = any(p_item_ids))
       and not exists (
-        select 1 from public.machine_components mc
+        select 1
+        from public.machine_components mc
         where mc.component_item_id = ti.item_id
           and mc.machine_item_id = any(p_item_ids)
       );
-
-    delete from public.transit_items ti
-    where ti.transit_id = v_transit_id
-      and not (ti.item_id = any(p_item_ids));
 
     foreach v_item_id in array p_item_ids loop
       insert into public.transit_items (transit_id, item_id)
@@ -110,6 +114,9 @@ begin
     from public.transits where id = v_transit_id for update;
     if not found then raise exception 'Transit not found'; end if;
     if v_progress = 'completed' then raise exception 'Transit is already completed'; end if;
+    if v_progress <> 'moving' then
+      raise exception 'Only a moving Transit can be completed';
+    end if;
 
     if nullif(btrim(p_payload->>'receiver'), '') is null
        or nullif(p_payload->>'received_at', '') is null then
