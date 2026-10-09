@@ -1752,13 +1752,13 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
     } else if (active.manufacturer) {
       const r = await supabase.from("equipment_manufacturers").select("id,name,is_active").order("name");
       if (r.error) setError(r.error.message);
-      else setRefs(r.data || []);
+      else setRefs({ manufacturers: r.data || [], probeTypes: [], machineModels: [], compatibilities: [] });
     } else if (active.probeType) {
       const r = await supabase.from("probe_types").select("id,name,is_active").order("name");
       if (r.error) setError(r.error.message);
-      else setRefs(r.data || []);
+      else setRefs({ manufacturers: [], probeTypes: r.data || [], machineModels: [], compatibilities: [] });
     } else {
-      setRefs([]);
+      setRefs({ manufacturers: [], probeTypes: [], machineModels: [], compatibilities: [] });
     }
     setLoading(false);
   }
@@ -1767,7 +1767,7 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
     const next = MASTER_GROUPS.find((group) => group.key === activeKey);
     if (next && next.key !== active.key) {
       setActive(next);
-      setRefs(next.manufacturer && next.probeType ? {manufacturers:[],probeTypes:[]} : []);
+      setRefs({ manufacturers: [], probeTypes: [], machineModels: [], compatibilities: [] });
       setEditing(null);
       setError("");
     }
@@ -1777,7 +1777,7 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
 
   function chooseCategory(group) {
     setActive(group);
-    setRefs(group.manufacturer && group.probeType ? {manufacturers:[],probeTypes:[]} : []);
+    setRefs({ manufacturers: [], probeTypes: [], machineModels: [], compatibilities: [] });
     setEditing(null);
     setError("");
     onActiveChange?.(group.key);
@@ -2046,8 +2046,8 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
               {!loading&&rows.length===0&&<tr><td colSpan={(active.manufacturer?1:0)+(active.probeType?1:0)+(active.key==="probe_models"?1:0)+3} className="empty-cell">No records found.</td></tr>}
               {rows.map(row=><Fragment key={row.id}><tr>
                 <td><strong>{row.name}</strong></td>
-                {active.manufacturer&&<td>{(active.probeType ? (refs.manufacturers || []) : (refs || [])).find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}
-                {active.probeType&&<td>{(active.manufacturer ? (refs.probeTypes || []) : (refs || [])).find(x=>x.id===row.probe_type_id)?.name||"—"}</td>}
+                {active.manufacturer&&<td>{(refs.manufacturers || []).find(x=>x.id===row.manufacturer_id)?.name||"—"}</td>}
+                {active.probeType&&<td>{(refs.probeTypes || []).find(x=>x.id===row.probe_type_id)?.name||"—"}</td>}
                 {active.key === "probe_models" && <td>
                   {(() => {
                     const compatibleIds = (refs.compatibilities || []).filter((x) => x.probe_model_id === row.id).map((x) => x.machine_model_id);
