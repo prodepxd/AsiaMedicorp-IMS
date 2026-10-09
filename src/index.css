@@ -48,6 +48,14 @@ button { cursor: pointer; }
 }
 .brand { display: flex; gap: 12px; align-items: center; padding: 4px 8px 30px; }
 .brand .brand-mark { margin: 0; }
+.brand-logo {
+  display: block;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  object-fit: contain;
+  object-position: center;
+}
 .brand strong { display: block; font-size: .82rem; letter-spacing: .08em; }
 .brand span { display: block; margin-top: 4px; color: #71839a; font-size: .72rem; }
 .nav { display: grid; gap: 5px; }
