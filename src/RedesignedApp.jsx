@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
+import asiaMedicorpLogo from "./assets/asia-medicorp-logo.png";
 import { RedesignedGlobalStock, RedesignedMasterData, RedesignedItemView, MASTER_GROUPS } from "./inventory/RedesignedInventory";
 import TransitModule from "./transit/TransitModule";
 
@@ -130,7 +131,7 @@ export default function App() {
 
   return <div className="ims-shell">
     <aside className="sidebar">
-      <div className="brand"><div className="brand-mark">AM</div><div><strong>ASIA MEDICORP</strong><span>Inventory Management</span></div></div>
+      <div className="brand"><img className="brand-logo" src={asiaMedicorpLogo} alt="Asia Medicorp logo" /><div><strong>ASIA MEDICORP</strong><span>Inventory Management</span></div></div>
       <nav className="nav"><p className="nav-title">WORKSPACE</p>
         {visibleNav.map(item=><div key={item.label} className="nav-group">
           <button
