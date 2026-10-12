@@ -124,7 +124,20 @@ function Select({ value, onChange, options, placeholder = "Select", disabled = f
 function FilterDropdown({ value, onChange, options, placeholder = "Select...", searchPlaceholder = "Search options..." }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const dropdownRef = useRef(null);
   const selected = options.find((option) => option.value === value);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handlePointerDown = (event) => {
+      if (!dropdownRef.current?.contains(event.target)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [open]);
   const visibleOptions = options.filter((option) => option.label.toLowerCase().includes(query.trim().toLowerCase()));
 
   function choose(optionValue) {
@@ -134,7 +147,7 @@ function FilterDropdown({ value, onChange, options, placeholder = "Select...", s
   }
 
   return (
-    <div className={open ? "transit-item-dropdown open stock-filter-dropdown" : "transit-item-dropdown stock-filter-dropdown"}>
+    <div ref={dropdownRef} className={open ? "transit-item-dropdown open stock-filter-dropdown" : "transit-item-dropdown stock-filter-dropdown"}>
       <button type="button" className="transit-item-dropdown-trigger" onClick={() => setOpen((current) => !current)}>
         <span>{selected?.label || placeholder}</span><span className="transit-item-dropdown-chevron">▾</span>
       </button>
@@ -1779,10 +1792,22 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
   const [form, setForm] = useState({name:"",manufacturer_id:"",probe_type_id:"",compatible_machine_model_ids:[]});
   const [compatibilitySearch, setCompatibilitySearch] = useState("");
   const [compatibilityOpen, setCompatibilityOpen] = useState(false);
+  const compatibilityDropdownRef = useRef(null);
   const [editing, setEditing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!compatibilityOpen) return undefined;
+    const handlePointerDown = (event) => {
+      if (!compatibilityDropdownRef.current?.contains(event.target)) {
+        setCompatibilityOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [compatibilityOpen]);
 
   async function load() {
     setLoading(true);
@@ -2027,7 +2052,7 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
               <span className="master-compatibility-count">{(form.compatible_machine_model_ids || []).length} / 8 selected</span>
             </div>
 
-            <div className="master-compatibility-dropdown">
+            <div ref={compatibilityDropdownRef} className="master-compatibility-dropdown">
               <button
                 type="button"
                 className={compatibilityOpen ? "master-compatibility-trigger open" : "master-compatibility-trigger"}
