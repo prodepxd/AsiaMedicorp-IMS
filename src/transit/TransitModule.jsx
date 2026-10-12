@@ -225,11 +225,16 @@ function TransitForm({
   );
   const [receiver, setReceiver] = useState(editRecord?.receiver || "");
   const [receivedAt, setReceivedAt] = useState(
-    editRecord?.received_at ? localDateTimeValue(new Date(editRecord.received_at)) : ""
+    editRecord?.received_at
+      ? localDateTimeValue(new Date(editRecord.received_at))
+      : mode === "complete"
+        ? localDateTimeValue()
+        : ""
   );
   const [note, setNote] = useState(editRecord?.note || "");
   const [itemSearch, setItemSearch] = useState("");
   const [itemDropdownOpen, setItemDropdownOpen] = useState(false);
+  const itemDropdownRef = useRef(null);
   const [machineComponents, setMachineComponents] = useState({});
   const [movingItemIds, setMovingItemIds] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -237,6 +242,17 @@ function TransitForm({
 
   const itemMap = useMemo(() => Object.fromEntries(availableItems.map((item) => [item.id, item])), [availableItems]);
   const movingItemIdSet = useMemo(() => new Set(movingItemIds), [movingItemIds]);
+
+  useEffect(() => {
+    if (!itemDropdownOpen) return undefined;
+    const handlePointerDown = (event) => {
+      if (!itemDropdownRef.current?.contains(event.target)) {
+        setItemDropdownOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [itemDropdownOpen]);
 
   useEffect(() => {
     let alive = true;
@@ -398,8 +414,8 @@ function TransitForm({
     if (!sender.trim()) return setError("Sender is required.");
     if (!carrier.trim()) return setError("Carrier is required.");
     if (mode === "complete" && !sentAt) return setError("Sent date/time is required to complete the Transit.");
-    if (mode === "complete" && (!receiver.trim() || !receivedAt)) {
-      return setError("Receiver and received date/time are required to complete the Transit.");
+    if (mode === "complete" && !receiver.trim()) {
+      return setError("Receiver is required to complete the Transit.");
     }
 
     if (mode !== "complete") {
@@ -418,11 +434,14 @@ function TransitForm({
     setSaving(true);
 
     try {
+      const completionReceivedAt = mode === "complete"
+        ? (receivedAt || localDateTimeValue())
+        : receivedAt;
       const payload = {
         from_location_id: fromLocationId,
         to_location_id: toLocationId,
         sent_at: sentAt ? new Date(sentAt).toISOString() : null,
-        received_at: receivedAt ? new Date(receivedAt).toISOString() : null,
+        received_at: completionReceivedAt ? new Date(completionReceivedAt).toISOString() : null,
         sender: sender.trim(),
         receiver: receiver.trim() || null,
         carrier: carrier.trim(),
@@ -508,7 +527,7 @@ function TransitForm({
                 <div><strong>Global Stock items *</strong><span>Search by serial number and select one or more items.</span></div>
                 <span className="history-count">{selectedItemIds.length} selected</span>
               </div>
-              <div className={itemDropdownOpen ? "transit-item-dropdown open" : "transit-item-dropdown"}>
+              <div ref={itemDropdownRef} className={itemDropdownOpen ? "transit-item-dropdown open" : "transit-item-dropdown"}>
                 <button type="button" className="transit-item-dropdown-trigger" onClick={() => setItemDropdownOpen((open) => !open)} disabled={!fromLocationId || itemsLoading}>
                   <span>{!fromLocationId ? "Select a starting location first" : itemsLoading ? "Loading Global Stock..." : selectedSummary.length ? (selectedSummary.filter((item) => item.item_type === "Machine").length + " machine" + (selectedSummary.filter((item) => item.item_type === "Machine").length === 1 ? "" : "s") + " · " + selectedItemIds.length + " items selected") : "Select Global Stock items"}</span>
                   <span className="transit-item-dropdown-chevron">▾</span>
@@ -611,7 +630,7 @@ function TransitForm({
               </label>
               <label className="redesign-field">
                 <span>Received date & time{mode === "complete" ? " *" : ""}</span>
-                <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} required={mode === "complete"} />
+                <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} />
               </label>
             </div>
 
