@@ -225,11 +225,7 @@ function TransitForm({
   );
   const [receiver, setReceiver] = useState(editRecord?.receiver || "");
   const [receivedAt, setReceivedAt] = useState(
-    editRecord?.received_at
-      ? localDateTimeValue(new Date(editRecord.received_at))
-      : mode === "complete"
-        ? localDateTimeValue()
-        : ""
+    editRecord?.received_at ? localDateTimeValue(new Date(editRecord.received_at)) : ""
   );
   const [note, setNote] = useState(editRecord?.note || "");
   const [itemSearch, setItemSearch] = useState("");
