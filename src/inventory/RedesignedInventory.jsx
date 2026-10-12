@@ -129,14 +129,22 @@ function FilterDropdown({ value, onChange, options, placeholder = "Select...", s
 
   useEffect(() => {
     if (!open) return undefined;
-    const handlePointerDown = (event) => {
-      if (!dropdownRef.current?.contains(event.target)) {
+
+    // Capture outside interactions before other components can stop propagation.
+    const closeWhenOutside = (event) => {
+      const root = dropdownRef.current;
+      if (root && !root.contains(event.target)) {
         setOpen(false);
         setQuery("");
       }
     };
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
+
+    document.addEventListener("pointerdown", closeWhenOutside, true);
+    document.addEventListener("click", closeWhenOutside, true);
+    return () => {
+      document.removeEventListener("pointerdown", closeWhenOutside, true);
+      document.removeEventListener("click", closeWhenOutside, true);
+    };
   }, [open]);
   const visibleOptions = options.filter((option) => option.label.toLowerCase().includes(query.trim().toLowerCase()));
 
