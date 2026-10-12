@@ -43,10 +43,170 @@ async function loadInventoryStateMap(supabase, itemIds) {
   return Object.fromEntries((data || []).map((row) => [row.item_id, row.inventory_state]));
 }
 
+function LocationCombobox({
+  label,
+  locations,
+  value,
+  onChange,
+  supabase,
+  canCreate,
+  disabled = false,
+  onCreated,
+}) {
+  const selectedLocation = locations.find((location) => location.id === value);
+  const [query, setQuery] = useState(selectedLocation?.name || "");
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [localError, setLocalError] = useState("");
+
+  useEffect(() => {
+    if (selectedLocation) setQuery(selectedLocation.name);
+  }, [selectedLocation?.id, selectedLocation?.name]);
+
+  const normalizedQuery = query.trim();
+  const normalizedQueryLower = normalizedQuery.toLowerCase();
+  const filteredLocations = useMemo(() => {
+    const search = normalizedQueryLower;
+    return locations.filter((location) => (
+      !search || location.name.toLowerCase().includes(search)
+    ));
+  }, [locations, normalizedQueryLower]);
+  const exactLocation = locations.find(
+    (location) => location.name.trim().toLowerCase() === normalizedQueryLower
+  );
+
+  function changeQuery(nextValue) {
+    setQuery(nextValue);
+    setOpen(true);
+    setLocalError("");
+    if (value) onChange("");
+  }
+
+  async function createLocation() {
+    if (!normalizedQuery || creating || exactLocation || !canCreate) return;
+    setCreating(true);
+    setLocalError("");
+
+    try {
+      const { data, error } = await supabase
+        .from("locations")
+        .insert({ name: normalizedQuery })
+        .select("id,name,is_active")
+        .single();
+
+      if (error) {
+        // A concurrent insert or an inactive duplicate may have won the race.
+        if (error.code === "23505") {
+          const { data: rows, error: lookupError } = await supabase
+            .from("locations")
+            .select("id,name,is_active")
+            .order("name");
+          if (lookupError) throw lookupError;
+
+          const existing = (rows || []).find(
+            (location) => location.name.trim().toLowerCase() === normalizedQueryLower
+          );
+          if (existing?.is_active !== false && existing) {
+            onCreated(existing);
+            onChange(existing.id);
+            setQuery(existing.name);
+            setOpen(false);
+            return;
+          }
+          if (existing?.is_active === false) {
+            throw new Error("A location with this name already exists but is inactive. Ask an administrator to reactivate it.");
+          }
+        }
+        throw error;
+      }
+
+      onCreated(data);
+      onChange(data.id);
+      setQuery(data.name);
+      setOpen(false);
+    } catch (createError) {
+      setLocalError(createError?.message || "The master location could not be created.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <div className="redesign-field transit-location-field">
+      <span>{label} *</span>
+      <div
+        className="transit-location-picker"
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+        }}
+      >
+        <input
+          type="text"
+          value={query}
+          disabled={disabled}
+          required
+          autoComplete="off"
+          aria-label={label}
+          aria-expanded={open}
+          placeholder={disabled ? "Location cannot be changed here" : "Search or enter a location..."}
+          onFocus={() => setOpen(true)}
+          onChange={(event) => changeQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setOpen(false);
+            if (event.key === "Enter" && open) event.preventDefault();
+          }}
+        />
+        {open && !disabled && (
+          <div className="transit-location-options" role="listbox" aria-label={label + " options"}>
+            {filteredLocations.length > 0 ? filteredLocations.map((location) => (
+              <button
+                type="button"
+                className="transit-location-option"
+                role="option"
+                aria-selected={location.id === value}
+                key={location.id}
+                onClick={() => {
+                  onChange(location.id);
+                  setQuery(location.name);
+                  setOpen(false);
+                  setLocalError("");
+                }}
+              >
+                {location.name}
+              </button>
+            )) : (
+              <div className="transit-location-feedback">No active master locations match.</div>
+            )}
+            {normalizedQuery && !exactLocation && (
+              canCreate ? (
+                <button
+                  type="button"
+                  className="transit-location-option transit-location-create"
+                  disabled={creating}
+                  onClick={createLocation}
+                >
+                  {creating ? "Creating master location..." : `+ Create master location “${normalizedQuery}”`}
+                </button>
+              ) : (
+                <div className="transit-location-feedback">
+                  No exact match. Ask an administrator to add this master location.
+                </div>
+              )
+            )}
+            {localError && <div className="transit-location-feedback transit-location-error">{localError}</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TransitForm({
   supabase,
   items,
   locations,
+  canCreateLocation,
+  onLocationCreated,
   editRecord,
   initialItemIds,
   onClose,
@@ -70,6 +230,7 @@ function TransitForm({
   const [note, setNote] = useState(editRecord?.note || "");
   const [itemSearch, setItemSearch] = useState("");
   const [itemDropdownOpen, setItemDropdownOpen] = useState(false);
+  const itemDropdownRef = useRef(null);
   const [machineComponents, setMachineComponents] = useState({});
   const [movingItemIds, setMovingItemIds] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -77,6 +238,17 @@ function TransitForm({
 
   const itemMap = useMemo(() => Object.fromEntries(availableItems.map((item) => [item.id, item])), [availableItems]);
   const movingItemIdSet = useMemo(() => new Set(movingItemIds), [movingItemIds]);
+
+  useEffect(() => {
+    if (!itemDropdownOpen) return undefined;
+    const handlePointerDown = (event) => {
+      if (!itemDropdownRef.current?.contains(event.target)) {
+        setItemDropdownOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [itemDropdownOpen]);
 
   useEffect(() => {
     let alive = true;
@@ -238,8 +410,8 @@ function TransitForm({
     if (!sender.trim()) return setError("Sender is required.");
     if (!carrier.trim()) return setError("Carrier is required.");
     if (mode === "complete" && !sentAt) return setError("Sent date/time is required to complete the Transit.");
-    if (mode === "complete" && (!receiver.trim() || !receivedAt)) {
-      return setError("Receiver and received date/time are required to complete the Transit.");
+    if (mode === "complete" && !receiver.trim()) {
+      return setError("Receiver is required to complete the Transit.");
     }
 
     if (mode !== "complete") {
@@ -258,11 +430,14 @@ function TransitForm({
     setSaving(true);
 
     try {
+      const completionReceivedAt = mode === "complete"
+        ? (receivedAt || localDateTimeValue())
+        : receivedAt;
       const payload = {
         from_location_id: fromLocationId,
         to_location_id: toLocationId,
         sent_at: sentAt ? new Date(sentAt).toISOString() : null,
-        received_at: receivedAt ? new Date(receivedAt).toISOString() : null,
+        received_at: completionReceivedAt ? new Date(completionReceivedAt).toISOString() : null,
         sender: sender.trim(),
         receiver: receiver.trim() || null,
         carrier: carrier.trim(),
@@ -314,20 +489,32 @@ function TransitForm({
 
         <form className="transit-form" onSubmit={save}>
           <div className="transit-form-grid transit-location-grid">
-              <label className="redesign-field">
-                <span>From location *</span>
-                <select value={fromLocationId} disabled={mode === "complete" || Boolean(editRecord)} onChange={(event) => { setFromLocationId(event.target.value); setSelectedItemIds([]); setError(""); }} required>
-                  <option value="">Select starting location first</option>
-                  {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-                </select>
-              </label>
-              <label className="redesign-field">
-                <span>To location *</span>
-                <select value={toLocationId} disabled={mode === "complete"} onChange={(event) => setToLocationId(event.target.value)} required>
-                  <option value="">Select destination</option>
-                  {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-                </select>
-              </label>
+            <LocationCombobox
+              label="From location"
+              locations={locations}
+              value={fromLocationId}
+              onChange={(id) => {
+                if (id !== fromLocationId) {
+                  setFromLocationId(id);
+                  setSelectedItemIds([]);
+                  setError("");
+                }
+              }}
+              supabase={supabase}
+              canCreate={canCreateLocation}
+              disabled={mode === "complete" || Boolean(editRecord)}
+              onCreated={onLocationCreated}
+            />
+            <LocationCombobox
+              label="To location"
+              locations={locations}
+              value={toLocationId}
+              onChange={setToLocationId}
+              supabase={supabase}
+              canCreate={canCreateLocation}
+              disabled={mode === "complete"}
+              onCreated={onLocationCreated}
+            />
           </div>
 
           {mode !== "complete" && (
@@ -336,7 +523,7 @@ function TransitForm({
                 <div><strong>Global Stock items *</strong><span>Search by serial number and select one or more items.</span></div>
                 <span className="history-count">{selectedItemIds.length} selected</span>
               </div>
-              <div className={itemDropdownOpen ? "transit-item-dropdown open" : "transit-item-dropdown"}>
+              <div ref={itemDropdownRef} className={itemDropdownOpen ? "transit-item-dropdown open" : "transit-item-dropdown"}>
                 <button type="button" className="transit-item-dropdown-trigger" onClick={() => setItemDropdownOpen((open) => !open)} disabled={!fromLocationId || itemsLoading}>
                   <span>{!fromLocationId ? "Select a starting location first" : itemsLoading ? "Loading Global Stock..." : selectedSummary.length ? (selectedSummary.filter((item) => item.item_type === "Machine").length + " machine" + (selectedSummary.filter((item) => item.item_type === "Machine").length === 1 ? "" : "s") + " · " + selectedItemIds.length + " items selected") : "Select Global Stock items"}</span>
                   <span className="transit-item-dropdown-chevron">▾</span>
@@ -439,7 +626,7 @@ function TransitForm({
               </label>
               <label className="redesign-field">
                 <span>Received date & time{mode === "complete" ? " *" : ""}</span>
-                <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} required={mode === "complete"} />
+                <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} />
               </label>
             </div>
 
@@ -734,7 +921,7 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, canDelete, onEdit
   );
 }
 
-export default function TransitModule({ supabase, canEdit, canDelete, onItemClick, view = "active" }) {
+export default function TransitModule({ supabase, canEdit, canDelete, canCreateLocation = false, onItemClick, view = "active" }) {
   const [items, setItems] = useState([]);
   const [locations, setLocations] = useState([]);
   const [inventoryStatuses, setInventoryStatuses] = useState([]);
@@ -1031,6 +1218,12 @@ export default function TransitModule({ supabase, canEdit, canDelete, onItemClic
           supabase={supabase}
           items={items}
           locations={locations}
+          canCreateLocation={canCreateLocation}
+          onLocationCreated={(createdLocation) => {
+            setLocations((current) => [...current.filter((location) => location.id !== createdLocation.id), createdLocation]
+              .filter((location) => location.is_active !== false)
+              .sort((a, b) => a.name.localeCompare(b.name)));
+          }}
           editRecord={editingTransit}
           initialItemIds={editingItemIds}
           mode={formMode}
