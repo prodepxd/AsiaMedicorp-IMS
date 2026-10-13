@@ -2049,8 +2049,8 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
     return (
       <form className="master-edit-form" onSubmit={save}>
           <div className="master-form-field"><label>Name</label><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} autoFocus /></div>
-          {active.manufacturer && <div className="master-form-field"><label>Manufacturer</label><Select value={form.manufacturer_id} onChange={e=>setForm({...form,manufacturer_id:e.target.value})} options={activeOrCurrent(active.probeType ? refs.manufacturers : refs, form.manufacturer_id).map(x=>({value:x.id,label:x.name}))} required /></div>}
-          {active.probeType && <div className="master-form-field"><label>Probe Type</label><Select value={form.probe_type_id} onChange={e=>setForm({...form,probe_type_id:e.target.value})} options={activeOrCurrent(active.manufacturer ? refs.probeTypes : refs, form.probe_type_id).map(x=>({value:x.id,label:x.name}))} placeholder="Select probe type" required /></div>}
+          {active.manufacturer && <div className="master-form-field"><label>Manufacturer</label><Select value={form.manufacturer_id} onChange={e=>setForm({...form,manufacturer_id:e.target.value})} options={activeOrCurrent(refs.manufacturers, form.manufacturer_id).map(x=>({value:x.id,label:x.name}))} required /></div>}
+          {active.probeType && <div className="master-form-field"><label>Probe Type</label><Select value={form.probe_type_id} onChange={e=>setForm({...form,probe_type_id:e.target.value})} options={activeOrCurrent(refs.probeTypes, form.probe_type_id).map(x=>({value:x.id,label:x.name}))} placeholder="Select probe type" required /></div>}
           {active.key === "probe_models" && <div className="master-form-field master-compatibility-field">
             <div className="master-compatibility-heading">
               <div>
