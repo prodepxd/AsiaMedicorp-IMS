@@ -911,14 +911,19 @@ button { cursor: pointer; }
   color: #aebed0; font-size: .74rem; font-weight: 700;
 }
 .redesign-field input,
-.redesign-field select {
-  width: 100%; min-height: 46px; padding: 11px 13px;
+.redesign-field select,
+.redesign-field textarea {
+  box-sizing: border-box; width: 100%; min-height: 46px; padding: 11px 13px;
   border: 1px solid #2a3d54; border-radius: 10px;
   outline: none; color: #dbe7f5; background: #081522;
   transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
 }
+.redesign-field textarea {
+  min-height: 112px; resize: vertical; line-height: 1.5; font: inherit;
+}
 .redesign-field input:focus,
-.redesign-field select:focus {
+.redesign-field select:focus,
+.redesign-field textarea:focus {
   border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.1); background: #0a1828;
 }
 .redesign-field select:disabled { opacity: .55; cursor: not-allowed; }
