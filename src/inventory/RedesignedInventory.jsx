@@ -546,6 +546,17 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     if (field.type === "select") return <Select value={value} onChange={onChange}
       options={field.options} required={field.required} />;
 
+    // Quality notes support multiple lines during both item creation and editing.
+    if (field.key === "quality_note") {
+      return <textarea
+        rows={4}
+        value={value}
+        onChange={onChange}
+        placeholder="Enter note (line breaks supported)"
+        autoFocus
+      />;
+    }
+
     return <input type={field.type === "number" ? "number" : "text"} min={field.min} max={field.max}
       step={field.step} value={value} onChange={onChange} autoFocus />;
   }
