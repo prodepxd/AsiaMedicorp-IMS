@@ -290,8 +290,8 @@ export default function App() {
         <div className="user-area"><div><strong>{profile.full_name || session.user.email}</strong><span>{profile.role}</span></div><button className="signout-button" onClick={signOut}>Sign out</button></div>
       </header>
       {error && <div className="error-message">{error}</div>}
-      <WorkspaceErrorBoundary key={active + ":" + (selectedItemId || "")}>
-        {active==="Global Stock" && !selectedItemId && <RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} activeType={globalStockType} onActiveTypeChange={(type) => navigateTo({ globalStockType: type })} onItemClick={(id) => navigateTo({ selectedItemId: id })} />}
+      <WorkspaceErrorBoundary key={active}>
+        {active==="Global Stock" && <div style={{ display: selectedItemId ? "none" : "contents" }}><RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} activeType={globalStockType} onActiveTypeChange={(type) => navigateTo({ globalStockType: type })} onItemClick={(id) => navigateTo({ selectedItemId: id })} /></div>}
         {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onBack={goBack} onDeleted={goBack} onItemClick={(id) => navigateTo({ selectedItemId: id })} />}
         {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} activeKey={masterCategory} onActiveChange={(key) => navigateTo({ masterCategory: key })} />}
         {active.startsWith("Transit") && <TransitModule supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} canCreateLocation={profile.role==="admin"} view={transitCategory} onItemClick={(id) => navigateTo({ active: "Global Stock", selectedItemId: id })} />}
