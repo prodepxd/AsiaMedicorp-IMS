@@ -1622,8 +1622,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
   );
 }
 
-export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
-  const [activeType, setActiveType] = useState("Machine");
+export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine", onActiveTypeChange, onItemClick }) {
   const [items, setItems] = useState([]);
   const [masters, setMasters] = useState({ inventoryStatuses: [], qualities: [], locations: [], equipmentManufacturers: [], hardDiskManufacturers: [], machineModels: [], probeModels: [], probeTypes: [], boardTypes: [] });
   const [loading, setLoading] = useState(true);
@@ -1780,7 +1779,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   return (
     <section className="content-card redesign-stock">
       <div className="section-heading"><div><p className="section-kicker">GLOBAL STOCK</p><h2>Inventory by item type</h2><p>Item types are fixed by the IMS design. Select a type to see only its relevant characteristics.</p></div><div className="stock-result-actions"><span className="stock-result-count">Showing <strong>{filtered.length}</strong> results</span><button className="primary-button" onClick={()=>setShowAdd(true)} disabled={!canEdit}>+ Add item</button></div></div>
-      <div className="redesign-tabs">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{setActiveType(type);setSearch("");setFilters({model:"",manufacturer:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
+      <div className="redesign-tabs">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{onActiveTypeChange?.(type);setSearch("");setFilters({model:"",manufacturer:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
       <div className="redesign-toolbar redesign-stock-filters">
         <label className="stock-filter-field"><span>Serial number</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search serial number..." /></label>
         <label className="stock-filter-field"><span>Note</span><input value={filters.note} onChange={e=>setFilters(current=>({...current,note:e.target.value}))} placeholder="Search notes..." /></label>
