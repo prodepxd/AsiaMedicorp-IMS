@@ -13,8 +13,8 @@ const ITEM_TYPES = [
 ];
 
 const TYPE_CONFIG = {
-  Machine: ["manufacturer", "model", "manufacturer_year", "monitor_size", "software_version", "functions", "portable", "connectors"],
-  Probe: ["manufacturer", "model", "probe_type", "year"],
+  Machine: ["manufacturer", "model", "functions", "quality_note"],
+  Probe: ["manufacturer", "model", "probe_type", "quality_note"],
   Board: ["compatible_machine", "board_type", "part_number", "version_number", "repaired"],
   PSU: ["compatible_machine"],
   Monitor: ["compatible_machine", "monitor_size", "video_input"],
@@ -26,6 +26,7 @@ const TYPE_CONFIG = {
 const FIELD_LABELS = {
   manufacturer: "Manufacturer",
   model: "Model",
+  quality_note: "Note",
   manufacturer_year: "Manufacturer year",
   monitor_size: "Monitor size",
   software_version: "Software version",
@@ -1628,7 +1629,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ model: "", location: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
+  const [filters, setFilters] = useState({ model: "", location: "", note: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
   const [showAdd, setShowAdd] = useState(false);
 
   async function loadMasters() {
@@ -1693,6 +1694,8 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
     return items.filter((item) => {
       const d = item.detail || {};
       if (serialQuery && !String(item.serial_number || "").toLowerCase().includes(serialQuery)) return false;
+      const noteQuery = filters.note.trim().toLowerCase();
+      if (noteQuery && !String(item.quality_note || "").toLowerCase().includes(noteQuery)) return false;
       if (selectedLocation && item.current_location_id !== selectedLocation) return false;
       if (selectedModel) {
         const modelId = activeType === "Machine" || activeType === "Probe"
@@ -1737,6 +1740,10 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
 
   function display(item, key) {
     const d=item.detail||{};
+    if (key==="quality_note") {
+      const note = String(item.quality_note || "");
+      return <span className="stock-note-cell" title={note || "No note"}>{note || "—"}</span>;
+    }
     if (key==="manufacturer") return manufacturerName(item);
     if (key==="model") {
       const list = activeType === "Machine" ? masters.machineModels : masters.probeModels;
@@ -1770,9 +1777,10 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   return (
     <section className="content-card redesign-stock">
       <div className="section-heading"><div><p className="section-kicker">GLOBAL STOCK</p><h2>Inventory by item type</h2><p>Item types are fixed by the IMS design. Select a type to see only its relevant characteristics.</p></div><button className="primary-button" onClick={()=>setShowAdd(true)} disabled={!canEdit}>+ Add item</button></div>
-      <div className="redesign-tabs">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{setActiveType(type);setSearch("");setFilters({model:"",location:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
+      <div className="redesign-tabs">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{setActiveType(type);setSearch("");setFilters({model:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
       <div className="redesign-toolbar redesign-stock-filters">
         <label className="stock-filter-field"><span>Serial number</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search serial number..." /></label>
+        <label className="stock-filter-field"><span>Note</span><input value={filters.note} onChange={e=>setFilters(current=>({...current,note:e.target.value}))} placeholder="Search notes..." /></label>
         {(["Machine", "Probe"].includes(activeType) || ["Board", "PSU", "Monitor", "Hard Disk", "Keyboard"].includes(activeType)) && <label className="stock-filter-field stock-model-filter"><span>{["Machine", "Probe"].includes(activeType) ? "Model" : "Compatible machine"}</span>
           <FilterDropdown value={filters.model} onChange={(value) => setFilters((current) => ({ ...current, model: value }))} options={[{ value: "", label: "All models" }, ...filterModelOptions]} placeholder="All models" searchPlaceholder="Search Manufacturer Model..." />
         </label>}
@@ -1787,7 +1795,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
           <label className="stock-filter-field"><span>Capacity (GB)</span><input type="number" min="0" value={filters.capacity} onChange={e=>setFilters(current=>({...current,capacity:e.target.value}))} placeholder="Any capacity" /></label>
         </>}
         <label className="stock-filter-field"><span>Location</span><FilterDropdown value={filters.location} onChange={(value) => setFilters((current) => ({ ...current, location: value }))} options={locationOptions} placeholder="All locations" searchPlaceholder="Search locations..." /></label>
-        <div className="stock-filter-actions"><button className="secondary-button" onClick={()=>{setSearch("");setFilters({model:"",location:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>Clear filters</button><button className="secondary-button" onClick={loadItems}>Refresh</button></div>
+        <div className="stock-filter-actions"><button className="secondary-button" onClick={()=>{setSearch("");setFilters({model:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>Clear filters</button><button className="secondary-button" onClick={loadItems}>Refresh</button></div>
       </div>
       {error && <div className="error-message">{error}</div>}
       <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>Serial number</th>{columns.map(c=><th key={c}>{FIELD_LABELS[c]}</th>)}<th>Inventory Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>

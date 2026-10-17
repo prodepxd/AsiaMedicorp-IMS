@@ -1747,3 +1747,12 @@ button { cursor: pointer; }
   line-height: 1.45;
 }
 .transit-location-error { color: #fca5a5; }
+
+/* Keep Global Stock notes readable without allowing long/multiline text to widen the table. */
+.stock-table td .stock-note-cell {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
