@@ -1955,16 +1955,8 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
     }
     if (active.key === "probe_models") {
       const selectedCompatibility = form.compatible_machine_model_ids || [];
-      const existingCompatibilityCount = editing === "new"
-        ? 0
-        : (refs.compatibilities || []).filter((x) => x.probe_model_id === editing).length;
       if (selectedCompatibility.length > 8) {
         setError("A Probe Model can support a maximum of 8 Machine Models.");
-        setSaving(false);
-        return;
-      }
-      if (selectedCompatibility.length === 0 && (editing === "new" || existingCompatibilityCount > 0)) {
-        setError("At least 1 compatible Machine Model is required.");
         setSaving(false);
         return;
       }
@@ -2077,7 +2069,7 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
           {active.key === "probe_models" && <div className="master-form-field master-compatibility-field">
             <div className="master-compatibility-heading">
               <div>
-                <label>Compatible Machine Models {editing === "new" ? "*" : "(existing records may be assigned later)"}</label>
+                <label>Compatible Machine Models (optional)</label>
                 <small className="master-form-hint">Machine Models are automatically limited to the Probe Model's manufacturer.</small>
               </div>
               <span className="master-compatibility-count">{(form.compatible_machine_model_ids || []).length} / 8 selected</span>
