@@ -77,29 +77,32 @@ export default function App() {
   const [active, setActive] = useState("Global Stock");
   const [masterCategory, setMasterCategory] = useState(MASTER_GROUPS[0].key);
   const [transitCategory, setTransitCategory] = useState("active");
+  const [globalStockType, setGlobalStockType] = useState("Machine");
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [error, setError] = useState("");
   const navigationIndexRef = useRef(0);
   const currentViewRef = useRef(null);
   const [canGoBack, setCanGoBack] = useState(false);
 
-  const currentView = { active, masterCategory, transitCategory, selectedItemId };
+  const currentView = { active, masterCategory, transitCategory, globalStockType, selectedItemId };
   currentViewRef.current = currentView;
 
   const applyView = useCallback((view) => {
     setActive(view.active);
     setMasterCategory(view.masterCategory);
     setTransitCategory(view.transitCategory);
+    setGlobalStockType(view.globalStockType || "Machine");
     setSelectedItemId(view.selectedItemId);
   }, []);
 
   const navigateTo = useCallback((updates) => {
-    const current = currentViewRef.current || { active, masterCategory, transitCategory, selectedItemId };
+    const current = currentViewRef.current || { active, masterCategory, transitCategory, globalStockType, selectedItemId };
     const next = { ...current, ...updates };
     if (
       next.active === current.active &&
       next.masterCategory === current.masterCategory &&
       next.transitCategory === current.transitCategory &&
+      next.globalStockType === current.globalStockType &&
       next.selectedItemId === current.selectedItemId
     ) return;
 
@@ -110,7 +113,7 @@ export default function App() {
     currentViewRef.current = next;
     applyView(next);
     setCanGoBack(nextIndex > 0);
-  }, [active, masterCategory, transitCategory, selectedItemId, applyView]);
+  }, [active, masterCategory, transitCategory, globalStockType, selectedItemId, applyView]);
 
   const goBack = useCallback(() => {
     const currentIndex = Number(window.history.state?.imsIndex ?? navigationIndexRef.current ?? 0);
@@ -123,15 +126,17 @@ export default function App() {
     const existingState = window.history.state;
     if (existingState?.imsNavigation && existingState.imsView) {
       const index = Number(existingState.imsIndex) || 0;
+      const restoredView = { globalStockType: "Machine", ...existingState.imsView };
       navigationIndexRef.current = index;
-      currentViewRef.current = existingState.imsView;
-      applyView(existingState.imsView);
+      currentViewRef.current = restoredView;
+      applyView(restoredView);
       setCanGoBack(index > 0);
     } else {
       const initialView = currentViewRef.current || {
         active: "Global Stock",
         masterCategory: MASTER_GROUPS[0].key,
         transitCategory: "active",
+        globalStockType: "Machine",
         selectedItemId: null,
       };
       window.history.replaceState({ imsNavigation: true, imsIndex: 0, imsView: initialView }, "");
@@ -143,9 +148,10 @@ export default function App() {
     const handlePopState = (event) => {
       if (event.state?.imsNavigation && event.state.imsView) {
         const index = Number(event.state.imsIndex) || 0;
+        const restoredView = { globalStockType: "Machine", ...event.state.imsView };
         navigationIndexRef.current = index;
-        currentViewRef.current = event.state.imsView;
-        applyView(event.state.imsView);
+        currentViewRef.current = restoredView;
+        applyView(restoredView);
         setCanGoBack(index > 0);
       } else {
         navigationIndexRef.current = 0;
@@ -193,6 +199,7 @@ export default function App() {
       active: "Global Stock",
       masterCategory: MASTER_GROUPS[0].key,
       transitCategory: "active",
+      globalStockType: "Machine",
       selectedItemId: null,
     };
     setSession(null);
@@ -284,9 +291,9 @@ export default function App() {
       </header>
       {error && <div className="error-message">{error}</div>}
       <WorkspaceErrorBoundary key={active + ":" + (selectedItemId || "")}>
-        {active==="Global Stock" && !selectedItemId && <RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} onItemClick={(id) => navigateTo({ selectedItemId: id })} />}
+        {active==="Global Stock" && !selectedItemId && <RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} activeType={globalStockType} onActiveTypeChange={(type) => navigateTo({ globalStockType: type })} onItemClick={(id) => navigateTo({ selectedItemId: id })} />}
         {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onBack={goBack} onDeleted={goBack} onItemClick={(id) => navigateTo({ selectedItemId: id })} />}
-        {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} activeKey={masterCategory} onActiveChange={setMasterCategory} />}
+        {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} activeKey={masterCategory} onActiveChange={(key) => navigateTo({ masterCategory: key })} />}
         {active.startsWith("Transit") && <TransitModule supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} canCreateLocation={profile.role==="admin"} view={transitCategory} onItemClick={(id) => navigateTo({ active: "Global Stock", selectedItemId: id })} />}
       </WorkspaceErrorBoundary>
       {active!=="Global Stock" && active!=="Admin / Master Data" && !active.startsWith("Transit") && <section className="content-card"><div className="section-heading">
