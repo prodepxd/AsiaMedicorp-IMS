@@ -1629,7 +1629,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ model: "", location: "", note: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
+  const [filters, setFilters] = useState({ model: "", manufacturer: "", location: "", note: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
   const [showAdd, setShowAdd] = useState(false);
 
   async function loadMasters() {
@@ -1691,12 +1691,14 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
     const serialQuery = search.trim().toLowerCase();
     const selectedModel = filters.model;
     const selectedLocation = filters.location;
+    const selectedManufacturer = filters.manufacturer;
     return items.filter((item) => {
       const d = item.detail || {};
       if (serialQuery && !String(item.serial_number || "").toLowerCase().includes(serialQuery)) return false;
       const noteQuery = filters.note.trim().toLowerCase();
       if (noteQuery && !String(item.quality_note || "").toLowerCase().includes(noteQuery)) return false;
       if (selectedLocation && item.current_location_id !== selectedLocation) return false;
+      if (activeType === "Probe" && selectedManufacturer && d.manufacturer_id !== selectedManufacturer) return false;
       if (selectedModel) {
         const modelId = activeType === "Machine" || activeType === "Probe"
           ? d.model_id
@@ -1734,6 +1736,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
     return { value: model.id, label: [manufacturer, model.name].filter(Boolean).join(" ") };
   });
   const locationOptions = [{ value: "", label: "All locations" }, ...(masters.locations || []).map((location) => ({ value: location.id, label: location.name }))];
+  const manufacturerOptions = [{ value: "", label: "All manufacturers" }, ...(masters.equipmentManufacturers || []).map((manufacturer) => ({ value: manufacturer.id, label: manufacturer.name }))];
   const boardTypeOptions = [{ value: "", label: "All board types" }, ...(masters.boardTypes || []).map((boardType) => ({ value: boardType.id, label: boardType.name }))];
   const hardDiskTypeOptions = [{ value: "", label: "All types" }, ...["IDE", "SATA", "SSD"].map((type) => ({ value: type, label: type }))];
   const hardDiskSizeOptions = [{ value: "", label: "All sizes" }, { value: "2.5", label: '2.5"' }, { value: "3.5", label: '3.5"' }];
@@ -1776,11 +1779,12 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
 
   return (
     <section className="content-card redesign-stock">
-      <div className="section-heading"><div><p className="section-kicker">GLOBAL STOCK</p><h2>Inventory by item type</h2><p>Item types are fixed by the IMS design. Select a type to see only its relevant characteristics.</p></div><button className="primary-button" onClick={()=>setShowAdd(true)} disabled={!canEdit}>+ Add item</button></div>
-      <div className="redesign-tabs">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{setActiveType(type);setSearch("");setFilters({model:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
+      <div className="section-heading"><div><p className="section-kicker">GLOBAL STOCK</p><h2>Inventory by item type</h2><p>Item types are fixed by the IMS design. Select a type to see only its relevant characteristics.</p></div><div className="stock-result-actions"><span className="stock-result-count">Showing <strong>{filtered.length}</strong> results</span><button className="primary-button" onClick={()=>setShowAdd(true)} disabled={!canEdit}>+ Add item</button></div></div>
+      <div className="redesign-tabs">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{setActiveType(type);setSearch("");setFilters({model:"",manufacturer:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
       <div className="redesign-toolbar redesign-stock-filters">
         <label className="stock-filter-field"><span>Serial number</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search serial number..." /></label>
         <label className="stock-filter-field"><span>Note</span><input value={filters.note} onChange={e=>setFilters(current=>({...current,note:e.target.value}))} placeholder="Search notes..." /></label>
+        {activeType === "Probe" && <label className="stock-filter-field"><span>Manufacturer</span><FilterDropdown value={filters.manufacturer} onChange={(value) => setFilters((current) => ({ ...current, manufacturer: value }))} options={manufacturerOptions} placeholder="All manufacturers" searchPlaceholder="Search manufacturers..." /></label>}
         {(["Machine", "Probe"].includes(activeType) || ["Board", "PSU", "Monitor", "Hard Disk", "Keyboard"].includes(activeType)) && <label className="stock-filter-field stock-model-filter"><span>{["Machine", "Probe"].includes(activeType) ? "Model" : "Compatible machine"}</span>
           <FilterDropdown value={filters.model} onChange={(value) => setFilters((current) => ({ ...current, model: value }))} options={[{ value: "", label: "All models" }, ...filterModelOptions]} placeholder="All models" searchPlaceholder="Search Manufacturer Model..." />
         </label>}
@@ -1795,10 +1799,10 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
           <label className="stock-filter-field"><span>Capacity (GB)</span><input type="number" min="0" value={filters.capacity} onChange={e=>setFilters(current=>({...current,capacity:e.target.value}))} placeholder="Any capacity" /></label>
         </>}
         <label className="stock-filter-field"><span>Location</span><FilterDropdown value={filters.location} onChange={(value) => setFilters((current) => ({ ...current, location: value }))} options={locationOptions} placeholder="All locations" searchPlaceholder="Search locations..." /></label>
-        <div className="stock-filter-actions"><button className="secondary-button" onClick={()=>{setSearch("");setFilters({model:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>Clear filters</button><button className="secondary-button" onClick={loadItems}>Refresh</button></div>
+        <div className="stock-filter-actions"><button className="secondary-button" onClick={()=>{setSearch("");setFilters({model:"",manufacturer:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>Clear filters</button><button className="secondary-button" onClick={loadItems}>Refresh</button></div>
       </div>
       {error && <div className="error-message">{error}</div>}
-      <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>Serial number</th>{columns.map(c=><th key={c}>{FIELD_LABELS[c]}</th>)}<th>Inventory Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
+      <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>Serial number</th>{columns.map(c=><th key={c}>{FIELD_LABELS[c]}</th>)}<th>Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
         {!loading && filtered.length===0 && <tr><td colSpan={columns.length+4} className="empty-cell">{items.length?"No matching items.":"No items of this type yet."}</td></tr>}
         {filtered.map(item=><tr key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{item.inventory_state || (masters.inventoryStatuses || []).find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{(masters.qualities || []).find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{(masters.locations || []).find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
       </tbody></table></div>
