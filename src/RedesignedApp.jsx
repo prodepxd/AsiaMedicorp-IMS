@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, supabaseConfigured } from "./lib/supabase";
 import asiaMedicorpLogo from "./assets/asia-medicorp-logo.png";
 import { RedesignedGlobalStock, RedesignedMasterData, RedesignedItemView, MASTER_GROUPS } from "./inventory/RedesignedInventory";
@@ -77,8 +77,91 @@ export default function App() {
   const [active, setActive] = useState("Global Stock");
   const [masterCategory, setMasterCategory] = useState(MASTER_GROUPS[0].key);
   const [transitCategory, setTransitCategory] = useState("active");
+  const [globalStockType, setGlobalStockType] = useState("Machine");
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [error, setError] = useState("");
+  const navigationIndexRef = useRef(0);
+  const currentViewRef = useRef(null);
+  const [canGoBack, setCanGoBack] = useState(false);
+
+  const currentView = { active, masterCategory, transitCategory, globalStockType, selectedItemId };
+  currentViewRef.current = currentView;
+
+  const applyView = useCallback((view) => {
+    setActive(view.active);
+    setMasterCategory(view.masterCategory);
+    setTransitCategory(view.transitCategory);
+    setGlobalStockType(view.globalStockType || "Machine");
+    setSelectedItemId(view.selectedItemId);
+  }, []);
+
+  const navigateTo = useCallback((updates) => {
+    const current = currentViewRef.current || { active, masterCategory, transitCategory, globalStockType, selectedItemId };
+    const next = { ...current, ...updates };
+    if (
+      next.active === current.active &&
+      next.masterCategory === current.masterCategory &&
+      next.transitCategory === current.transitCategory &&
+      next.globalStockType === current.globalStockType &&
+      next.selectedItemId === current.selectedItemId
+    ) return;
+
+    const currentIndex = Number(window.history.state?.imsIndex ?? navigationIndexRef.current ?? 0);
+    const nextIndex = currentIndex + 1;
+    window.history.pushState({ imsNavigation: true, imsIndex: nextIndex, imsView: next }, "");
+    navigationIndexRef.current = nextIndex;
+    currentViewRef.current = next;
+    applyView(next);
+    setCanGoBack(nextIndex > 0);
+  }, [active, masterCategory, transitCategory, globalStockType, selectedItemId, applyView]);
+
+  const goBack = useCallback(() => {
+    const currentIndex = Number(window.history.state?.imsIndex ?? navigationIndexRef.current ?? 0);
+    if (currentIndex > 0) window.history.back();
+  }, []);
+
+  useEffect(() => {
+    if (!session || !profile) return;
+
+    const existingState = window.history.state;
+    if (existingState?.imsNavigation && existingState.imsView) {
+      const index = Number(existingState.imsIndex) || 0;
+      const restoredView = { globalStockType: "Machine", ...existingState.imsView };
+      navigationIndexRef.current = index;
+      currentViewRef.current = restoredView;
+      applyView(restoredView);
+      setCanGoBack(index > 0);
+    } else {
+      const initialView = currentViewRef.current || {
+        active: "Global Stock",
+        masterCategory: MASTER_GROUPS[0].key,
+        transitCategory: "active",
+        globalStockType: "Machine",
+        selectedItemId: null,
+      };
+      window.history.replaceState({ imsNavigation: true, imsIndex: 0, imsView: initialView }, "");
+      navigationIndexRef.current = 0;
+      currentViewRef.current = initialView;
+      setCanGoBack(false);
+    }
+
+    const handlePopState = (event) => {
+      if (event.state?.imsNavigation && event.state.imsView) {
+        const index = Number(event.state.imsIndex) || 0;
+        const restoredView = { globalStockType: "Machine", ...event.state.imsView };
+        navigationIndexRef.current = index;
+        currentViewRef.current = restoredView;
+        applyView(restoredView);
+        setCanGoBack(index > 0);
+      } else {
+        navigationIndexRef.current = 0;
+        setCanGoBack(false);
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [session, profile, applyView]);
 
   const loadProfile = useCallback(async (userId) => {
     const { data, error: profileError } = await supabase.from("profiles")
@@ -112,7 +195,20 @@ export default function App() {
 
   async function signOut() {
     await supabase.auth.signOut();
-    setSession(null); setProfile(null); setActive("Global Stock"); setMasterCategory(MASTER_GROUPS[0].key); setSelectedItemId(null);
+    const initialView = {
+      active: "Global Stock",
+      masterCategory: MASTER_GROUPS[0].key,
+      transitCategory: "active",
+      globalStockType: "Machine",
+      selectedItemId: null,
+    };
+    setSession(null);
+    setProfile(null);
+    applyView(initialView);
+    currentViewRef.current = initialView;
+    navigationIndexRef.current = 0;
+    setCanGoBack(false);
+    window.history.replaceState({ imsNavigation: true, imsIndex: 0, imsView: initialView }, "");
   }
 
   if (!supabaseConfigured) return <main className="login-shell"><section className="login-card">
@@ -136,12 +232,12 @@ export default function App() {
         {visibleNav.map(item=><div key={item.label} className="nav-group">
           <button
             className={(active===item.label || (item.label === "Transit" && active.startsWith("Transit")))?"nav-item active":"nav-item"}
-            onClick={()=>{
-              setActive(item.label);
-              setSelectedItemId(null);
-              if (item.label === "Admin / Master Data") setMasterCategory((current) => current || MASTER_GROUPS[0].key);
-              if (item.label === "Transit") setTransitCategory("active");
-            }}
+            onClick={() => navigateTo({
+              active: item.label,
+              selectedItemId: null,
+              masterCategory: item.label === "Admin / Master Data" ? (masterCategory || MASTER_GROUPS[0].key) : masterCategory,
+              transitCategory: item.label === "Transit" ? "active" : transitCategory,
+            })}
           >
             <span>{item.icon}</span>{item.label}
           </button>
@@ -152,9 +248,7 @@ export default function App() {
                   key={group.key}
                   className={masterCategory === group.key ? "nav-subitem active" : "nav-subitem"}
                   onClick={() => {
-                    setActive("Admin / Master Data");
-                    setMasterCategory(group.key);
-                    setSelectedItemId(null);
+                    navigateTo({ active: "Admin / Master Data", masterCategory: group.key, selectedItemId: null });
                   }}
                 >
                   {group.label}
@@ -167,9 +261,7 @@ export default function App() {
               <button
                 className={transitCategory === "active" ? "nav-subitem active" : "nav-subitem"}
                 onClick={() => {
-                  setActive("Transit / Active Transits");
-                  setTransitCategory("active");
-                  setSelectedItemId(null);
+                  navigateTo({ active: "Transit / Active Transits", transitCategory: "active", selectedItemId: null });
                 }}
               >
                 Active Transits
@@ -177,9 +269,7 @@ export default function App() {
               <button
                 className={transitCategory === "past" ? "nav-subitem active" : "nav-subitem"}
                 onClick={() => {
-                  setActive("Transit / Past Transits");
-                  setTransitCategory("past");
-                  setSelectedItemId(null);
+                  navigateTo({ active: "Transit / Past Transits", transitCategory: "past", selectedItemId: null });
                 }}
               >
                 Past Transits
@@ -191,15 +281,20 @@ export default function App() {
       <div className="sidebar-footer"><div className="secure-badge">● Secure workspace</div><span>{profile.role.toUpperCase()} access</span></div>
     </aside>
     <main className="main-content">
-      <header className="topbar"><div><p className="eyebrow">INVENTORY MANAGEMENT SYSTEM</p><h1>{active}</h1></div>
+      <header className="topbar"><div className="topbar-heading">
+        <button type="button" className="ims-back-button" onClick={goBack} disabled={!canGoBack} aria-label="Go back to the previous IMS page" title={canGoBack ? "Go back to the previous IMS page" : "You are at the first IMS page"}>
+          <span aria-hidden="true">←</span> Back
+        </button>
+        <div><p className="eyebrow">INVENTORY MANAGEMENT SYSTEM</p><h1>{active}</h1></div>
+      </div>
         <div className="user-area"><div><strong>{profile.full_name || session.user.email}</strong><span>{profile.role}</span></div><button className="signout-button" onClick={signOut}>Sign out</button></div>
       </header>
       {error && <div className="error-message">{error}</div>}
-      <WorkspaceErrorBoundary key={active + ":" + (selectedItemId || "")}>
-        {active==="Global Stock" && !selectedItemId && <RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} onItemClick={setSelectedItemId} />}
-        {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onBack={()=>setSelectedItemId(null)} onDeleted={()=>setSelectedItemId(null)} onItemClick={setSelectedItemId} />}
-        {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} activeKey={masterCategory} onActiveChange={setMasterCategory} />}
-        {active.startsWith("Transit") && <TransitModule supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} canCreateLocation={profile.role==="admin"} view={transitCategory} onItemClick={(id) => { setActive("Global Stock"); setSelectedItemId(id); }} />}
+      <WorkspaceErrorBoundary key={active}>
+        {active==="Global Stock" && <div style={{ display: selectedItemId ? "none" : "contents" }}><RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} activeType={globalStockType} onActiveTypeChange={(type) => navigateTo({ globalStockType: type })} onItemClick={(id) => navigateTo({ selectedItemId: id })} /></div>}
+        {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onBack={goBack} onDeleted={goBack} onItemClick={(id) => navigateTo({ selectedItemId: id })} />}
+        {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} activeKey={masterCategory} onActiveChange={(key) => navigateTo({ masterCategory: key })} />}
+        {active.startsWith("Transit") && <TransitModule supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} canCreateLocation={profile.role==="admin"} view={transitCategory} onItemClick={(id) => navigateTo({ active: "Global Stock", selectedItemId: id })} />}
       </WorkspaceErrorBoundary>
       {active!=="Global Stock" && active!=="Admin / Master Data" && !active.startsWith("Transit") && <section className="content-card"><div className="section-heading">
         <div><p className="section-kicker">{active.toUpperCase()}</p><h2>Module ready</h2><p>Authentication and role access are connected. This module will be built on the live IMS database next.</p></div>

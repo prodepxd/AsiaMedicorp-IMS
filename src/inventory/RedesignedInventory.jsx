@@ -1622,8 +1622,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
   );
 }
 
-export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
-  const [activeType, setActiveType] = useState("Machine");
+export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine", onActiveTypeChange, onItemClick }) {
   const [items, setItems] = useState([]);
   const [masters, setMasters] = useState({ inventoryStatuses: [], qualities: [], locations: [], equipmentManufacturers: [], hardDiskManufacturers: [], machineModels: [], probeModels: [], probeTypes: [], boardTypes: [] });
   const [loading, setLoading] = useState(true);
@@ -1780,7 +1779,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, onItemClick }) {
   return (
     <section className="content-card redesign-stock">
       <div className="section-heading"><div><p className="section-kicker">GLOBAL STOCK</p><h2>Inventory by item type</h2><p>Item types are fixed by the IMS design. Select a type to see only its relevant characteristics.</p></div><div className="stock-result-actions"><span className="stock-result-count">Showing <strong>{filtered.length}</strong> results</span><button className="primary-button" onClick={()=>setShowAdd(true)} disabled={!canEdit}>+ Add item</button></div></div>
-      <div className="redesign-tabs">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{setActiveType(type);setSearch("");setFilters({model:"",manufacturer:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
+      <div className="redesign-tabs">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{onActiveTypeChange?.(type);setSearch("");setFilters({model:"",manufacturer:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
       <div className="redesign-toolbar redesign-stock-filters">
         <label className="stock-filter-field"><span>Serial number</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search serial number..." /></label>
         <label className="stock-filter-field"><span>Note</span><input value={filters.note} onChange={e=>setFilters(current=>({...current,note:e.target.value}))} placeholder="Search notes..." /></label>
@@ -1955,16 +1954,8 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
     }
     if (active.key === "probe_models") {
       const selectedCompatibility = form.compatible_machine_model_ids || [];
-      const existingCompatibilityCount = editing === "new"
-        ? 0
-        : (refs.compatibilities || []).filter((x) => x.probe_model_id === editing).length;
       if (selectedCompatibility.length > 8) {
         setError("A Probe Model can support a maximum of 8 Machine Models.");
-        setSaving(false);
-        return;
-      }
-      if (selectedCompatibility.length === 0 && (editing === "new" || existingCompatibilityCount > 0)) {
-        setError("At least 1 compatible Machine Model is required.");
         setSaving(false);
         return;
       }
@@ -2077,7 +2068,7 @@ export function RedesignedMasterData({ supabase, canEdit, activeKey, onActiveCha
           {active.key === "probe_models" && <div className="master-form-field master-compatibility-field">
             <div className="master-compatibility-heading">
               <div>
-                <label>Compatible Machine Models {editing === "new" ? "*" : "(existing records may be assigned later)"}</label>
+                <label>Compatible Machine Models (optional)</label>
                 <small className="master-form-hint">Machine Models are automatically limited to the Probe Model's manufacturer.</small>
               </div>
               <span className="master-compatibility-count">{(form.compatible_machine_model_ids || []).length} / 8 selected</span>
