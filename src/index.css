@@ -1756,3 +1756,29 @@ button { cursor: pointer; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+
+/* Global Stock result count alongside the Add item action. */
+.stock-result-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+.stock-result-count {
+  color: #8da2ba;
+  font-size: .72rem;
+  white-space: nowrap;
+}
+.stock-result-count strong {
+  color: #e5edf7;
+  font-size: .85rem;
+  font-weight: 800;
+}
+@media (max-width: 600px) {
+  .stock-result-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
