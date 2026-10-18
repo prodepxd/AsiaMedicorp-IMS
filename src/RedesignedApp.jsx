@@ -83,6 +83,16 @@ export default function App() {
   const navigationIndexRef = useRef(0);
   const currentViewRef = useRef(null);
   const [canGoBack, setCanGoBack] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!sidebarOpen) return undefined;
+    const handleEscape = (event) => {
+      if (event.key === "Escape") setSidebarOpen(false);
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [sidebarOpen]);
 
   const currentView = { active, masterCategory, transitCategory, globalStockType, selectedItemId };
   currentViewRef.current = currentView;
@@ -226,9 +236,30 @@ export default function App() {
   const visibleNav = navItems.filter(x => !x.adminOnly || profile.role === "admin");
 
   return <div className="ims-shell">
-    <aside className="sidebar">
-      <div className="brand"><img className="brand-logo" src={asiaMedicorpLogo} alt="Asia Medicorp logo" /><div><strong>ASIA MEDICORP</strong><span>Inventory Management</span></div></div>
-      <nav className="nav"><p className="nav-title">WORKSPACE</p>
+    {sidebarOpen && <button type="button" className="sidebar-backdrop" aria-label="Close navigation menu" onClick={() => setSidebarOpen(false)} />}
+    <div
+      className={sidebarOpen ? "sidebar-drawer open" : "sidebar-drawer"}
+      onMouseEnter={() => setSidebarOpen(true)}
+      onMouseLeave={() => setSidebarOpen(false)}
+    >
+      <div className="sidebar-controls">
+        <button
+          type="button"
+          className="menu-trigger"
+          aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
+          aria-expanded={sidebarOpen}
+          aria-controls="primary-navigation"
+          onClick={() => setSidebarOpen((open) => !open)}
+          onFocus={() => setSidebarOpen(true)}
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
+        <button type="button" className="ims-back-button drawer-back-button" onClick={goBack} disabled={!canGoBack} aria-label="Go back to the previous IMS page" title={canGoBack ? "Go back to the previous IMS page" : "You are at the first IMS page"}>
+          <span aria-hidden="true">←</span> Back
+        </button>
+      </div>
+      <aside className="sidebar" id="primary-navigation" aria-label="Primary navigation">
+      <nav className="nav" onClick={(event) => { if (event.target.closest("button")) setSidebarOpen(false); }}><p className="nav-title">WORKSPACE</p>
         {visibleNav.map(item=><div key={item.label} className="nav-group">
           <button
             className={(active===item.label || (item.label === "Transit" && active.startsWith("Transit")))?"nav-item active":"nav-item"}
@@ -279,16 +310,23 @@ export default function App() {
         </div>)}
       </nav>
       <div className="sidebar-footer"><div className="secure-badge">● Secure workspace</div><span>{profile.role.toUpperCase()} access</span></div>
-    </aside>
+      </aside>
+    </div>
     <main className="main-content">
-      <header className="topbar"><div className="topbar-heading">
-        <button type="button" className="ims-back-button" onClick={goBack} disabled={!canGoBack} aria-label="Go back to the previous IMS page" title={canGoBack ? "Go back to the previous IMS page" : "You are at the first IMS page"}>
-          <span aria-hidden="true">←</span> Back
-        </button>
-        <div><p className="eyebrow">INVENTORY MANAGEMENT SYSTEM</p><h1>{active}</h1></div>
-      </div>
+      <header className="topbar">
+        <div className="platform-brand">
+          <img className="platform-brand-logo" src={asiaMedicorpLogo} alt="Asia Medicorp logo" />
+          <div className="platform-brand-copy">
+            <strong>Asia Medicorp</strong>
+            <span>Inventory Management</span>
+          </div>
+        </div>
         <div className="user-area"><div><strong>{profile.full_name || session.user.email}</strong><span>{profile.role}</span></div><button className="signout-button" onClick={signOut}>Sign out</button></div>
       </header>
+      <div className="workspace-title">
+        <p className="eyebrow">INVENTORY MANAGEMENT SYSTEM</p>
+        <h1>{active}</h1>
+      </div>
       {error && <div className="error-message">{error}</div>}
       <WorkspaceErrorBoundary key={active}>
         {active==="Global Stock" && <div style={{ display: selectedItemId ? "none" : "contents" }}><RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} activeType={globalStockType} onActiveTypeChange={(type) => navigateTo({ globalStockType: type })} onItemClick={(id) => navigateTo({ selectedItemId: id })} /></div>}
