@@ -1901,7 +1901,8 @@ button { cursor: pointer; }
   position: absolute;
   z-index: 110;
   top: calc(100% + 7px);
-  left: 0;
+  left: auto;
+  right: 0;
   display: grid;
   gap: 3px;
   width: max-content;
