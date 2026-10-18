@@ -248,7 +248,9 @@ export default function App() {
           aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
           aria-expanded={sidebarOpen}
           aria-controls="primary-navigation"
-          onMouseEnter={() => setSidebarOpen(true)}
+          onMouseEnter={() => {
+            if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) setSidebarOpen(true);
+          }}
           onClick={() => setSidebarOpen((open) => !open)}
         >
           <span aria-hidden="true">☰</span>
