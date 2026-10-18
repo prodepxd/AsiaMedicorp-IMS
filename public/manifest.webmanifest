@@ -8,8 +8,8 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#ffffff",
-  "theme_color": "#0f172a",
+  "background_color": "#07111f",
+  "theme_color": "#07111f",
   "icons": [
     {
       "src": "./icons/asia-medicorp-icon-192.png",
