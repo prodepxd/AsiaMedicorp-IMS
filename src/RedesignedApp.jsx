@@ -239,7 +239,6 @@ export default function App() {
     {sidebarOpen && <button type="button" className="sidebar-backdrop" aria-label="Close navigation menu" onClick={() => setSidebarOpen(false)} />}
     <div
       className={sidebarOpen ? "sidebar-drawer open" : "sidebar-drawer"}
-      onMouseEnter={() => setSidebarOpen(true)}
       onMouseLeave={() => setSidebarOpen(false)}
     >
       <div className="sidebar-controls">
@@ -249,8 +248,8 @@ export default function App() {
           aria-label={sidebarOpen ? "Close navigation menu" : "Open navigation menu"}
           aria-expanded={sidebarOpen}
           aria-controls="primary-navigation"
+          onMouseEnter={() => setSidebarOpen(true)}
           onClick={() => setSidebarOpen((open) => !open)}
-          onFocus={() => setSidebarOpen(true)}
         >
           <span aria-hidden="true">☰</span>
         </button>
