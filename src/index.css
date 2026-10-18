@@ -2041,3 +2041,71 @@ button { cursor: pointer; }
   .workspace-heading-row { flex-direction: column; }
   .user-area { gap: 8px; }
 }
+
+
+/* Two-row responsive app header: centered branding/user controls above page context/navigation. */
+.topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 8px 0 16px;
+}
+.platform-brand {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+  width: max-content;
+  max-width: 100%;
+}
+.user-area {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+.workspace-navigation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+  margin: 0 0 26px;
+}
+.workspace-navigation-row .workspace-title { flex: 0 1 auto; }
+.workspace-navigation-row .primary-tabs { flex: 1 1 auto; justify-content: flex-end; }
+@media (max-width: 900px) {
+  .topbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .platform-brand { grid-column: 1 / -1; grid-row: 1; justify-self: center; }
+  .user-area { grid-column: 2; grid-row: 1; align-self: start; }
+  .workspace-navigation-row { flex-direction: column; align-items: stretch; gap: 14px; }
+  .workspace-navigation-row .workspace-title { flex: 0 0 auto; }
+  .workspace-navigation-row .primary-tabs { width: 100%; justify-content: center; }
+}
+@media (max-width: 600px) {
+  .topbar { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .platform-brand { grid-column: 1; grid-row: 1; justify-self: center; }
+  .user-area { grid-column: 1; grid-row: 2; justify-self: stretch; width: 100%; }
+  .workspace-navigation-row { margin-bottom: 20px; }
+  .workspace-navigation-row .primary-tabs { display: flex; flex-wrap: wrap; }
+  .workspace-navigation-row .primary-tab { flex: 0 1 auto; max-width: 100%; white-space: normal; text-align: center; }
+}
+/* Prevent the Global Stock Add Item action from overflowing narrow viewports. */
+@media (max-width: 600px) {
+  .stock-result-actions {
+    min-width: 0;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .stock-result-actions .primary-button {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    flex: 0 1 auto;
+  }
+  .section-heading { min-width: 0; flex-wrap: wrap; }
+  .section-heading > div { min-width: 0; }
+}
