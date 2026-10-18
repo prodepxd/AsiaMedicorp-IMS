@@ -44,18 +44,15 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            event.waitUntil(
-              caches.open(CACHE_NAME).then((cache) => cache.put(APP_SHELL_URL, copy))
-            );
-          }
-          return response;
+          if (!response.ok) return response;
+          // Persist the shell before completing the navigation response.
+          return caches.open(CACHE_NAME)
+            .then((cache) => cache.put(APP_SHELL_URL, response.clone()))
+            .then(() => response);
         })
         .catch(async () => {
           const cached = await caches.match(APP_SHELL_URL);
-          if (cached) return cached;
-          return Response.error();
+          return cached || Response.error();
         })
     );
     return;
@@ -68,13 +65,10 @@ self.addEventListener("fetch", (event) => {
     caches.match(request).then((cached) => {
       if (cached) return cached;
       return fetch(request).then((response) => {
-        if (response.ok && response.type === "basic") {
-          const copy = response.clone();
-          event.waitUntil(
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy))
-          );
-        }
-        return response;
+        if (!response.ok || response.type !== "basic") return response;
+        return caches.open(CACHE_NAME)
+          .then((cache) => cache.put(request, response.clone()))
+          .then(() => response);
       });
     })
   );
