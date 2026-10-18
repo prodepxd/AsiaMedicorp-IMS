@@ -5,6 +5,12 @@ import sharp from "sharp";
 
 const existingLogo = readFileSync(new URL("./src/assets/asia-medicorp-logo.png", import.meta.url));
 
+// GitHub Pages hosts this app under a repository subpath. Vercel previews
+// host each deployment at the domain root, so select the base automatically
+// from Vercel's documented build environment instead of relying on a dashboard
+// build-command override.
+const base = process.env.VERCEL === "1" ? "/" : "/AsiaMedicorp-IMS/";
+
 const pwaBrandAssets = {
   name: "pwa-existing-brand-logo",
   async generateBundle() {
@@ -27,6 +33,6 @@ const pwaBrandAssets = {
 };
 
 export default defineConfig({
-  base: "/AsiaMedicorp-IMS/",
+  base,
   plugins: [react(), pwaBrandAssets],
 });
