@@ -1810,7 +1810,7 @@ button { cursor: pointer; }
 }
 .topbar {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 24px;
   margin-bottom: 22px;
@@ -1855,7 +1855,7 @@ button { cursor: pointer; }
 .primary-tabs {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 7px;
   min-width: 0;
@@ -1996,7 +1996,7 @@ button { cursor: pointer; }
   .primary-tabs {
     grid-column: 1 / -1;
     grid-row: 2;
-    justify-content: flex-start;
+    justify-content: center;
   }
 }
 @media (max-width: 760px) {
@@ -2017,7 +2017,7 @@ button { cursor: pointer; }
   .platform-brand { grid-row: 1; }
   .primary-tabs {
     grid-row: 2;
-    justify-content: flex-start;
+    justify-content: center;
     gap: 6px;
   }
   .user-area {
