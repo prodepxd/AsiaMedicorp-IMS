@@ -2129,3 +2129,47 @@ button { cursor: pointer; }
     max-width: none;
   }
 }
+
+
+/* Keep the centered brand and user controls on one row at desktop/tablet widths,
+   while preserving the existing stacked mobile layout. */
+.main-content {
+  padding-top: 12px;
+}
+.topbar {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  padding-top: 4px;
+  padding-bottom: 12px;
+}
+.platform-brand {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+}
+.user-area {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+@media (max-width: 760px) {
+  .main-content { padding-top: 10px; }
+  .topbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding-top: 2px;
+    padding-bottom: 12px;
+  }
+  .platform-brand {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: center;
+  }
+  .user-area {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: stretch;
+    width: 100%;
+  }
+}
