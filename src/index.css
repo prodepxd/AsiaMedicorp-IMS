@@ -2109,3 +2109,23 @@ button { cursor: pointer; }
   .section-heading { min-width: 0; flex-wrap: wrap; }
   .section-heading > div { min-width: 0; }
 }
+
+/* Keep centered branding and user controls from colliding on tablet-sized screens. */
+@media (max-width: 900px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .platform-brand {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: center;
+  }
+  .user-area {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: stretch;
+    width: 100%;
+    max-width: none;
+  }
+}
