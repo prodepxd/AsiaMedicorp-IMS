@@ -252,6 +252,24 @@ export default function App() {
             <strong>Asia Medicorp</strong>
             <span>Inventory Management</span>
           </div>
+        <div className="user-area">
+          <div><strong>{profile.full_name || session.user.email}</strong><span>{profile.role}</span></div>
+          <button className="signout-button" onClick={signOut}>Sign out</button>
+        </div>
+      </header>
+      <div className="workspace-heading-row">
+        <button type="button" className="ims-back-button" onClick={goBack} disabled={!canGoBack} aria-label="Go back to the previous IMS page" title={canGoBack ? "Go back to the previous IMS page" : "You are at the first IMS page"}>
+          <span aria-hidden="true">←</span> Back
+        </button>
+        <div className="workspace-title">
+          <p className="eyebrow">INVENTORY MANAGEMENT SYSTEM</p>
+          <h1>{active}</h1>
+        </div>
+      </header>
+      <div className="workspace-navigation-row">
+        <div className="workspace-title">
+          <p className="eyebrow">INVENTORY MANAGEMENT SYSTEM</p>
+          <h1>{active}</h1>
         </div>
         <nav className="primary-tabs" aria-label="Primary navigation" ref={navMenuRef}>
           <button
@@ -326,21 +344,7 @@ export default function App() {
             </div>
           )}
         </nav>
-        <div className="user-area">
-          <div><strong>{profile.full_name || session.user.email}</strong><span>{profile.role}</span></div>
-          <button className="signout-button" onClick={signOut}>Sign out</button>
-        </div>
-      </header>
-      <div className="workspace-heading-row">
-        <button type="button" className="ims-back-button" onClick={goBack} disabled={!canGoBack} aria-label="Go back to the previous IMS page" title={canGoBack ? "Go back to the previous IMS page" : "You are at the first IMS page"}>
-          <span aria-hidden="true">←</span> Back
-        </button>
-        <div className="workspace-title">
-          <p className="eyebrow">INVENTORY MANAGEMENT SYSTEM</p>
-          <h1>{active}</h1>
-        </div>
-      </div>
-      {error && <div className="error-message">{error}</div>}
+      </div>      {error && <div className="error-message">{error}</div>}
       <WorkspaceErrorBoundary key={active}>
         {active==="Global Stock" && <div style={{ display: selectedItemId ? "none" : "contents" }}><RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} activeType={globalStockType} onActiveTypeChange={(type) => navigateTo({ globalStockType: type })} onItemClick={(id) => navigateTo({ selectedItemId: id })} /></div>}
         {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onBack={goBack} onDeleted={goBack} onItemClick={(id) => navigateTo({ selectedItemId: id })} />}
