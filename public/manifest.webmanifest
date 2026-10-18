@@ -1,0 +1,21 @@
+{
+  "id": "./",
+  "name": "Asia Medicorp IMS",
+  "short_name": "AsiaMedicorp",
+  "description": "Asia Medicorp Inventory Management System",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "./icons/asia-medicorp-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
