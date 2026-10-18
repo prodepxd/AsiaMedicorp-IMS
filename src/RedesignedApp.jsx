@@ -270,7 +270,6 @@ export default function App() {
               className={active.startsWith("Transit") ? "primary-tab active" : "primary-tab"}
               aria-expanded={openNavMenu === "Transit"}
               onClick={() => {
-                navigateTo({ active: "Transit / Active Transits", transitCategory: "active", selectedItemId: null });
                 setOpenNavMenu((current) => current === "Transit" ? null : "Transit");
               }}
             >
@@ -280,7 +279,7 @@ export default function App() {
               <div className="primary-submenu" role="group" aria-label="Transit views">
                 <button
                   type="button"
-                  className={transitCategory === "active" ? "active" : ""}
+                  className={active.startsWith("Transit") && transitCategory === "active" ? "active" : ""}
                   onClick={() => {
                     navigateTo({ active: "Transit / Active Transits", transitCategory: "active", selectedItemId: null });
                     setOpenNavMenu(null);
@@ -288,7 +287,7 @@ export default function App() {
                 >Active Transits</button>
                 <button
                   type="button"
-                  className={transitCategory === "past" ? "active" : ""}
+                  className={active.startsWith("Transit") && transitCategory === "past" ? "active" : ""}
                   onClick={() => {
                     navigateTo({ active: "Transit / Past Transits", transitCategory: "past", selectedItemId: null });
                     setOpenNavMenu(null);
@@ -304,11 +303,6 @@ export default function App() {
                 className={active === "Admin / Master Data" ? "primary-tab active" : "primary-tab"}
                 aria-expanded={openNavMenu === "Admin / Master Data"}
                 onClick={() => {
-                  navigateTo({
-                    active: "Admin / Master Data",
-                    masterCategory: masterCategory || MASTER_GROUPS[0].key,
-                    selectedItemId: null,
-                  });
                   setOpenNavMenu((current) => current === "Admin / Master Data" ? null : "Admin / Master Data");
                 }}
               >
@@ -320,7 +314,7 @@ export default function App() {
                     <button
                       type="button"
                       key={group.key}
-                      className={masterCategory === group.key ? "active" : ""}
+                      className={active === "Admin / Master Data" && masterCategory === group.key ? "active" : ""}
                       onClick={() => {
                         navigateTo({ active: "Admin / Master Data", masterCategory: group.key, selectedItemId: null });
                         setOpenNavMenu(null);
