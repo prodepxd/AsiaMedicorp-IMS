@@ -1794,3 +1794,383 @@ button { cursor: pointer; }
     justify-content: space-between;
   }
 }
+
+
+/* Compact horizontal header, responsive navigation tabs, and dropdown menus. */
+.ims-shell {
+  display: block;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #07111f;
+}
+.main-content {
+  width: 100%;
+  min-width: 0;
+  padding: 26px clamp(16px, 3vw, 38px) 48px;
+}
+.topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 22px;
+  padding: 8px 0 18px;
+  border-bottom: 1px solid #1b2a3d;
+}
+.platform-brand {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 18px;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+.platform-brand-logo {
+  display: block;
+  width: 76px;
+  height: 76px;
+  flex: 0 0 76px;
+  object-fit: contain;
+  object-position: center;
+}
+.platform-brand-copy { min-width: 0; }
+.platform-brand-copy strong {
+  display: block;
+  color: #f1f5f9;
+  font-size: clamp(1.8rem, 3.3vw, 2.65rem);
+  font-weight: 850;
+  letter-spacing: -.045em;
+  line-height: 1.08;
+}
+.platform-brand-copy span {
+  display: block;
+  margin-top: 7px;
+  color: #8da2ba;
+  font-size: clamp(.78rem, 1.25vw, .98rem);
+  font-weight: 600;
+  letter-spacing: .07em;
+}
+.primary-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+}
+.primary-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 13px;
+  border: 1px solid #26384e;
+  border-radius: 10px;
+  color: #9fb2c7;
+  background: #0a1726;
+  font-size: .78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+}
+.primary-tab > span:first-child { color: #718aa5; }
+.primary-tab:hover,
+.primary-tab:focus-visible {
+  border-color: #3b82f6;
+  color: #f1f5f9;
+  background: #102238;
+}
+.primary-tab:focus-visible,
+.primary-submenu button:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+}
+.primary-tab.active {
+  border-color: #3b82f6;
+  color: #fff;
+  background: #173b70;
+  box-shadow: inset 0 0 16px rgba(37,99,235,.1);
+}
+.primary-tab.active > span:first-child { color: #93c5fd; }
+.primary-tab-chevron { margin-left: 1px; color: #71859d; }
+.primary-nav-group { position: relative; flex: 0 0 auto; }
+.primary-submenu {
+  position: absolute;
+  z-index: 110;
+  top: calc(100% + 7px);
+  left: auto;
+  right: 0;
+  display: grid;
+  gap: 3px;
+  width: max-content;
+  min-width: 190px;
+  max-width: min(320px, calc(100vw - 32px));
+  max-height: min(60vh, 420px);
+  overflow: auto;
+  padding: 7px;
+  border: 1px solid #26384e;
+  border-radius: 11px;
+  background: #0c1929;
+  box-shadow: 0 18px 44px rgba(0,0,0,.4);
+}
+.primary-submenu-wide { min-width: 230px; }
+.primary-submenu button {
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  padding: 10px 11px;
+  color: #91a4ba;
+  background: transparent;
+  font-size: .75rem;
+  font-weight: 600;
+  text-align: left;
+  line-height: 1.35;
+  white-space: normal;
+}
+.primary-submenu button:hover,
+.primary-submenu button.active {
+  color: #e8f1ff;
+  background: #17345a;
+}
+.user-area {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+  max-width: 280px;
+}
+.user-area > div { min-width: 0; }
+.user-area strong {
+  display: block;
+  overflow: hidden;
+  color: #dbe7f5;
+  font-size: .8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-area span {
+  display: block;
+  margin-top: 3px;
+  color: #71859d;
+  font-size: .7rem;
+  text-transform: capitalize;
+}
+.signout-button {
+  flex: 0 0 auto;
+  border: 1px solid #26384e;
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: #9aadc1;
+  background: #0c1929;
+  white-space: nowrap;
+}
+.signout-button:hover { color: #fff; border-color: #3b82f6; }
+.workspace-heading-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+  margin: 8px 0 26px;
+}
+.workspace-title {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.workspace-title h1 {
+  margin: 5px 0 0;
+  font-size: clamp(1.65rem, 3vw, 2.4rem);
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1320px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+  }
+  .platform-brand { grid-column: 1; }
+  .user-area { grid-column: 2; }
+  .primary-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+  }
+}
+@media (max-width: 760px) {
+  .main-content { padding: 18px 16px 36px; }
+  .topbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+  }
+  .platform-brand,
+  .user-area,
+  .primary-tabs {
+    grid-column: 1;
+    width: 100%;
+    max-width: 100%;
+  }
+  .platform-brand { grid-row: 1; }
+  .primary-tabs {
+    grid-row: 2;
+    justify-content: center;
+    gap: 6px;
+  }
+  .user-area {
+    grid-row: 3;
+    justify-content: space-between;
+  }
+  .primary-tab { min-height: 42px; padding: 9px 11px; }
+  .primary-submenu {
+    left: auto;
+    right: 0;
+  }
+  .workspace-heading-row { align-items: flex-start; gap: 12px; }
+}
+@media (max-width: 480px) {
+  .platform-brand { gap: 12px; }
+  .platform-brand-logo { width: 76px; height: 76px; flex-basis: 76px; }
+  .platform-brand-copy strong { font-size: clamp(1.65rem, 7.5vw, 2rem); }
+  .platform-brand-copy span { font-size: .68rem; letter-spacing: .04em; }
+  .primary-tabs { gap: 5px; }
+  .primary-tab { padding: 9px 10px; font-size: .72rem; }
+  .workspace-heading-row { flex-direction: column; }
+  .user-area { gap: 8px; }
+}
+
+
+/* Two-row responsive app header: centered branding/user controls above page context/navigation. */
+.topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 8px 0 16px;
+}
+.platform-brand {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+  width: max-content;
+  max-width: 100%;
+}
+.user-area {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+.workspace-navigation-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+  margin: 0 0 26px;
+}
+.workspace-navigation-row .workspace-title { flex: 0 1 auto; }
+.workspace-navigation-row .primary-tabs { flex: 1 1 auto; justify-content: flex-end; }
+@media (max-width: 900px) {
+  .topbar { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .platform-brand { grid-column: 1 / -1; grid-row: 1; justify-self: center; }
+  .user-area { grid-column: 2; grid-row: 1; align-self: start; }
+  .workspace-navigation-row { flex-direction: column; align-items: stretch; gap: 14px; }
+  .workspace-navigation-row .workspace-title { flex: 0 0 auto; }
+  .workspace-navigation-row .primary-tabs { width: 100%; justify-content: center; }
+}
+@media (max-width: 600px) {
+  .topbar { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .platform-brand { grid-column: 1; grid-row: 1; justify-self: center; }
+  .user-area { grid-column: 1; grid-row: 2; justify-self: stretch; width: 100%; }
+  .workspace-navigation-row { margin-bottom: 20px; }
+  .workspace-navigation-row .primary-tabs { display: flex; flex-wrap: wrap; }
+  .workspace-navigation-row .primary-tab { flex: 0 1 auto; max-width: 100%; white-space: normal; text-align: center; }
+}
+/* Prevent the Global Stock Add Item action from overflowing narrow viewports. */
+@media (max-width: 600px) {
+  .stock-result-actions {
+    min-width: 0;
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .stock-result-actions .primary-button {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    flex: 0 1 auto;
+  }
+  .section-heading { min-width: 0; flex-wrap: wrap; }
+  .section-heading > div { min-width: 0; }
+}
+
+/* Keep centered branding and user controls from colliding on tablet-sized screens. */
+@media (max-width: 900px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .platform-brand {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: center;
+  }
+  .user-area {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: stretch;
+    width: 100%;
+    max-width: none;
+  }
+}
+
+
+/* Keep the centered brand and user controls on one row at desktop/tablet widths,
+   while preserving the existing stacked mobile layout. */
+.main-content {
+  padding-top: 12px;
+}
+.topbar {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  padding-top: 4px;
+  padding-bottom: 12px;
+}
+.platform-brand {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+}
+.user-area {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+}
+@media (max-width: 760px) {
+  .main-content { padding-top: 10px; }
+  .topbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding-top: 2px;
+    padding-bottom: 12px;
+  }
+  .platform-brand {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: center;
+  }
+  .user-area {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: stretch;
+    width: 100%;
+  }
+}

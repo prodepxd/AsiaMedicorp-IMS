@@ -83,6 +83,24 @@ export default function App() {
   const navigationIndexRef = useRef(0);
   const currentViewRef = useRef(null);
   const [canGoBack, setCanGoBack] = useState(false);
+  const [openNavMenu, setOpenNavMenu] = useState(null);
+  const navMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!openNavMenu) return undefined;
+    const handlePointerDown = (event) => {
+      if (!navMenuRef.current?.contains(event.target)) setOpenNavMenu(null);
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setOpenNavMenu(null);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openNavMenu]);
 
   const currentView = { active, masterCategory, transitCategory, globalStockType, selectedItemId };
   currentViewRef.current = currentView;
@@ -226,69 +244,99 @@ export default function App() {
   const visibleNav = navItems.filter(x => !x.adminOnly || profile.role === "admin");
 
   return <div className="ims-shell">
-    <aside className="sidebar">
-      <div className="brand"><img className="brand-logo" src={asiaMedicorpLogo} alt="Asia Medicorp logo" /><div><strong>ASIA MEDICORP</strong><span>Inventory Management</span></div></div>
-      <nav className="nav"><p className="nav-title">WORKSPACE</p>
-        {visibleNav.map(item=><div key={item.label} className="nav-group">
-          <button
-            className={(active===item.label || (item.label === "Transit" && active.startsWith("Transit")))?"nav-item active":"nav-item"}
-            onClick={() => navigateTo({
-              active: item.label,
-              selectedItemId: null,
-              masterCategory: item.label === "Admin / Master Data" ? (masterCategory || MASTER_GROUPS[0].key) : masterCategory,
-              transitCategory: item.label === "Transit" ? "active" : transitCategory,
-            })}
-          >
-            <span>{item.icon}</span>{item.label}
-          </button>
-          {item.label === "Admin / Master Data" && active === "Admin / Master Data" && (
-            <div className="nav-submenu">
-              {MASTER_GROUPS.map((group) => (
-                <button
-                  key={group.key}
-                  className={masterCategory === group.key ? "nav-subitem active" : "nav-subitem"}
-                  onClick={() => {
-                    navigateTo({ active: "Admin / Master Data", masterCategory: group.key, selectedItemId: null });
-                  }}
-                >
-                  {group.label}
-                </button>
-              ))}
-            </div>
-          )}
-          {item.label === "Transit" && active.startsWith("Transit") && (
-            <div className="nav-submenu">
-              <button
-                className={transitCategory === "active" ? "nav-subitem active" : "nav-subitem"}
-                onClick={() => {
-                  navigateTo({ active: "Transit / Active Transits", transitCategory: "active", selectedItemId: null });
-                }}
-              >
-                Active Transits
-              </button>
-              <button
-                className={transitCategory === "past" ? "nav-subitem active" : "nav-subitem"}
-                onClick={() => {
-                  navigateTo({ active: "Transit / Past Transits", transitCategory: "past", selectedItemId: null });
-                }}
-              >
-                Past Transits
-              </button>
-            </div>
-          )}
-        </div>)}
-      </nav>
-      <div className="sidebar-footer"><div className="secure-badge">● Secure workspace</div><span>{profile.role.toUpperCase()} access</span></div>
-    </aside>
     <main className="main-content">
-      <header className="topbar"><div className="topbar-heading">
-        <button type="button" className="ims-back-button" onClick={goBack} disabled={!canGoBack} aria-label="Go back to the previous IMS page" title={canGoBack ? "Go back to the previous IMS page" : "You are at the first IMS page"}>
-          <span aria-hidden="true">←</span> Back
-        </button>
-        <div><p className="eyebrow">INVENTORY MANAGEMENT SYSTEM</p><h1>{active}</h1></div>
-      </div>
-        <div className="user-area"><div><strong>{profile.full_name || session.user.email}</strong><span>{profile.role}</span></div><button className="signout-button" onClick={signOut}>Sign out</button></div>
+      <header className="topbar">
+        <div className="platform-brand">
+          <img className="platform-brand-logo" src={asiaMedicorpLogo} alt="Asia Medicorp logo" />
+          <div className="platform-brand-copy">
+            <strong>Asia Medicorp</strong>
+            <span>Inventory Management</span>
+          </div>
+        </div>
+        <div className="user-area">
+          <div><strong>{profile.full_name || session.user.email}</strong><span>{profile.role}</span></div>
+          <button className="signout-button" onClick={signOut}>Sign out</button>
+        </div>
       </header>
+      <div className="workspace-navigation-row">
+        <div className="workspace-title">
+          <p className="eyebrow">INVENTORY MANAGEMENT SYSTEM</p>
+          <h1>{active}</h1>
+        </div>
+        <nav className="primary-tabs" aria-label="Primary navigation" ref={navMenuRef}>
+          <button
+            type="button"
+            className={active === "Global Stock" ? "primary-tab active" : "primary-tab"}
+            onClick={() => {
+              setOpenNavMenu(null);
+              navigateTo({ active: "Global Stock", selectedItemId: null });
+            }}
+          >
+            <span aria-hidden="true">▦</span> Global Stock
+          </button>
+          <div className="primary-nav-group">
+            <button
+              type="button"
+              className={active.startsWith("Transit") ? "primary-tab active" : "primary-tab"}
+              aria-expanded={openNavMenu === "Transit"}
+              onClick={() => {
+                setOpenNavMenu((current) => current === "Transit" ? null : "Transit");
+              }}
+            >
+              <span aria-hidden="true">⇄</span> Transit <span className="primary-tab-chevron" aria-hidden="true">⌄</span>
+            </button>
+            {openNavMenu === "Transit" && (
+              <div className="primary-submenu" role="group" aria-label="Transit views">
+                <button
+                  type="button"
+                  className={active.startsWith("Transit") && transitCategory === "active" ? "active" : ""}
+                  onClick={() => {
+                    navigateTo({ active: "Transit / Active Transits", transitCategory: "active", selectedItemId: null });
+                    setOpenNavMenu(null);
+                  }}
+                >Active Transits</button>
+                <button
+                  type="button"
+                  className={active.startsWith("Transit") && transitCategory === "past" ? "active" : ""}
+                  onClick={() => {
+                    navigateTo({ active: "Transit / Past Transits", transitCategory: "past", selectedItemId: null });
+                    setOpenNavMenu(null);
+                  }}
+                >Past Transits</button>
+              </div>
+            )}
+          </div>
+          {profile.role === "admin" && (
+            <div className="primary-nav-group">
+              <button
+                type="button"
+                className={active === "Admin / Master Data" ? "primary-tab active" : "primary-tab"}
+                aria-expanded={openNavMenu === "Admin / Master Data"}
+                onClick={() => {
+                  setOpenNavMenu((current) => current === "Admin / Master Data" ? null : "Admin / Master Data");
+                }}
+              >
+                <span aria-hidden="true">⚙</span> Admin / Master Data <span className="primary-tab-chevron" aria-hidden="true">⌄</span>
+              </button>
+              {openNavMenu === "Admin / Master Data" && (
+                <div className="primary-submenu primary-submenu-wide" role="group" aria-label="Master data categories">
+                  {MASTER_GROUPS.map((group) => (
+                    <button
+                      type="button"
+                      key={group.key}
+                      className={active === "Admin / Master Data" && masterCategory === group.key ? "active" : ""}
+                      onClick={() => {
+                        navigateTo({ active: "Admin / Master Data", masterCategory: group.key, selectedItemId: null });
+                        setOpenNavMenu(null);
+                      }}
+                    >{group.label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </nav>
+      </div>
       {error && <div className="error-message">{error}</div>}
       <WorkspaceErrorBoundary key={active}>
         {active==="Global Stock" && <div style={{ display: selectedItemId ? "none" : "contents" }}><RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} activeType={globalStockType} onActiveTypeChange={(type) => navigateTo({ globalStockType: type })} onItemClick={(id) => navigateTo({ selectedItemId: id })} /></div>}
