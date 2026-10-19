@@ -246,6 +246,7 @@ export default function App() {
   return <div className="ims-shell">
     <main className="main-content">
       <header className="topbar">
+        <button type="button" className="global-back-button" onClick={goBack} disabled={!canGoBack} aria-label="Go back" title="Go back">←</button>
         <div className="platform-brand">
           <img className="platform-brand-logo" src={asiaMedicorpLogo} alt="Asia Medicorp logo" />
           <div className="platform-brand-copy">

@@ -1606,9 +1606,9 @@ button { cursor: pointer; }
 
 /* Searchable Global Stock filter dropdowns */
 .redesign-stock { overflow: visible; }
-.redesign-stock-filters {
+ .redesign-stock-filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   align-items: start;
   gap: 12px;
   padding: 0 28px 20px;
@@ -1652,9 +1652,18 @@ button { cursor: pointer; }
 }
 .stock-filter-dropdown-menu {
   z-index: 60;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   max-height: 320px;
   box-sizing: border-box;
+  overflow-x: hidden;
 }
+.stock-filter-dropdown-menu > input { box-sizing: border-box; max-width: 100%; min-width: 0; }
+.stock-filter-dropdown-options { min-width: 0; overflow-x: hidden; }
+.stock-filter-dropdown-separator { white-space: normal; overflow-wrap: anywhere; }
+.stock-filter-dropdown .transit-item-dropdown-trigger > span:first-child { min-width: 0; white-space: normal; overflow-wrap: anywhere; text-align: left; }
+.stock-filter-dropdown .transit-item-dropdown-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; }
 .stock-filter-dropdown-menu > input { width: 100%; }
 .stock-filter-dropdown-options {
   display: grid;
@@ -1687,13 +1696,18 @@ button { cursor: pointer; }
   font-size: .7rem;
 }
 .redesign-stock-filters .stock-filter-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
   align-self: end;
   gap: 8px;
-  flex-wrap: wrap;
+  min-width: 0;
 }
-.redesign-stock-filters .stock-filter-actions button { white-space: nowrap; }
+.redesign-stock-filters .stock-filter-actions button { white-space: nowrap; min-width: 0; width: 100%; }
+.stock-filter-actions .stock-icon-button,
+.global-back-button { display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+.stock-filter-actions .stock-icon-button { padding: 8px; }
+.stock-filter-dropdown-menu { overflow-x: hidden !important; }
 @media (max-width: 760px) {
   .redesign-stock-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 18px 18px; }
   .redesign-stock-filters .stock-filter-actions { grid-column: 1 / -1; }
@@ -2172,5 +2186,180 @@ button { cursor: pointer; }
     grid-row: 2;
     justify-self: stretch;
     width: 100%;
+  }
+}
+
+
+/* Global Stock filter and navigation refinements */
+.redesign-tabs-single-row {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  align-items: stretch;
+  justify-content: stretch;
+  width: 100%;
+  overflow: visible;
+  gap: 8px;
+}
+.redesign-tabs-single-row .redesign-tab {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 9px 6px;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  justify-content: center;
+}
+.stock-filter-dropdown-separator {
+  padding: 8px 9px 5px;
+  border-top: 1px solid #26384e;
+  margin-top: 4px;
+  color: #6f8aa7;
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-align: center;
+  white-space: nowrap;
+}
+.redesign-location-choice { display: grid; gap: 14px; }
+.redesign-location-offices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.redesign-location-offices .redesign-radio-option { min-width: 0; }
+.redesign-location-offices .redesign-radio-option span { overflow-wrap: anywhere; }
+.redesign-location-other { display: grid; gap: 7px; color: #9fb2c7; font-size: .72rem; font-weight: 600; }
+.stock-icon-button { min-width: 42px; min-height: 42px; padding: 8px 12px; font-size: 1.1rem; line-height: 1; }
+.stock-scroll-control {
+  position: fixed;
+  z-index: 45;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 1px solid #31577f;
+  border-radius: 999px;
+  padding: 9px 16px;
+  color: #e8f1ff;
+  background: rgba(12, 25, 41, .96);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  font-size: .75rem;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+.stock-scroll-control:hover { border-color: #60a5fa; background: #17345a; }
+.stock-scroll-top { top: 12px; }
+.stock-scroll-bottom { bottom: 14px; }
+@media (max-width: 760px) {
+  .redesign-stock-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .redesign-stock-filters .stock-filter-actions { grid-column: 1 / -1; }
+  .redesign-tabs-single-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .redesign-location-offices { grid-template-columns: 1fr; }
+  .redesign-tabs-single-row { padding-left: 16px; padding-right: 16px; }
+}
+
+
+/* Global back control sized to match the brand mark */
+.topbar { position: relative; min-height: 76px; align-items: center; justify-content: center; }
+.platform-brand { margin: 0 auto; }
+.user-area { position: absolute; right: 0; top: 0; }
+.global-back-button {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  flex: 0 0 76px;
+  border: 1px solid #26384e;
+  border-radius: 12px;
+  color: #c5d3e2;
+  background: #0c1929;
+  font-size: 2rem;
+  line-height: 1;
+}
+.global-back-button:hover:not(:disabled) { border-color: #3b82f6; color: #fff; background: #102238; }
+.global-back-button:disabled { opacity: .35; cursor: not-allowed; }
+@media (max-width: 760px) {
+  .topbar { min-height: 0; padding-top: 0; gap: 12px; flex-direction: column; }
+  .global-back-button { position: absolute; top: 0; left: 0; width: 48px; height: 48px; }
+  .platform-brand { max-width: calc(100% - 64px); }
+  .platform-brand-logo { width: 56px; height: 56px; flex-basis: 56px; }
+  .user-area { position: static; width: 100%; max-width: none; justify-content: space-between; }
+}
+
+/* Final sizing and alignment adjustments for Global Stock */
+.redesign-stock-filters { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.redesign-stock-filters .stock-filter-field,
+.redesign-stock-filters .stock-filter-field > *,
+.redesign-stock-filters .stock-filter-actions { min-width: 0; max-width: 100%; }
+.redesign-stock-filters .stock-filter-actions { grid-column: span 2; }
+.global-back-button { padding: 0; }
+.stock-icon-button { display: inline-flex; align-items: center; justify-content: center; text-align: center; padding: 0; }
+.stock-filter-dropdown-menu,
+.stock-filter-dropdown-options { overflow-x: hidden; }
+.stock-filter-dropdown-option { white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+@media (max-width: 760px) {
+  .redesign-stock-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .redesign-stock-filters .stock-filter-actions { grid-column: 1 / -1; }
+}
+
+
+/* Allocate all remaining filter-row width to filters; keep action buttons square at the far right. */
+.redesign-stock-filters {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+.redesign-stock-filters .stock-filter-field {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+}
+.redesign-stock-filters .stock-filter-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: end;
+  gap: 8px;
+  width: auto;
+  margin-left: auto;
+}
+.redesign-stock-filters .stock-filter-actions .stock-icon-button {
+  flex: 0 0 42px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+}
+@media (max-width: 760px) {
+  .redesign-stock-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .redesign-stock-filters .stock-filter-field { width: auto; }
+  .redesign-stock-filters .stock-filter-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+
+/* Vertically center branding and account controls with the global Back button. */
+@media (min-width: 761px) {
+  .topbar {
+    align-items: center;
+    min-height: 76px;
+  }
+  .topbar .platform-brand {
+    align-self: center;
+  }
+  .topbar .user-area {
+    top: 50%;
+    transform: translateY(-50%);
+    align-items: center;
+  }
+  .topbar .global-back-button {
+    top: 50%;
+    transform: translateY(-50%);
   }
 }
