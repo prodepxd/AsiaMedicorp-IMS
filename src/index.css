@@ -2363,3 +2363,42 @@ button { cursor: pointer; }
     transform: translateY(-50%);
   }
 }
+
+
+/* Keep the result count and Add Item action inside the Global Stock card on mobile. */
+@media (max-width: 760px) {
+  .redesign-stock .section-heading {
+    align-items: stretch;
+    gap: 14px;
+  }
+  .redesign-stock .section-heading > .stock-result-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-self: stretch;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    justify-content: stretch;
+    justify-items: stretch;
+    gap: 10px;
+  }
+  .redesign-stock .stock-result-count {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: left;
+    line-height: 1.4;
+  }
+  .redesign-stock .section-heading .stock-result-actions .primary-button {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+    margin: 0;
+  }
+}
