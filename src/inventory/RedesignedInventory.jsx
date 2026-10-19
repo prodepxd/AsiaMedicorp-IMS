@@ -1642,7 +1642,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ model: "", manufacturer: "", location: "", note: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
+  const [filters, setFilters] = useState({ model: "", manufacturer: "", location: "", note: "", status: "", quality: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
   const [showAdd, setShowAdd] = useState(false);
   const filtersRef = useRef(null);
   const lastStockRowRef = useRef(null);
@@ -1719,6 +1719,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
       const noteQuery = filters.note.trim().toLowerCase();
       if (noteQuery && !String(item.quality_note || "").toLowerCase().includes(noteQuery)) return false;
       if (selectedLocation && item.current_location_id !== selectedLocation) return false;
+      if (activeType !== "Hard Disk" && filters.status && item.inventory_status_id !== filters.status) return false;\n      if (activeType !== "Hard Disk" && filters.quality && item.quality_status_id !== filters.quality) return false;
       if ((activeType === "Probe" || activeType === "Machine") && selectedManufacturer && d.manufacturer_id !== selectedManufacturer) return false;
       if (activeType === "Probe" && filters.probeType && d.probe_type_id !== filters.probeType) return false;
       if (selectedModel) {
@@ -1780,6 +1781,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   const locationOptions = [{ value: "", label: "All locations" }, ...officeLocations.map((location) => ({ value: location.id, label: location.name })), { value: "__separator__", label: "──────── Other locations ────────", separator: true }, ...otherLocations.map((location) => ({ value: location.id, label: location.name }))];
   const manufacturerOptions = [{ value: "", label: "All manufacturers" }, ...(masters.equipmentManufacturers || []).map((manufacturer) => ({ value: manufacturer.id, label: manufacturer.name }))];
   const probeTypeOptions = [{ value: "", label: "All probe types" }, ...(masters.probeTypes || []).map((probeType) => ({ value: probeType.id, label: probeType.name }))];
+  const statusOptions = [{ value: "", label: "All statuses" }, ...(masters.inventoryStatuses || []).map((status) => ({ value: status.id, label: status.name }))];\n  const qualityOptions = [{ value: "", label: "All qualities" }, ...(masters.qualities || []).map((quality) => ({ value: quality.id, label: quality.name }))];
   const boardTypeOptions = [{ value: "", label: "All board types" }, ...(masters.boardTypes || []).map((boardType) => ({ value: boardType.id, label: boardType.name }))];
   const hardDiskTypeOptions = [{ value: "", label: "All types" }, ...["IDE", "SATA", "SSD"].map((type) => ({ value: type, label: type }))];
   const hardDiskSizeOptions = [{ value: "", label: "All sizes" }, { value: "2.5", label: '2.5"' }, { value: "3.5", label: '3.5"' }];
@@ -1823,7 +1825,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   return (
     <section className="content-card redesign-stock">
       <div className="section-heading"><div><p className="section-kicker">GLOBAL STOCK</p><h2>Inventory by item type</h2><p>Item types are fixed by the IMS design. Select a type to see only its relevant characteristics.</p></div><div className="stock-result-actions"><span className="stock-result-count">Showing <strong>{filtered.length}</strong> results</span><button className="primary-button" onClick={()=>setShowAdd(true)} disabled={!canEdit}>+ Add item</button></div></div>
-      <div className="redesign-tabs redesign-tabs-single-row">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{onActiveTypeChange?.(type);setSearch("");setFilters({model:"",manufacturer:"",probeType:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
+      <div className="redesign-tabs redesign-tabs-single-row">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{onActiveTypeChange?.(type);setSearch("");setFilters({model:"",manufacturer:"",probeType:"",location:"",note:"",status:"",quality:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
       <div className="redesign-toolbar redesign-stock-filters" ref={filtersRef}>
         <label className="stock-filter-field"><span>Serial number</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search serial number..." /></label>
         <label className="stock-filter-field"><span>Note</span><input value={filters.note} onChange={e=>setFilters(current=>({...current,note:e.target.value}))} placeholder="Search notes..." /></label>
@@ -1842,6 +1844,8 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
           <label className="stock-filter-field"><span>Size</span><FilterDropdown value={filters.size} onChange={(value) => setFilters((current) => ({ ...current, size: value }))} options={hardDiskSizeOptions} placeholder="All sizes" searchPlaceholder="Search sizes..." /></label>
           <label className="stock-filter-field"><span>Capacity (GB)</span><input type="number" min="0" value={filters.capacity} onChange={e=>setFilters(current=>({...current,capacity:e.target.value}))} placeholder="Any capacity" /></label>
         </>}
+        {activeType !== "Hard Disk" && <label className="stock-filter-field"><span>Status</span><FilterDropdown value={filters.status || ""} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={statusOptions} placeholder="All statuses" searchPlaceholder="Search statuses..." /></label>}
+        {activeType !== "Hard Disk" && <label className="stock-filter-field"><span>Quality</span><FilterDropdown value={filters.quality || ""} onChange={(value) => setFilters((current) => ({ ...current, quality: value }))} options={qualityOptions} placeholder="All qualities" searchPlaceholder="Search qualities..." /></label>}
         <label className="stock-filter-field"><span>Location</span><FilterDropdown value={filters.location} onChange={(value) => setFilters((current) => ({ ...current, location: value }))} options={locationOptions} placeholder="All locations" searchPlaceholder="Search locations..." /></label>
         <div className="stock-filter-actions"><button className="secondary-button stock-icon-button" aria-label="Clear filters" title="Clear filters" onClick={()=>{setSearch("");setFilters({model:"",manufacturer:"",probeType:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>⌫</button><button className="secondary-button stock-icon-button" aria-label="Refresh stock" title="Refresh stock" onClick={loadItems}>↻</button></div>
       </div>
