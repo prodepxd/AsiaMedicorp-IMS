@@ -2342,3 +2342,24 @@ button { cursor: pointer; }
     margin-left: 0;
   }
 }
+
+
+/* Vertically center branding and account controls with the global Back button. */
+@media (min-width: 761px) {
+  .topbar {
+    align-items: center;
+    min-height: 76px;
+  }
+  .topbar .platform-brand {
+    align-self: center;
+  }
+  .topbar .user-area {
+    top: 50%;
+    transform: translateY(-50%);
+    align-items: center;
+  }
+  .topbar .global-back-button {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+}
