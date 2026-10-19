@@ -161,7 +161,7 @@ function FilterDropdown({ value, onChange, options, placeholder = "Select...", s
   return (
     <div ref={dropdownRef} className={open ? "transit-item-dropdown open stock-filter-dropdown" : "transit-item-dropdown stock-filter-dropdown"}>
       <button type="button" className="transit-item-dropdown-trigger" onClick={() => setOpen((current) => !current)}>
-        <span>{selected?.label || placeholder}</span><span className="transit-item-dropdown-chevron">▾</span>
+        <span>{value ? (selected?.label || placeholder) : (options.some((option) => option.value === "") ? "All" : (selected?.label || placeholder))}</span><span className="transit-item-dropdown-chevron">▾</span>
       </button>
       {open && <div className="transit-item-dropdown-menu stock-filter-dropdown-menu">
         <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchPlaceholder} />
