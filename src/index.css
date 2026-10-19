@@ -2302,3 +2302,43 @@ button { cursor: pointer; }
   .redesign-stock-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .redesign-stock-filters .stock-filter-actions { grid-column: 1 / -1; }
 }
+
+
+/* Allocate all remaining filter-row width to filters; keep action buttons square at the far right. */
+.redesign-stock-filters {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+}
+.redesign-stock-filters .stock-filter-field {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+}
+.redesign-stock-filters .stock-filter-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: end;
+  gap: 8px;
+  width: auto;
+  margin-left: auto;
+}
+.redesign-stock-filters .stock-filter-actions .stock-icon-button {
+  flex: 0 0 42px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+}
+@media (max-width: 760px) {
+  .redesign-stock-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .redesign-stock-filters .stock-filter-field { width: auto; }
+  .redesign-stock-filters .stock-filter-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+    margin-left: 0;
+  }
+}
