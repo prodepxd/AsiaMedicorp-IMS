@@ -2227,3 +2227,35 @@ button { cursor: pointer; }
   .redesign-location-offices { grid-template-columns: 1fr; }
   .redesign-tabs-single-row { padding-left: 16px; padding-right: 16px; }
 }
+
+
+/* Global back control sized to match the brand mark */
+.topbar { position: relative; min-height: 76px; align-items: center; justify-content: center; }
+.platform-brand { margin: 0 auto; }
+.user-area { position: absolute; right: 0; top: 0; }
+.global-back-button {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  flex: 0 0 76px;
+  border: 1px solid #26384e;
+  border-radius: 12px;
+  color: #c5d3e2;
+  background: #0c1929;
+  font-size: 2rem;
+  line-height: 1;
+}
+.global-back-button:hover:not(:disabled) { border-color: #3b82f6; color: #fff; background: #102238; }
+.global-back-button:disabled { opacity: .35; cursor: not-allowed; }
+@media (max-width: 760px) {
+  .topbar { min-height: 0; padding-top: 0; gap: 12px; flex-direction: column; }
+  .global-back-button { position: absolute; top: 0; left: 0; width: 48px; height: 48px; }
+  .platform-brand { max-width: calc(100% - 64px); }
+  .platform-brand-logo { width: 56px; height: 56px; flex-basis: 56px; }
+  .user-area { position: static; width: 100%; max-width: none; justify-content: space-between; }
+}
