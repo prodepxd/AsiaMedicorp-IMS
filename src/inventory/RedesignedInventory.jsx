@@ -2,7 +2,8 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ItemTransitHistory } from "../transit/TransitModule";
 
 const OFFICE_LOCATION_IDS = ["e7feb93e-f6d0-4e78-a12f-1e0bde25e14d","fdf07d2c-b1e9-4603-8cc6-b851cb09910d","76cfa94c-bf64-4efb-ab1b-a10e47b12f8b"];
-\nconst ITEM_TYPES = [
+
+const ITEM_TYPES = [
   "Machine",
   "Probe",
   "Board",
