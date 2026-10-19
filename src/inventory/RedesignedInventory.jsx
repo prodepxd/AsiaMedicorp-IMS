@@ -1719,7 +1719,8 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
       const noteQuery = filters.note.trim().toLowerCase();
       if (noteQuery && !String(item.quality_note || "").toLowerCase().includes(noteQuery)) return false;
       if (selectedLocation && item.current_location_id !== selectedLocation) return false;
-      if (activeType !== "Hard Disk" && filters.status && item.inventory_status_id !== filters.status) return false;\n      if (activeType !== "Hard Disk" && filters.quality && item.quality_status_id !== filters.quality) return false;
+      if (activeType !== "Hard Disk" && filters.status && item.inventory_status_id !== filters.status) return false;
+      if (activeType !== "Hard Disk" && filters.quality && item.quality_status_id !== filters.quality) return false;
       if ((activeType === "Probe" || activeType === "Machine") && selectedManufacturer && d.manufacturer_id !== selectedManufacturer) return false;
       if (activeType === "Probe" && filters.probeType && d.probe_type_id !== filters.probeType) return false;
       if (selectedModel) {
@@ -1781,7 +1782,8 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   const locationOptions = [{ value: "", label: "All locations" }, ...officeLocations.map((location) => ({ value: location.id, label: location.name })), { value: "__separator__", label: "──────── Other locations ────────", separator: true }, ...otherLocations.map((location) => ({ value: location.id, label: location.name }))];
   const manufacturerOptions = [{ value: "", label: "All manufacturers" }, ...(masters.equipmentManufacturers || []).map((manufacturer) => ({ value: manufacturer.id, label: manufacturer.name }))];
   const probeTypeOptions = [{ value: "", label: "All probe types" }, ...(masters.probeTypes || []).map((probeType) => ({ value: probeType.id, label: probeType.name }))];
-  const statusOptions = [{ value: "", label: "All statuses" }, ...(masters.inventoryStatuses || []).map((status) => ({ value: status.id, label: status.name }))];\n  const qualityOptions = [{ value: "", label: "All qualities" }, ...(masters.qualities || []).map((quality) => ({ value: quality.id, label: quality.name }))];
+  const statusOptions = [{ value: "", label: "All statuses" }, ...(masters.inventoryStatuses || []).map((status) => ({ value: status.id, label: status.name }))];
+  const qualityOptions = [{ value: "", label: "All qualities" }, ...(masters.qualities || []).map((quality) => ({ value: quality.id, label: quality.name }))];
   const boardTypeOptions = [{ value: "", label: "All board types" }, ...(masters.boardTypes || []).map((boardType) => ({ value: boardType.id, label: boardType.name }))];
   const hardDiskTypeOptions = [{ value: "", label: "All types" }, ...["IDE", "SATA", "SSD"].map((type) => ({ value: type, label: type }))];
   const hardDiskSizeOptions = [{ value: "", label: "All sizes" }, { value: "2.5", label: '2.5"' }, { value: "3.5", label: '3.5"' }];
