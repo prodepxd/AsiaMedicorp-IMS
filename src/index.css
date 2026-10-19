@@ -2288,7 +2288,7 @@ button { cursor: pointer; }
 }
 
 /* Final sizing and alignment adjustments for Global Stock */
-.redesign-stock-filters { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
+.redesign-stock-filters { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .redesign-stock-filters .stock-filter-field,
 .redesign-stock-filters .stock-filter-field > *,
 .redesign-stock-filters .stock-filter-actions { min-width: 0; max-width: 100%; }
