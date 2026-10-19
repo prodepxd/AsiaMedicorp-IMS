@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ItemTransitHistory } from "../transit/TransitModule";
 
-const ITEM_TYPES = [
+const OFFICE_LOCATION_IDS = ["e7feb93e-f6d0-4e78-a12f-1e0bde25e14d","fdf07d2c-b1e9-4603-8cc6-b851cb09910d","76cfa94c-bf64-4efb-ab1b-a10e47b12f8b"];
+\nconst ITEM_TYPES = [
   "Machine",
   "Probe",
   "Board",
@@ -163,7 +164,9 @@ function FilterDropdown({ value, onChange, options, placeholder = "Select...", s
       {open && <div className="transit-item-dropdown-menu stock-filter-dropdown-menu">
         <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchPlaceholder} />
         <div className="stock-filter-dropdown-options">
-          {visibleOptions.length ? visibleOptions.map((option) => (
+          {visibleOptions.length ? visibleOptions.map((option) => option.separator ? (
+            <div key="__separator__" className="stock-filter-dropdown-separator" role="separator">{option.label}</div>
+          ) : (
             <button type="button" key={option.value || "__all"} className={option.value === value ? "stock-filter-dropdown-option selected" : "stock-filter-dropdown-option"} onClick={() => choose(option.value)}>{option.label}</button>
           )) : <div className="stock-filter-dropdown-empty">No matching options.</div>}
         </div>
@@ -292,7 +295,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       {key:"monitor_size",label:"Monitor size",type:"radio",options:SELECT_OPTIONS.monitor_size,required:true},
       {key:"software_version",label:"Software version",type:"text",required:true},
       {key:"portable",label:"Portable",type:"radio",options:SELECT_OPTIONS.portable,required:true},
-      {key:"current_location_id",label:"Location",type:"location",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",required:true},
       {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
       {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
@@ -382,6 +385,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
   function currentValueValid() {
     if (!currentField || !currentField.required) return true;
     if (currentField.type === "compatible_machine") return Boolean(form.compatible_machine_manufacturer_id && form.machine_model_id);
+    if (currentField.type === "location") return Boolean(form.current_location_id);
     const value = form[currentField.key];
     if (Array.isArray(value)) return true;
     return String(value ?? "").trim() !== "";
@@ -497,20 +501,28 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     if (field.type === "board_type") return <Select value={value} onChange={onChange}
       options={masters.boardTypes.map((x) => ({value:x.id,label:x.name}))} required />;
 
-    if (field.type === "location") return (
-      <div className="redesign-radio-group redesign-location-radio-group">
-        <label className={value === "" ? "redesign-radio-option selected" : "redesign-radio-option"}>
-          <input type="radio" name="location" value="" checked={value === ""} onChange={onChange} />
-          <span>Not set</span>
-        </label>
-        {masters.locations.map((location) => (
-          <label key={location.id} className={value === location.id ? "redesign-radio-option selected" : "redesign-radio-option"}>
-            <input type="radio" name="location" value={location.id} checked={value === location.id} onChange={onChange} />
-            <span>{location.name}</span>
-          </label>
-        ))}
-      </div>
-    );
+    if (field.type === "location") {
+      const offices = masters.locations.filter((location) => OFFICE_LOCATION_IDS.includes(location.id));
+      const otherLocations = masters.locations.filter((location) => !OFFICE_LOCATION_IDS.includes(location.id));
+      const isOffice = OFFICE_LOCATION_IDS.includes(value);
+      const otherLocationOptions = otherLocations.map((location) => ({ value: location.id, label: location.name }));
+      return (
+        <div className="redesign-location-choice">
+          <div className="redesign-location-offices">
+            {offices.map((location) => (
+              <label key={location.id} className={value === location.id ? "redesign-radio-option selected" : "redesign-radio-option"}>
+                <input type="radio" name="location-office" value={location.id} checked={value === location.id} onChange={() => set("current_location_id", location.id)} required />
+                <span>{location.name}</span>
+              </label>
+            ))}
+          </div>
+          <div className="redesign-location-other">
+            <span>Or select another location</span>
+            <FilterDropdown value={isOffice ? "" : value} onChange={(locationId) => set("current_location_id", locationId)} options={otherLocationOptions} placeholder="Search other locations..." searchPlaceholder="Search locations..." />
+          </div>
+        </div>
+      );
+    }
 
     if (field.type === "status") return <Select value={value} onChange={onChange}
       options={masters.inventoryStatuses.map((x) => ({value:x.id,label:x.name}))} required />;
@@ -573,7 +585,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       inventory_status_id: form.inventory_status_id,
       quality_status_id: form.quality_status_id,
       quality_note: form.quality_note.trim() || null,
-      current_location_id: form.current_location_id || null,
+      current_location_id: form.current_location_id,
     };
 
     let details;
@@ -1697,7 +1709,8 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
       const noteQuery = filters.note.trim().toLowerCase();
       if (noteQuery && !String(item.quality_note || "").toLowerCase().includes(noteQuery)) return false;
       if (selectedLocation && item.current_location_id !== selectedLocation) return false;
-      if (activeType === "Probe" && selectedManufacturer && d.manufacturer_id !== selectedManufacturer) return false;
+      if ((activeType === "Probe" || activeType === "Machine") && selectedManufacturer && d.manufacturer_id !== selectedManufacturer) return false;
+      if (activeType === "Probe" && filters.probeType && d.probe_type_id !== filters.probeType) return false;
       if (selectedModel) {
         const modelId = activeType === "Machine" || activeType === "Probe"
           ? d.model_id
@@ -1734,8 +1747,11 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
     const manufacturer = (masters.equipmentManufacturers || []).find((entry) => entry.id === model.manufacturer_id)?.name || "";
     return { value: model.id, label: [manufacturer, model.name].filter(Boolean).join(" ") };
   });
-  const locationOptions = [{ value: "", label: "All locations" }, ...(masters.locations || []).map((location) => ({ value: location.id, label: location.name }))];
+  const officeLocations = (masters.locations || []).filter((location) => OFFICE_LOCATION_IDS.includes(location.id));
+  const otherLocations = (masters.locations || []).filter((location) => !OFFICE_LOCATION_IDS.includes(location.id));
+  const locationOptions = [{ value: "", label: "All locations" }, ...officeLocations.map((location) => ({ value: location.id, label: location.name })), { value: "__separator__", label: "──────── Other locations ────────", separator: true }, ...otherLocations.map((location) => ({ value: location.id, label: location.name }))];
   const manufacturerOptions = [{ value: "", label: "All manufacturers" }, ...(masters.equipmentManufacturers || []).map((manufacturer) => ({ value: manufacturer.id, label: manufacturer.name }))];
+  const probeTypeOptions = [{ value: "", label: "All probe types" }, ...(masters.probeTypes || []).map((probeType) => ({ value: probeType.id, label: probeType.name }))];
   const boardTypeOptions = [{ value: "", label: "All board types" }, ...(masters.boardTypes || []).map((boardType) => ({ value: boardType.id, label: boardType.name }))];
   const hardDiskTypeOptions = [{ value: "", label: "All types" }, ...["IDE", "SATA", "SSD"].map((type) => ({ value: type, label: type }))];
   const hardDiskSizeOptions = [{ value: "", label: "All sizes" }, { value: "2.5", label: '2.5"' }, { value: "3.5", label: '3.5"' }];
@@ -1779,14 +1795,15 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   return (
     <section className="content-card redesign-stock">
       <div className="section-heading"><div><p className="section-kicker">GLOBAL STOCK</p><h2>Inventory by item type</h2><p>Item types are fixed by the IMS design. Select a type to see only its relevant characteristics.</p></div><div className="stock-result-actions"><span className="stock-result-count">Showing <strong>{filtered.length}</strong> results</span><button className="primary-button" onClick={()=>setShowAdd(true)} disabled={!canEdit}>+ Add item</button></div></div>
-      <div className="redesign-tabs">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{onActiveTypeChange?.(type);setSearch("");setFilters({model:"",manufacturer:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
+      <div className="redesign-tabs redesign-tabs-single-row">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{onActiveTypeChange?.(type);setSearch("");setFilters({model:"",manufacturer:"",probeType:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
       <div className="redesign-toolbar redesign-stock-filters">
         <label className="stock-filter-field"><span>Serial number</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search serial number..." /></label>
         <label className="stock-filter-field"><span>Note</span><input value={filters.note} onChange={e=>setFilters(current=>({...current,note:e.target.value}))} placeholder="Search notes..." /></label>
-        {activeType === "Probe" && <label className="stock-filter-field"><span>Manufacturer</span><FilterDropdown value={filters.manufacturer} onChange={(value) => setFilters((current) => ({ ...current, manufacturer: value }))} options={manufacturerOptions} placeholder="All manufacturers" searchPlaceholder="Search manufacturers..." /></label>}
+        {["Probe", "Machine"].includes(activeType) && <label className="stock-filter-field"><span>Manufacturer</span><FilterDropdown value={filters.manufacturer} onChange={(value) => setFilters((current) => ({ ...current, manufacturer: value }))} options={manufacturerOptions} placeholder="All manufacturers" searchPlaceholder="Search manufacturers..." /></label>}
         {(["Machine", "Probe"].includes(activeType) || ["Board", "PSU", "Monitor", "Hard Disk", "Keyboard"].includes(activeType)) && <label className="stock-filter-field stock-model-filter"><span>{["Machine", "Probe"].includes(activeType) ? "Model" : "Compatible machine"}</span>
           <FilterDropdown value={filters.model} onChange={(value) => setFilters((current) => ({ ...current, model: value }))} options={[{ value: "", label: "All models" }, ...filterModelOptions]} placeholder="All models" searchPlaceholder="Search Manufacturer Model..." />
         </label>}
+        {activeType === "Probe" && <label className="stock-filter-field"><span>Probe type</span><FilterDropdown value={filters.probeType || ""} onChange={(value) => setFilters((current) => ({ ...current, probeType: value }))} options={probeTypeOptions} placeholder="All probe types" searchPlaceholder="Search probe types..." /></label>}
         {activeType === "Board" && <>
           <label className="stock-filter-field"><span>Board type</span><FilterDropdown value={filters.boardType} onChange={(value) => setFilters((current) => ({ ...current, boardType: value }))} options={boardTypeOptions} placeholder="All board types" searchPlaceholder="Search board types..." /></label>
           <label className="stock-filter-field"><span>Part number</span><input value={filters.partNumber} onChange={e=>setFilters(current=>({...current,partNumber:e.target.value}))} placeholder="Search part number..." /></label>
