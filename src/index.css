@@ -2485,3 +2485,20 @@ button { cursor: pointer; }
   min-width: 100%;
   max-width: 100%;
 }
+
+
+/* On two-column layouts, every right-column filter dropdown must open leftward. */
+@media (max-width: 760px) {
+  .redesign-stock-filters > .stock-filter-field:nth-child(even) .stock-filter-dropdown-menu {
+    left: auto;
+    right: 0;
+    width: max-content;
+    min-width: 100%;
+    max-width: min(560px, calc(100vw - 32px));
+  }
+  .redesign-stock-filters > .stock-filter-field:nth-child(even) .stock-filter-dropdown-options {
+    width: max-content;
+    min-width: 100%;
+    max-width: 100%;
+  }
+}
