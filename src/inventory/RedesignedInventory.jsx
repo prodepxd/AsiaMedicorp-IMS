@@ -1705,23 +1705,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
 
 
 
-  useEffect(() => {
-    const updateScrollControls = () => {
-      const filtersRect = filtersRef.current?.getBoundingClientRect();
-      const lastRowRect = lastStockRowRef.current?.getBoundingClientRect();
-      const filtersPassed = Boolean(filtersRect && filtersRect.bottom < 0);
-      const lastRowVisible = Boolean(lastRowRect && lastRowRect.top < window.innerHeight && lastRowRect.bottom > 0);
-      setShowScrollTop(filtersPassed);
-      setShowScrollBottom(filtersPassed && Boolean(lastRowRect) && !lastRowVisible);
-    };
-    updateScrollControls();
-    window.addEventListener("scroll", updateScrollControls, { passive: true });
-    window.addEventListener("resize", updateScrollControls);
-    return () => {
-      window.removeEventListener("scroll", updateScrollControls);
-      window.removeEventListener("resize", updateScrollControls);
-    };
-  }, [filtered.length, loading, activeType]);
+
 
   const filtered = useMemo(() => {
     const serialQuery = search.trim().toLowerCase();
@@ -1755,6 +1739,24 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
       return true;
     });
   }, [items, search, filters, activeType]);
+
+  useEffect(() => {
+    const updateScrollControls = () => {
+      const filtersRect = filtersRef.current?.getBoundingClientRect();
+      const lastRowRect = lastStockRowRef.current?.getBoundingClientRect();
+      const filtersPassed = Boolean(filtersRect && filtersRect.bottom < 0);
+      const lastRowVisible = Boolean(lastRowRect && lastRowRect.top < window.innerHeight && lastRowRect.bottom > 0);
+      setShowScrollTop(filtersPassed);
+      setShowScrollBottom(filtersPassed && Boolean(lastRowRect) && !lastRowVisible);
+    };
+    updateScrollControls();
+    window.addEventListener("scroll", updateScrollControls, { passive: true });
+    window.addEventListener("resize", updateScrollControls);
+    return () => {
+      window.removeEventListener("scroll", updateScrollControls);
+      window.removeEventListener("resize", updateScrollControls);
+    };
+  }, [filtered.length, loading, activeType]);
 
   function manufacturerName(item) {
     const id = item.detail?.manufacturer_id;
