@@ -148,9 +148,10 @@ function FilterDropdown({ value, onChange, options, placeholder = "Select...", s
       document.removeEventListener("click", closeWhenOutside, true);
     };
   }, [open]);
-  const visibleOptions = options.filter((option) => option.label.toLowerCase().includes(query.trim().toLowerCase()));
+  const visibleOptions = options.filter((option) => option.separator || option.label.toLowerCase().includes(query.trim().toLowerCase()));
 
   function choose(optionValue) {
+    if (optionValue === "__separator__") return;
     onChange(optionValue);
     setOpen(false);
     setQuery("");
@@ -1642,6 +1643,10 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState({ model: "", manufacturer: "", location: "", note: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
   const [showAdd, setShowAdd] = useState(false);
+  const filtersRef = useRef(null);
+  const lastStockRowRef = useRef(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   async function loadMasters() {
     const [s,q,l,em,hm,mm,pm,pt,bt] = await Promise.all([
@@ -1697,6 +1702,24 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
 
   useEffect(() => { loadMasters(); }, []);
   useEffect(() => { loadItems(); }, [activeType]);
+
+  useEffect(() => {
+    const updateScrollControls = () => {
+      const filtersRect = filtersRef.current?.getBoundingClientRect();
+      const lastRowRect = lastStockRowRef.current?.getBoundingClientRect();
+      const filtersPassed = Boolean(filtersRect && filtersRect.bottom < 0);
+      const lastRowVisible = Boolean(lastRowRect && lastRowRect.top < window.innerHeight && lastRowRect.bottom > 0);
+      setShowScrollTop(filtersPassed);
+      setShowScrollBottom(filtersPassed && Boolean(lastRowRect) && !lastRowVisible);
+    };
+    updateScrollControls();
+    window.addEventListener("scroll", updateScrollControls, { passive: true });
+    window.addEventListener("resize", updateScrollControls);
+    return () => {
+      window.removeEventListener("scroll", updateScrollControls);
+      window.removeEventListener("resize", updateScrollControls);
+    };
+  }, [filtered.length, loading, activeType]);
 
   const filtered = useMemo(() => {
     const serialQuery = search.trim().toLowerCase();
@@ -1796,7 +1819,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
     <section className="content-card redesign-stock">
       <div className="section-heading"><div><p className="section-kicker">GLOBAL STOCK</p><h2>Inventory by item type</h2><p>Item types are fixed by the IMS design. Select a type to see only its relevant characteristics.</p></div><div className="stock-result-actions"><span className="stock-result-count">Showing <strong>{filtered.length}</strong> results</span><button className="primary-button" onClick={()=>setShowAdd(true)} disabled={!canEdit}>+ Add item</button></div></div>
       <div className="redesign-tabs redesign-tabs-single-row">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{onActiveTypeChange?.(type);setSearch("");setFilters({model:"",manufacturer:"",probeType:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
-      <div className="redesign-toolbar redesign-stock-filters">
+      <div className="redesign-toolbar redesign-stock-filters" ref={filtersRef}>
         <label className="stock-filter-field"><span>Serial number</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search serial number..." /></label>
         <label className="stock-filter-field"><span>Note</span><input value={filters.note} onChange={e=>setFilters(current=>({...current,note:e.target.value}))} placeholder="Search notes..." /></label>
         {["Probe", "Machine"].includes(activeType) && <label className="stock-filter-field"><span>Manufacturer</span><FilterDropdown value={filters.manufacturer} onChange={(value) => setFilters((current) => ({ ...current, manufacturer: value }))} options={manufacturerOptions} placeholder="All manufacturers" searchPlaceholder="Search manufacturers..." /></label>}
@@ -1815,13 +1838,15 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
           <label className="stock-filter-field"><span>Capacity (GB)</span><input type="number" min="0" value={filters.capacity} onChange={e=>setFilters(current=>({...current,capacity:e.target.value}))} placeholder="Any capacity" /></label>
         </>}
         <label className="stock-filter-field"><span>Location</span><FilterDropdown value={filters.location} onChange={(value) => setFilters((current) => ({ ...current, location: value }))} options={locationOptions} placeholder="All locations" searchPlaceholder="Search locations..." /></label>
-        <div className="stock-filter-actions"><button className="secondary-button" onClick={()=>{setSearch("");setFilters({model:"",manufacturer:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>Clear filters</button><button className="secondary-button" onClick={loadItems}>Refresh</button></div>
+        <div className="stock-filter-actions"><button className="secondary-button stock-icon-button" aria-label="Clear filters" title="Clear filters" onClick={()=>{setSearch("");setFilters({model:"",manufacturer:"",probeType:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>⌫</button><button className="secondary-button stock-icon-button" aria-label="Refresh stock" title="Refresh stock" onClick={loadItems}>↻</button></div>
       </div>
       {error && <div className="error-message">{error}</div>}
       <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>Serial number</th>{columns.map(c=><th key={c}>{FIELD_LABELS[c]}</th>)}<th>Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
         {!loading && filtered.length===0 && <tr><td colSpan={columns.length+4} className="empty-cell">{items.length?"No matching items.":"No items of this type yet."}</td></tr>}
-        {filtered.map(item=><tr key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{item.inventory_state || (masters.inventoryStatuses || []).find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{(masters.qualities || []).find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{(masters.locations || []).find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
+        {filtered.map((item,index)=><tr ref={index === filtered.length - 1 ? lastStockRowRef : null} key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{item.inventory_state || (masters.inventoryStatuses || []).find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{(masters.qualities || []).find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{(masters.locations || []).find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
       </tbody></table></div>
+      {showScrollTop && <button type="button" className="stock-scroll-control stock-scroll-top" onClick={() => filtersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })} aria-label="Scroll to filters" title="Scroll to filters">↑ Filters</button>}
+      {showScrollBottom && <button type="button" className="stock-scroll-control stock-scroll-bottom" onClick={() => lastStockRowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })} aria-label="Scroll to last stock row" title="Scroll to last stock row">↓ Bottom</button>}
       {showAdd && <ItemForm supabase={supabase} type={activeType} onClose={()=>setShowAdd(false)} onSaved={async()=>{await loadItems();setShowAdd(false);}} />}
     </section>
   );
