@@ -1703,6 +1703,8 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   useEffect(() => { loadMasters(); }, []);
   useEffect(() => { loadItems(); }, [activeType]);
 
+
+
   useEffect(() => {
     const updateScrollControls = () => {
       const filtersRect = filtersRef.current?.getBoundingClientRect();
