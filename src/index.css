@@ -2363,3 +2363,32 @@ button { cursor: pointer; }
     transform: translateY(-50%);
   }
 }
+
+
+/* Keep every Global Stock filter trigger at a consistent height and truncate long selected labels. */
+.stock-filter-dropdown .transit-item-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  min-height: 42px;
+  max-height: 42px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.stock-filter-dropdown .transit-item-dropdown-trigger > span:first-child {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+.stock-filter-dropdown .transit-item-dropdown-trigger > .transit-item-dropdown-chevron {
+  flex: 0 0 auto;
+}
