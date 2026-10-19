@@ -2431,3 +2431,74 @@ button { cursor: pointer; }
     margin: 0;
   }
 }
+
+
+/* Searchable Global Stock dropdowns size to their longest option where viewport space permits. */
+.stock-filter-dropdown { position: relative; }
+.stock-filter-dropdown .transit-item-dropdown-menu.stock-filter-dropdown-menu {
+  left: 0;
+  right: auto;
+  width: max-content;
+  min-width: 100%;
+  max-width: min( min(560px, calc(100vw - 32px)), 90vw );
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+.stock-filter-dropdown .stock-filter-dropdown-options {
+  width: max-content;
+  min-width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+.stock-filter-dropdown .stock-filter-dropdown-option {
+  width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.stock-filter-dropdown .stock-filter-dropdown-separator {
+  width: 100%;
+  box-sizing: border-box;
+}
+.stock-filter-dropdown .transit-item-dropdown-trigger > span:first-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stock-filter-dropdown .transit-item-dropdown-menu > input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+
+/* Keep the final Global Stock filter dropdown inside the row's right edge. */
+.redesign-stock-filters .stock-filter-field:last-of-type .stock-filter-dropdown-menu {
+  left: auto;
+  right: 0;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(560px, calc(100vw - 32px));
+}
+.redesign-stock-filters .stock-filter-field:last-of-type .stock-filter-dropdown-options {
+  width: max-content;
+  min-width: 100%;
+  max-width: 100%;
+}
+
+
+/* On two-column layouts, every right-column filter dropdown must open leftward. */
+@media (max-width: 760px) {
+  .redesign-stock-filters > .stock-filter-field:nth-child(even) .stock-filter-dropdown-menu {
+    left: auto;
+    right: 0;
+    width: max-content;
+    min-width: 100%;
+    max-width: min(560px, calc(100vw - 32px));
+  }
+  .redesign-stock-filters > .stock-filter-field:nth-child(even) .stock-filter-dropdown-options {
+    width: max-content;
+    min-width: 100%;
+    max-width: 100%;
+  }
+}
