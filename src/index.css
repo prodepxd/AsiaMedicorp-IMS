@@ -2470,3 +2470,18 @@ button { cursor: pointer; }
   min-width: 0;
   box-sizing: border-box;
 }
+
+
+/* Keep the final Global Stock filter dropdown inside the row's right edge. */
+.redesign-stock-filters .stock-filter-field:last-of-type .stock-filter-dropdown-menu {
+  left: auto;
+  right: 0;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(560px, calc(100vw - 32px));
+}
+.redesign-stock-filters .stock-filter-field:last-of-type .stock-filter-dropdown-options {
+  width: max-content;
+  min-width: 100%;
+  max-width: 100%;
+}
