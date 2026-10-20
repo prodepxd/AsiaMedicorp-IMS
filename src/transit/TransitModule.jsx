@@ -409,10 +409,10 @@ function TransitForm({
     if (fromLocationId === toLocationId) return setError("From and To locations must be different.");
     if (!sender.trim()) return setError("Sender is required.");
     if (!carrier.trim()) return setError("Carrier is required.");
-    if (mode === "complete" && !sentAt) return setError("Sent date/time is required to complete the Transit.");
-    if (mode === "complete" && !receivedAt) return setError("Received date/time is required. Use Current if it should be now.");
-    if (mode === "complete" && !receiver.trim()) return setError("Receiver is required to complete the Transit.");
-    if (mode === "complete" && new Date(receivedAt).getTime() < new Date(sentAt).getTime()) return setError("Received date/time cannot be earlier than sent date/time.");
+    if ((mode === "complete" || mode === "past") && !sentAt) return setError("Sent date/time is required.");
+    if ((mode === "complete" || mode === "past") && !receivedAt) return setError("Received date/time is required. Use Current if it should be now.");
+    if ((mode === "complete" || mode === "past") && !receiver.trim()) return setError("Receiver is required.");
+    if ((mode === "complete" || mode === "past") && new Date(receivedAt).getTime() < new Date(sentAt).getTime()) return setError("Received date/time cannot be earlier than sent date/time.");
 
     if (mode !== "complete") {
       const { data: activeRows, error: activeRowsError } = await supabase.from("transit_items").select("item_id,transit_id").in("item_id", selectedItemIds);
@@ -441,11 +441,9 @@ function TransitForm({
         note: note.trim() || null,
       };
 
-      const operation = mode === "complete"
-        ? "complete_transit"
-        : editRecord
-          ? "edit_transit"
-          : "create_transit";
+      const operation = mode === "complete" ? "complete_transit"
+        : mode === "past" ? "create_past_transit"
+        : editRecord ? "edit_transit" : "create_transit";
 
       const { error: operationError } = await supabase.rpc(
         "atomic_inventory_transit_operation",
@@ -466,18 +464,18 @@ function TransitForm({
     }
   }
 
-  const title = mode === "complete" ? "Complete Transit" : editRecord ? "Edit Transit" : "Create Transit";
+  const title = mode === "complete" ? "Complete Transit" : mode === "past" ? "Create Past Transit" : editRecord ? "Edit Transit" : "Create Transit";
 
   return (
     <div className="modal-backdrop">
       <div className="modal-card transit-modal">
         <div className="modal-header">
           <div>
-            <p className="section-kicker">{mode === "complete" ? "COMPLETE TRANSIT" : editRecord ? "EDIT TRANSIT" : "NEW TRANSIT"}</p>
+            <p className="section-kicker">{mode === "complete" ? "COMPLETE TRANSIT" : mode === "past" ? "PAST TRANSIT" : editRecord ? "EDIT TRANSIT" : "NEW TRANSIT"}</p>
             <h2>{title}</h2>
             <p>
-              {mode === "complete"
-                ? "Record the receiver and received date/time before completion."
+              {mode === "complete" ? "Record the receiver and received date/time before completion."
+                : mode === "past" ? "Record a historical movement. It will be created directly as completed and update item locations and transit histories."
                 : "A Transit can contain one or more Global Stock items. Select the starting location first, then choose the items to move."}
             </p>
           </div>
@@ -649,7 +647,7 @@ function TransitForm({
           <div className="modal-actions">
             <button type="button" className="secondary-button" onClick={onClose} disabled={saving}>Cancel</button>
             <button type="submit" className="primary-button" disabled={saving}>
-              {saving ? "Saving..." : mode === "complete" ? "Complete Transit" : editRecord ? "Save changes" : "Create Transit"}
+              {saving ? "Saving..." : mode === "complete" ? "Complete Transit" : mode === "past" ? "Create Past Transit" : editRecord ? "Save changes" : "Create Transit"}
             </button>
           </div>
         </form>
@@ -924,7 +922,7 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, canDelete, onEdit
   );
 }
 
-export default function TransitModule({ supabase, canEdit, canDelete, canCreateLocation = false, onItemClick, view = "active" }) {
+export default function TransitModule({ supabase, canEdit, canDelete, canCreateLocation = false, onItemClick, view = "standby" }) {
   const [items, setItems] = useState([]);
   const [locations, setLocations] = useState([]);
   const [inventoryStatuses, setInventoryStatuses] = useState([]);
@@ -1056,7 +1054,7 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
   function openCreate() {
     setEditingTransit(null);
     setEditingItemIds([]);
-    setFormMode("edit");
+    setFormMode(view === "completed" ? "past" : "edit");
     setShowForm(true);
   }
 
@@ -1175,12 +1173,13 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
       <div className="section-heading transit-header">
         <div>
           <p className="section-kicker">TRANSIT</p>
-          <h2>{view === "past" ? "Past Transits" : "Active Transits"}</h2>
+          <h2>{view === "standby" ? "Stand-By Transits" : view === "moving" ? "Moving Transits" : "Completed Transits"}</h2>
           <p>Move one or more Global Stock items between locations.</p>
         </div>
         <div className="transit-header-actions">
           <button className="secondary-button" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
-          {canEdit && view === "active" && <button className="primary-button" onClick={openCreate}>+ Create Transit</button>}
+          {canEdit && view === "completed" && <button className="primary-button" onClick={openCreate}>+ Create Past Transit</button>}
+          {canEdit && view !== "completed" && <button className="primary-button" onClick={openCreate}>+ Create Transit</button>}
         </div>
       </div>
 
@@ -1202,17 +1201,13 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
         <div className="history-empty">Loading Transits...</div>
       ) : (
         <div className="transit-sections">
-          {view === "active" ? (
-            <>
-              {renderSection("Moving", PROGRESS.moving, "moving", grouped[PROGRESS.moving])}
-              {renderSection("Stand-By", PROGRESS.standby, "standby", grouped[PROGRESS.standby])}
-            </>
-          ) : (
-            <>
-              {renderSection("Completed", PROGRESS.completed, "completed", pastTransits, pastVisible)}
-              {pastVisible < pastTransits.length && <div ref={pastLoadRef} className="transit-infinite-sentinel" aria-hidden="true" />}
-            </>
-          )}
+          <>
+            {renderSection(view === "standby" ? "Stand-By" : view === "moving" ? "Moving" : "Completed", view,
+              view === "standby" ? "standby" : view === "moving" ? "moving" : "completed",
+              grouped[view === "standby" ? PROGRESS.standby : view === "moving" ? PROGRESS.moving : PROGRESS.completed],
+              view === "completed" ? pastVisible : undefined)}
+            {view === "completed" && pastVisible < pastTransits.length && <div ref={pastLoadRef} className="transit-infinite-sentinel" aria-hidden="true" />}
+          </>
         </div>
       )}
 
