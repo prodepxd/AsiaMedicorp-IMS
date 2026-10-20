@@ -616,22 +616,22 @@ function TransitForm({
               </label>
             </div>
 
-            <div className="transit-details-row transit-two-col">
+            {(mode === "start" || mode === "complete" || mode === "past") && <div className="transit-details-row transit-two-col">
               <div className="redesign-field transit-timestamp-field">
-                <span>Sent date & time{mode === "complete" ? " *" : ""}</span>
+                <span>Sent date & time *</span>
                 <div className="transit-timestamp-controls">
-                  <input type="datetime-local" value={sentAt} onChange={(event) => setSentAt(event.target.value)} required={mode === "complete"} />
+                  <input type="datetime-local" value={sentAt} onChange={(event) => setSentAt(event.target.value)} required />
                   <button type="button" className="secondary-button transit-current-button" onClick={() => setSentAt(localDateTimeValue())}>Current</button>
                 </div>
               </div>
-              <div className="redesign-field transit-timestamp-field">
-                <span>Received date & time{mode === "complete" ? " *" : ""}</span>
+              {(mode === "complete" || mode === "past") && <div className="redesign-field transit-timestamp-field">
+                <span>Received date & time *</span>
                 <div className="transit-timestamp-controls">
-                  <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} required={mode === "complete"} />
+                  <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} required />
                   <button type="button" className="secondary-button transit-current-button" onClick={() => setReceivedAt(localDateTimeValue())}>Current</button>
                 </div>
-              </div>
-            </div>
+              </div>}
+            </div>}
 
             <div className="transit-details-row transit-two-col">
               <label className="redesign-field">
