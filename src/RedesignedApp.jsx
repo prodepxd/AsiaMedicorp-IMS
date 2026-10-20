@@ -76,7 +76,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("Global Stock");
   const [masterCategory, setMasterCategory] = useState(MASTER_GROUPS[0].key);
-  const [transitCategory, setTransitCategory] = useState("active");
+  const [transitCategory, setTransitCategory] = useState("standby");
   const [globalStockType, setGlobalStockType] = useState("Machine");
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [error, setError] = useState("");
@@ -290,20 +290,28 @@ export default function App() {
               <div className="primary-submenu" role="group" aria-label="Transit views">
                 <button
                   type="button"
-                  className={active.startsWith("Transit") && transitCategory === "active" ? "active" : ""}
+                  className={active.startsWith("Transit") && transitCategory === "standby" ? "active" : ""}
                   onClick={() => {
-                    navigateTo({ active: "Transit / Active Transits", transitCategory: "active", selectedItemId: null });
+                    navigateTo({ active: "Transit / Stand-By Transits", transitCategory: "standby", selectedItemId: null });
                     setOpenNavMenu(null);
                   }}
-                >Active Transits</button>
+                >Stand-By Transits</button>
                 <button
                   type="button"
-                  className={active.startsWith("Transit") && transitCategory === "past" ? "active" : ""}
+                  className={active.startsWith("Transit") && transitCategory === "moving" ? "active" : ""}
                   onClick={() => {
-                    navigateTo({ active: "Transit / Past Transits", transitCategory: "past", selectedItemId: null });
+                    navigateTo({ active: "Transit / Moving Transits", transitCategory: "moving", selectedItemId: null });
                     setOpenNavMenu(null);
                   }}
-                >Past Transits</button>
+                >Moving Transits</button>
+                <button
+                  type="button"
+                  className={active.startsWith("Transit") && transitCategory === "completed" ? "active" : ""}
+                  onClick={() => {
+                    navigateTo({ active: "Transit / Completed Transits", transitCategory: "completed", selectedItemId: null });
+                    setOpenNavMenu(null);
+                  }}
+                >Completed Transits</button>
               </div>
             )}
           </div>
