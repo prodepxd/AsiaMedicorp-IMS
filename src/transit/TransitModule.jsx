@@ -410,9 +410,9 @@ function TransitForm({
     if (!sender.trim()) return setError("Sender is required.");
     if (!carrier.trim()) return setError("Carrier is required.");
     if (mode === "complete" && !sentAt) return setError("Sent date/time is required to complete the Transit.");
-    if (mode === "complete" && !receiver.trim()) {
-      return setError("Receiver is required to complete the Transit.");
-    }
+    if (mode === "complete" && !receivedAt) return setError("Received date/time is required. Use Current if it should be now.");
+    if (mode === "complete" && !receiver.trim()) return setError("Receiver is required to complete the Transit.");
+    if (mode === "complete" && new Date(receivedAt).getTime() < new Date(sentAt).getTime()) return setError("Received date/time cannot be earlier than sent date/time.");
 
     if (mode !== "complete") {
       const { data: activeRows, error: activeRowsError } = await supabase.from("transit_items").select("item_id,transit_id").in("item_id", selectedItemIds);
@@ -430,14 +430,11 @@ function TransitForm({
     setSaving(true);
 
     try {
-      const completionReceivedAt = mode === "complete"
-        ? (receivedAt || localDateTimeValue())
-        : receivedAt;
       const payload = {
         from_location_id: fromLocationId,
         to_location_id: toLocationId,
         sent_at: sentAt ? new Date(sentAt).toISOString() : null,
-        received_at: completionReceivedAt ? new Date(completionReceivedAt).toISOString() : null,
+        received_at: receivedAt ? new Date(receivedAt).toISOString() : null,
         sender: sender.trim(),
         receiver: receiver.trim() || null,
         carrier: carrier.trim(),
@@ -620,14 +617,20 @@ function TransitForm({
             </div>
 
             <div className="transit-details-row transit-two-col">
-              <label className="redesign-field">
+              <div className="redesign-field transit-timestamp-field">
                 <span>Sent date & time{mode === "complete" ? " *" : ""}</span>
-                <input type="datetime-local" value={sentAt} onChange={(event) => setSentAt(event.target.value)} required={mode === "complete"} />
-              </label>
-              <label className="redesign-field">
+                <div className="transit-timestamp-controls">
+                  <input type="datetime-local" value={sentAt} onChange={(event) => setSentAt(event.target.value)} required={mode === "complete"} />
+                  <button type="button" className="secondary-button transit-current-button" onClick={() => setSentAt(localDateTimeValue())}>Current</button>
+                </div>
+              </div>
+              <div className="redesign-field transit-timestamp-field">
                 <span>Received date & time{mode === "complete" ? " *" : ""}</span>
-                <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} />
-              </label>
+                <div className="transit-timestamp-controls">
+                  <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} required={mode === "complete"} />
+                  <button type="button" className="secondary-button transit-current-button" onClick={() => setReceivedAt(localDateTimeValue())}>Current</button>
+                </div>
+              </div>
             </div>
 
             <div className="transit-details-row transit-two-col">
