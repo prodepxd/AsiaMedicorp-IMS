@@ -2518,7 +2518,7 @@ button { cursor: pointer; }
 .transit-list-summary { color: #a9b9ca; font-size: .69rem; overflow-wrap: anywhere; }
 .transit-list-actions { display: flex; align-items: center; justify-content: flex-end; align-content: center; flex-wrap: wrap; gap: 6px; max-width: 280px; }
 .transit-list-actions button { padding: 7px 9px; font-size: .68rem; }
-.transit-detail-page { display: grid; gap: 20px; }
+.transit-detail-page { display: grid; gap: 20px; padding: 24px; }
 .transit-detail-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .transit-detail-header { display: grid; gap: 7px; padding-bottom: 16px; border-bottom: 1px solid #1e3045; }
 .transit-detail-header h2 { margin: 0; color: #e5edf7; font-size: clamp(1.25rem, 2vw, 1.8rem); overflow-wrap: anywhere; }
