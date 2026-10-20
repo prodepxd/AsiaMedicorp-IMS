@@ -2502,3 +2502,45 @@ button { cursor: pointer; }
     max-width: 100%;
   }
 }
+
+
+/* Transit module: explicit current-time controls and compact list/detail layouts. */
+.transit-timestamp-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.transit-timestamp-control input { min-width: 0; width: 100%; }
+.transit-current-button { min-height: 40px; white-space: nowrap; padding: 8px 12px; }
+.transit-list { display: grid; gap: 7px; }
+.transit-list-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 10px; padding: 10px 12px; border: 1px solid #24364a; border-radius: 9px; background: #0a1726; }
+.transit-list-open { display: grid; gap: 6px; min-width: 0; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.transit-list-open:hover .transit-list-route { color: #93c5fd; }
+.transit-list-route { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: #e0eaf6; font-size: .83rem; }
+.transit-list-route > span { color: #6d8fb7; }
+.transit-list-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; color: #8499b2; font-size: .67rem; }
+.transit-list-summary { color: #a9b9ca; font-size: .69rem; overflow-wrap: anywhere; }
+.transit-list-actions { display: flex; align-items: center; justify-content: flex-end; align-content: center; flex-wrap: wrap; gap: 6px; max-width: 280px; }
+.transit-list-actions button { padding: 7px 9px; font-size: .68rem; }
+.transit-detail-page { display: grid; gap: 20px; }
+.transit-detail-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.transit-detail-header { display: grid; gap: 7px; padding-bottom: 16px; border-bottom: 1px solid #1e3045; }
+.transit-detail-header h2 { margin: 0; color: #e5edf7; font-size: clamp(1.25rem, 2vw, 1.8rem); overflow-wrap: anywhere; }
+.transit-detail-header h2 span { color: #6d8fb7; padding: 0 6px; }
+.transit-detail-header > p:last-child { margin: 0; color: #8195ad; font-size: .75rem; }
+.transit-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.transit-detail-grid > div { display: grid; gap: 5px; min-width: 0; padding: 12px; border: 1px solid #22344a; border-radius: 8px; background: #0a1726; }
+.transit-detail-grid span, .transit-detail-note > span { color: #8195ad; font-size: .68rem; }
+.transit-detail-grid strong { color: #dbe7f5; font-size: .77rem; overflow-wrap: anywhere; }
+.transit-detail-items { display: grid; gap: 10px; }
+.transit-detail-items .transit-section-heading { padding: 0; }
+.transit-detail-items .transit-section-heading h3 { margin: 3px 0 0; }
+.transit-detail-item-list { display: grid; gap: 6px; }
+.transit-detail-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid #26384e; border-radius: 8px; background: #0a1726; color: #dbe7f5; text-align: left; cursor: pointer; }
+.transit-detail-item:hover { border-color: #3b82f6; background: #102238; }
+.transit-detail-item > span:first-child { display: grid; gap: 4px; min-width: 0; }
+.transit-detail-item strong { font-size: .76rem; overflow-wrap: anywhere; }
+.transit-detail-item small { color: #8195ad; font-size: .67rem; }
+.transit-detail-note { display: grid; gap: 5px; padding: 12px; border: 1px solid #22344a; border-radius: 8px; background: #0a1726; }
+.transit-detail-note p { margin: 0; color: #c2d0e0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .77rem; }
+.transit-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+.transit-detail-actions button { min-height: 38px; }
+.transit-history-progress { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+@media (max-width: 800px) { .transit-list-row { grid-template-columns: 1fr; } .transit-list-actions { max-width: none; justify-content: flex-start; } .transit-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .transit-timestamp-control { grid-template-columns: minmax(0, 1fr); } .transit-current-button { justify-self: start; } .transit-detail-grid { grid-template-columns: 1fr; } }
