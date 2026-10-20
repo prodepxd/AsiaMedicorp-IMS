@@ -177,13 +177,9 @@ BEGIN
             RAISE EXCEPTION 'One or more selected items do not exist';
         END IF;
 
-        IF EXISTS (
-            SELECT 1 FROM public.items i
-             WHERE i.id = ANY(p_item_ids)
-               AND i.current_location_id IS DISTINCT FROM v_from_location_id
-        ) THEN
-            RAISE EXCEPTION 'Every selected item must currently be at the Transit source location';
-        END IF;
+        -- Historical records must not require the item's current location to match
+        -- the recorded source: the item may have moved again since this Transit.
+
 
         IF EXISTS (
             SELECT 1 FROM public.machine_components mc
@@ -231,9 +227,9 @@ BEGIN
             VALUES (v_transit_id, v_item_id, v_received_at);
         END LOOP;
 
-        UPDATE public.items
-           SET current_location_id = v_to_location_id
-         WHERE id = ANY(p_item_ids);
+        -- Do not rewrite current item locations when recording historical movement.
+        -- The transit_items rows above add the movement to each item's history.
+
 
         RETURN v_transit_id;
     END IF;
