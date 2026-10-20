@@ -451,7 +451,7 @@ function TransitForm({
           ? "edit_transit"
           : "create_transit";
 
-      const { error: operationError } = await supabase.rpc(
+      const { data: savedTransitId, error: operationError } = await supabase.rpc(
         "atomic_inventory_transit_operation",
         {
           p_operation: operation,
@@ -461,6 +461,18 @@ function TransitForm({
         }
       );
       if (operationError) throw operationError;
+
+      // The existing atomic operation intentionally leaves stand-by timestamps
+      // untouched. Persist the form values through the timestamp RPC afterward.
+      // Completion already persists received_at as part of complete_transit.
+      if (mode !== "complete") {
+        const { error: timestampError } = await supabase.rpc("save_transit_timestamps", {
+          p_transit_id: savedTransitId || editRecord?.id,
+          p_sent_at: payload.sent_at,
+          p_received_at: payload.received_at,
+        });
+        if (timestampError) throw timestampError;
+      }
 
       await onSaved();
     } catch (saveError) {
