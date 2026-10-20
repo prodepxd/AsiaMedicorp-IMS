@@ -2502,3 +2502,36 @@ button { cursor: pointer; }
     max-width: 100%;
   }
 }
+
+/* Transit module: compact row list, explicit timestamp controls, and detail page */
+.transit-row-list { display: grid; gap: 8px; min-width: 0; }
+.transit-list-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; padding: 10px 12px; border: 1px solid #26384e; border-left: 3px solid #475569; border-radius: 9px; background: #0a1726; }
+.transit-section-moving .transit-list-row { border-left-color: #38a5f5; }
+.transit-section-standby .transit-list-row { border-left-color: #eab308; }
+.transit-section-completed .transit-list-row { border-left-color: #64748b; }
+.transit-list-open { display: grid; grid-template-columns: minmax(160px, 1.2fr) minmax(150px, 1fr) auto auto; align-items: center; gap: 12px; min-width: 0; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.transit-list-open:hover .transit-list-route { color: #fff; }
+.transit-list-route { color: #dbe7f5; font-size: .8rem; font-weight: 750; overflow-wrap: anywhere; }
+.transit-list-route > span { color: #61758c; padding: 0 4px; }
+.transit-list-meta { color: #8397ae; font-size: .68rem; overflow-wrap: anywhere; }
+.transit-list-chevron { color: #91a5bd; font-size: 1.35rem; line-height: 1; }
+.transit-list-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
+.transit-list-actions button { padding: 6px 9px; font-size: .68rem; }
+.transit-detail-page { display: grid; gap: 12px; padding: 18px 24px 28px; }
+.transit-detail-page > .transit-box { width: 100%; }
+.transit-timestamp-controls { display: flex; align-items: stretch; gap: 8px; min-width: 0; }
+.transit-timestamp-controls input { flex: 1; min-width: 0; }
+.transit-current-button { flex: 0 0 auto; padding: 8px 11px; white-space: nowrap; }
+@media (max-width: 760px) {
+  .transit-list-row { grid-template-columns: minmax(0, 1fr); }
+  .transit-list-open { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; }
+  .transit-list-route { grid-column: 1; }
+  .transit-list-meta { grid-column: 1; }
+  .transit-list-open .transit-progress-badge { grid-column: 2; grid-row: 1; }
+  .transit-list-chevron { grid-column: 2; grid-row: 2; justify-self: end; }
+  .transit-list-actions { justify-content: flex-start; }
+  .transit-detail-page { padding: 14px 16px 22px; }
+  .transit-timestamp-controls { flex-wrap: wrap; }
+  .transit-current-button { min-height: 38px; }
+}
+
