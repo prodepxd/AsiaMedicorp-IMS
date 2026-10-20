@@ -658,7 +658,7 @@ function TransitForm({
   );
 }
 
-export function ItemTransitHistory({ supabase, itemId, canEdit, focusLatestMoving = 0 }) {
+export function ItemTransitHistory({ supabase, itemId, canEdit, focusLatestMoving = 0, onTransitClick }) {
   const [rows, setRows] = useState([]);
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -773,6 +773,7 @@ export function ItemTransitHistory({ supabase, itemId, canEdit, focusLatestMovin
                   <div className="transit-history-movement-meta">
                     <div className="transit-history-progress">
                       <span className={`status-pill transit-progress-pill transit-progress-${progressClass(transit.transit_progress)}`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
+                      <button type="button" className="transit-history-open-button" onClick={() => onTransitClick?.(transit.id)}>Open Transit</button>
                     </div>
                     <div className="transit-history-note">
                       <div className="transit-history-section-heading">
