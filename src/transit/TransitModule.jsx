@@ -409,7 +409,7 @@ function TransitForm({
     if (fromLocationId === toLocationId) return setError("From and To locations must be different.");
     if (!sender.trim()) return setError("Sender is required.");
     if (!carrier.trim()) return setError("Carrier is required.");
-    if ((mode === "complete" || mode === "past") && !sentAt) return setError("Sent date/time is required.");
+    if ((mode === "complete" || mode === "past" || mode === "start") && !sentAt) return setError("Sent date/time is required. Use Current if it should be now.");
     if ((mode === "complete" || mode === "past") && !receivedAt) return setError("Received date/time is required. Use Current if it should be now.");
     if ((mode === "complete" || mode === "past") && !receiver.trim()) return setError("Receiver is required.");
     if ((mode === "complete" || mode === "past") && new Date(receivedAt).getTime() < new Date(sentAt).getTime()) return setError("Received date/time cannot be earlier than sent date/time.");
@@ -441,7 +441,8 @@ function TransitForm({
         note: note.trim() || null,
       };
 
-      const operation = mode === "complete" ? "complete_transit"
+      const operation = mode === "start" ? "start_transit"
+        : mode === "complete" ? "complete_transit"
         : mode === "past" ? "create_past_transit"
         : editRecord ? "edit_transit" : "create_transit";
 
@@ -451,7 +452,7 @@ function TransitForm({
           p_operation: operation,
           p_transit_id: editRecord?.id || null,
           p_payload: payload,
-          p_item_ids: selectedItemIds,
+          p_item_ids: mode === "start" || mode === "complete" ? [] : selectedItemIds,
         }
       );
       if (operationError) throw operationError;
@@ -464,17 +465,18 @@ function TransitForm({
     }
   }
 
-  const title = mode === "complete" ? "Complete Transit" : mode === "past" ? "Create Past Transit" : editRecord ? "Edit Transit" : "Create Transit";
+  const title = mode === "start" ? "Start Moving Transit" : mode === "complete" ? "Complete Transit" : mode === "past" ? "Create Past Transit" : editRecord ? "Edit Transit" : "Create Transit";
 
   return (
     <div className="modal-backdrop">
       <div className="modal-card transit-modal">
         <div className="modal-header">
           <div>
-            <p className="section-kicker">{mode === "complete" ? "COMPLETE TRANSIT" : mode === "past" ? "PAST TRANSIT" : editRecord ? "EDIT TRANSIT" : "NEW TRANSIT"}</p>
+            <p className="section-kicker">{mode === "start" ? "START TRANSIT" : mode === "complete" ? "COMPLETE TRANSIT" : mode === "past" ? "PAST TRANSIT" : editRecord ? "EDIT TRANSIT" : "NEW TRANSIT"}</p>
             <h2>{title}</h2>
             <p>
-              {mode === "complete" ? "Record the receiver and received date/time before completion."
+              {mode === "start" ? "Choose the sent date/time, or use Current to set it to now."
+                : mode === "complete" ? "Record the receiver and received date/time before completion."
                 : mode === "past" ? "Record a historical movement. It will be created directly as completed and update item locations and transit histories."
                 : "A Transit can contain one or more Global Stock items. Select the starting location first, then choose the items to move."}
             </p>
@@ -512,7 +514,7 @@ function TransitForm({
             />
           </div>
 
-          {mode !== "complete" && (
+          {mode !== "complete" && mode !== "start" && (
             <div className="transit-item-picker">
               <div className="transit-field-heading">
                 <div><strong>Global Stock items *</strong><span>Search by serial number and select one or more items.</span></div>
@@ -647,7 +649,7 @@ function TransitForm({
           <div className="modal-actions">
             <button type="button" className="secondary-button" onClick={onClose} disabled={saving}>Cancel</button>
             <button type="submit" className="primary-button" disabled={saving}>
-              {saving ? "Saving..." : mode === "complete" ? "Complete Transit" : mode === "past" ? "Create Past Transit" : editRecord ? "Save changes" : "Create Transit"}
+              {saving ? "Saving..." : mode === "start" ? "Start Moving" : mode === "complete" ? "Complete Transit" : mode === "past" ? "Create Past Transit" : editRecord ? "Save changes" : "Create Transit"}
             </button>
           </div>
         </form>
@@ -1083,20 +1085,11 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
     setShowForm(true);
   }
 
-  async function startMoving(transit) {
-    setError("");
-    const { error: updateError } = await supabase.rpc("atomic_inventory_transit_operation", {
-      p_operation: "start_transit",
-      p_transit_id: transit.id,
-      p_payload: { sent_at: transit.sent_at || new Date().toISOString() },
-      p_item_ids: [],
-    });
-
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-    await load();
+  function startMoving(transit) {
+    setEditingTransit(transit);
+    setEditingItemIds(transit.item_ids);
+    setFormMode("start");
+    setShowForm(true);
   }
 
   async function deleteTransit(transit) {
