@@ -924,7 +924,7 @@ function TransitCard({ transit, itemMap, locationMap, canEdit, canDelete, onEdit
   );
 }
 
-export default function TransitModule({ supabase, canEdit, canDelete, canCreateLocation = false, onItemClick, view = "standby" }) {
+export default function TransitModule({ supabase, canEdit, canDelete, canCreateLocation = false, onItemClick, view = "standby", selectedTransitId: selectedTransitIdProp = null, onTransitClick, onTransitBack }) {
   const [items, setItems] = useState([]);
   const [locations, setLocations] = useState([]);
   const [inventoryStatuses, setInventoryStatuses] = useState([]);
@@ -935,7 +935,8 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
   const [startingLocationFilter, setStartingLocationFilter] = useState("all");
   const [destinationLocationFilter, setDestinationLocationFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
-  const [selectedTransitId, setSelectedTransitId] = useState(null);
+  const [localSelectedTransitId, setLocalSelectedTransitId] = useState(null);
+  const selectedTransitId = selectedTransitIdProp || localSelectedTransitId;
   const [formMode, setFormMode] = useState("edit");
   const [editingTransit, setEditingTransit] = useState(null);
   const [editingItemIds, setEditingItemIds] = useState([]);
@@ -1044,7 +1045,7 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
   }, [search, startingLocationFilter, destinationLocationFilter, view]);
 
   useEffect(() => {
-    if (view !== "past" || pastVisible >= pastTransits.length || !pastLoadRef.current) return undefined;
+    if (view !== "completed" || pastVisible >= pastTransits.length || !pastLoadRef.current) return undefined;
     const observer = new IntersectionObserver((entries) => {
       if (entries[0]?.isIntersecting) {
         setPastVisible((value) => Math.min(value + 9, pastTransits.length));
@@ -1140,7 +1141,7 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
           <div className="transit-row-list">
             {list.slice(0, limit).map((transit) => (
               <div className="transit-list-row" key={transit.id}>
-                <button type="button" className="transit-list-open" onClick={() => setSelectedTransitId(transit.id)}>
+                <button type="button" className="transit-list-open" onClick={() => onTransitClick ? onTransitClick(transit.id) : setLocalSelectedTransitId(transit.id)}>
                   <span className="transit-list-route">{locationMap[transit.from_location_id] || "—"} <span aria-hidden="true">→</span> {locationMap[transit.to_location_id] || "—"}</span>
                   <span className="transit-list-meta">{transit.item_count} item{transit.item_count === 1 ? "" : "s"} · {transit.sender || "—"} · {formatDate(transit.sent_at || transit.created_at)}</span>
                   <span className={`transit-progress-badge transit-progress-${progressClass(transit.transit_progress)}`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
@@ -1171,7 +1172,7 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
           <p>Move one or more Global Stock items between locations.</p>
         </div>
         <div className="transit-header-actions">
-          {selectedTransitId && <button className="secondary-button" onClick={() => setSelectedTransitId(null)}>← Back to Transits</button>}
+          {selectedTransitId && <button className="secondary-button" onClick={() => onTransitBack ? onTransitBack() : setLocalSelectedTransitId(null)}>← Back to Transits</button>}
           {!selectedTransitId && <button className="secondary-button" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>}
           {!selectedTransitId && canEdit && view === "completed" && <button className="primary-button" onClick={openCreate}>+ Create Past Transit</button>}
           {!selectedTransitId && canEdit && view !== "completed" && <button className="primary-button" onClick={openCreate}>+ Create Transit</button>}
