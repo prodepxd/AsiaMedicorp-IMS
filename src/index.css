@@ -2535,3 +2535,5 @@ button { cursor: pointer; }
   .transit-current-button { min-height: 38px; }
 }
 
+.transit-history-open-button { display: inline-flex; align-items: center; justify-content: center; margin-top: 6px; padding: 5px 8px; border: 1px solid #334155; border-radius: 6px; background: #0b1d30; color: #b7c8db; font-size: .65rem; font-weight: 700; cursor: pointer; }
+.transit-history-open-button:hover { border-color: #4f86b8; color: #fff; }
