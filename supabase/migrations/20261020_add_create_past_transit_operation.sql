@@ -177,8 +177,8 @@ BEGIN
             RAISE EXCEPTION 'One or more selected items do not exist';
         END IF;
 
-        -- Historical records must not require the item's current location to match
-        -- the recorded source: the item may have moved again since this Transit.
+        -- Historical records do not require the item's current location to match the recorded source.
+
 
 
         IF EXISTS (
