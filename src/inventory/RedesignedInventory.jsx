@@ -749,7 +749,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
   </div></div>;
 }
 
-export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBack, onDeleted, onItemClick }) {
+export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBack, onDeleted, onItemClick, onTransitClick }) {
   const [item, setItem] = useState(null);
   const [masters, setMasters] = useState({
     inventoryStatuses: [], qualities: [], locations: [], equipmentManufacturers: [],
@@ -1628,6 +1628,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
             itemId={item.id}
             canEdit={canEdit}
             focusLatestMoving={focusMovingHistory}
+            onTransitClick={onTransitClick}
           />
           {error && <div className="error-message">{error}</div>}
         </div>

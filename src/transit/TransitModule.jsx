@@ -409,9 +409,13 @@ function TransitForm({
     if (fromLocationId === toLocationId) return setError("From and To locations must be different.");
     if (!sender.trim()) return setError("Sender is required.");
     if (!carrier.trim()) return setError("Carrier is required.");
-    if (mode === "complete" && !sentAt) return setError("Sent date/time is required to complete the Transit.");
+    if (mode === "complete" && !sentAt) return setError("Sent date/time is required to complete the Transit. Use Current if it should be now.");
+    if (mode === "complete" && !receivedAt) return setError("Received date/time is required to complete the Transit. Use Current if it should be now.");
     if (mode === "complete" && !receiver.trim()) {
       return setError("Receiver is required to complete the Transit.");
+    }
+    if (sentAt && receivedAt && new Date(receivedAt).getTime() < new Date(sentAt).getTime()) {
+      return setError("Received date/time cannot be earlier than sent date/time.");
     }
 
     if (mode !== "complete") {
@@ -430,14 +434,11 @@ function TransitForm({
     setSaving(true);
 
     try {
-      const completionReceivedAt = mode === "complete"
-        ? (receivedAt || localDateTimeValue())
-        : receivedAt;
       const payload = {
         from_location_id: fromLocationId,
         to_location_id: toLocationId,
         sent_at: sentAt ? new Date(sentAt).toISOString() : null,
-        received_at: completionReceivedAt ? new Date(completionReceivedAt).toISOString() : null,
+        received_at: receivedAt ? new Date(receivedAt).toISOString() : null,
         sender: sender.trim(),
         receiver: receiver.trim() || null,
         carrier: carrier.trim(),
@@ -450,7 +451,7 @@ function TransitForm({
           ? "edit_transit"
           : "create_transit";
 
-      const { error: operationError } = await supabase.rpc(
+      const { data: savedTransitId, error: operationError } = await supabase.rpc(
         "atomic_inventory_transit_operation",
         {
           p_operation: operation,
@@ -460,6 +461,18 @@ function TransitForm({
         }
       );
       if (operationError) throw operationError;
+
+      // The existing atomic operation intentionally leaves stand-by timestamps
+      // untouched. Persist the form values through the timestamp RPC afterward.
+      // Completion already persists received_at as part of complete_transit.
+      if (mode !== "complete") {
+        const { error: timestampError } = await supabase.rpc("save_transit_timestamps", {
+          p_transit_id: savedTransitId || editRecord?.id,
+          p_sent_at: payload.sent_at,
+          p_received_at: payload.received_at,
+        });
+        if (timestampError) throw timestampError;
+      }
 
       await onSaved();
     } catch (saveError) {
@@ -620,14 +633,20 @@ function TransitForm({
             </div>
 
             <div className="transit-details-row transit-two-col">
-              <label className="redesign-field">
+              <div className="redesign-field transit-timestamp-field">
                 <span>Sent date & time{mode === "complete" ? " *" : ""}</span>
-                <input type="datetime-local" value={sentAt} onChange={(event) => setSentAt(event.target.value)} required={mode === "complete"} />
-              </label>
-              <label className="redesign-field">
+                <div className="transit-timestamp-control">
+                  <input type="datetime-local" value={sentAt} onChange={(event) => setSentAt(event.target.value)} required={mode === "complete"} />
+                  <button type="button" className="secondary-button transit-current-button" onClick={() => setSentAt(localDateTimeValue())}>Current</button>
+                </div>
+              </div>
+              <div className="redesign-field transit-timestamp-field">
                 <span>Received date & time{mode === "complete" ? " *" : ""}</span>
-                <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} />
-              </label>
+                <div className="transit-timestamp-control">
+                  <input type="datetime-local" value={receivedAt} onChange={(event) => setReceivedAt(event.target.value)} required={mode === "complete"} />
+                  <button type="button" className="secondary-button transit-current-button" onClick={() => setReceivedAt(localDateTimeValue())}>Current</button>
+                </div>
+              </div>
             </div>
 
             <div className="transit-details-row transit-two-col">
@@ -655,7 +674,7 @@ function TransitForm({
   );
 }
 
-export function ItemTransitHistory({ supabase, itemId, canEdit, focusLatestMoving = 0 }) {
+export function ItemTransitHistory({ supabase, itemId, canEdit, focusLatestMoving = 0, onTransitClick }) {
   const [rows, setRows] = useState([]);
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -683,7 +702,14 @@ export function ItemTransitHistory({ supabase, itemId, canEdit, focusLatestMovin
         setError(historyError.message);
         setRows([]);
       } else {
-        setRows(data || []);
+        const sortedRows = [...(data || [])].sort((a, b) => {
+          const transitA = a.transits || {};
+          const transitB = b.transits || {};
+          const timeA = new Date(transitA.sent_at || transitA.received_at || a.received_at || transitA.created_at || a.created_at || 0).getTime();
+          const timeB = new Date(transitB.sent_at || transitB.received_at || b.received_at || transitB.created_at || b.created_at || 0).getTime();
+          return timeB - timeA;
+        });
+        setRows(sortedRows);
       }
       setLoading(false);
     }
@@ -770,6 +796,7 @@ export function ItemTransitHistory({ supabase, itemId, canEdit, focusLatestMovin
                   <div className="transit-history-movement-meta">
                     <div className="transit-history-progress">
                       <span className={`status-pill transit-progress-pill transit-progress-${progressClass(transit.transit_progress)}`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
+                      {onTransitClick && <button type="button" className="inline-edit-button" onClick={() => onTransitClick(transit.id, transit.transit_progress)}>Open Transit</button>}
                     </div>
                     <div className="transit-history-note">
                       <div className="transit-history-section-heading">
@@ -835,93 +862,75 @@ export function ItemTransitHistory({ supabase, itemId, canEdit, focusLatestMovin
   );
 }
 
-function TransitCard({ transit, itemMap, locationMap, canEdit, canDelete, onEdit, onStartMoving, onCancel, onDelete }) {
+function TransitListRow({ transit, itemMap, locationMap, canEdit, canDelete, onOpen, onEdit, onStartMoving, onCancel, onDelete }) {
   const transitItems = transit.item_ids.map((id) => itemMap[id]).filter(Boolean);
-
   return (
-    <article className={`transit-box transit-box-${progressClass(transit.transit_progress)}`}>
-      <div className="transit-box-header">
-        <div>
-          <p className="section-kicker">TRANSIT</p>
-          <h3>{locationMap[transit.from_location_id] || "—"} <span>→</span> {locationMap[transit.to_location_id] || "—"}</h3>
-          <p>Created {formatDate(transit.created_at)}</p>
-        </div>
-        <span className={`transit-progress-badge transit-progress-${progressClass(transit.transit_progress)}`}>
-          {PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}
+    <article className={`transit-list-row transit-list-row-${progressClass(transit.transit_progress)}`}>
+      <button type="button" className="transit-list-open" onClick={() => onOpen(transit)} aria-label={`Open Transit from ${locationMap[transit.from_location_id] || "unknown location"} to ${locationMap[transit.to_location_id] || "unknown location"}`}>
+        <span className="transit-list-route">
+          <strong>{locationMap[transit.from_location_id] || "—"}</strong><span aria-hidden="true">→</span><strong>{locationMap[transit.to_location_id] || "—"}</strong>
         </span>
-      </div>
-
-      <div className="transit-box-grid">
-        <div>
-          <span className="transit-label">Sender</span>
-          <strong>{transit.sender || "—"}</strong>
-        </div>
-        <div>
-          <span className="transit-label">Carrier</span>
-          <strong>{transit.carrier || "—"}</strong>
-        </div>
-        <div>
-          <span className="transit-label">Sent date & time</span>
-          <strong>{formatDate(transit.sent_at)}</strong>
-        </div>
-        {transit.receiver && (
-          <div>
-            <span className="transit-label">Receiver</span>
-            <strong>{transit.receiver}</strong>
-          </div>
-        )}
-        {transit.received_at && (
-          <div>
-            <span className="transit-label">Received date & time</span>
-            <strong>{formatDate(transit.received_at)}</strong>
-          </div>
-        )}
-      </div>
-
-      <div className="transit-box-items">
-        <div className="transit-field-heading">
-          <div><strong>Items</strong><span>{transitItems.length} item{transitItems.length === 1 ? "" : "s"}</span></div>
-        </div>
-        <div className="transit-box-item-list">
-          {transitItems.map((item) => (
-            <button key={item.id} type="button" className="inline-machine-link" onClick={() => onEdit?.("item", item.id)}>
-              {itemLabel(item)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {transit.note && (
-        <div className="transit-box-note">
-          <span className="transit-label">Transit note</span>
-          <p>{transit.note}</p>
-        </div>
-      )}
-
-      {(canEdit || canDelete) && (
-        <div className="transit-box-actions">
-          {canEdit && transit.transit_progress === PROGRESS.standby && (
-            <>
-              <button className="secondary-button" onClick={() => onEdit?.("edit", transit)}>Edit</button>
-              <button className="primary-button" onClick={() => onStartMoving(transit)}>Start Moving</button>
-            </>
-          )}
-          {canEdit && transit.transit_progress === PROGRESS.moving && (
-            <button className="primary-button" onClick={() => onEdit?.("complete", transit)}>Receive & Complete</button>
-          )}
-          {canDelete && transit.transit_progress !== PROGRESS.completed && (
-            <button className="danger-button" onClick={() => onCancel?.(transit)}>Cancel Transit</button>
-          )}
-          {canDelete && transit.transit_progress === PROGRESS.completed && (
-            <button className="danger-button" onClick={() => onDelete?.(transit)}>Delete Transit</button>
-          )}
-        </div>
-      )}
+        <span className="transit-list-meta">
+          <span className={`transit-progress-badge transit-progress-${progressClass(transit.transit_progress)}`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
+          <span>{transitItems.length} item{transitItems.length === 1 ? "" : "s"}</span>
+          <span>Sent {formatDate(transit.sent_at)}</span>
+          <span>{transit.received_at ? `Received ${formatDate(transit.received_at)}` : "Not received"}</span>
+        </span>
+        <span className="transit-list-summary">{transitItems.slice(0, 3).map(itemLabel).join(" · ")}{transitItems.length > 3 ? ` · +${transitItems.length - 3} more` : ""}</span>
+      </button>
+      {(canEdit || canDelete) && <div className="transit-list-actions">
+        {canEdit && transit.transit_progress === PROGRESS.standby && <>
+          <button type="button" className="secondary-button" onClick={() => onEdit(transit)}>Edit</button>
+          <button type="button" className="primary-button" onClick={() => onStartMoving(transit)}>Start Moving</button>
+        </>}
+        {canEdit && transit.transit_progress === PROGRESS.moving && <button type="button" className="primary-button" onClick={() => onEdit(transit, "complete")}>Receive &amp; Complete</button>}
+        {canDelete && transit.transit_progress !== PROGRESS.completed && <button type="button" className="danger-button" onClick={() => onCancel(transit)}>Cancel Transit</button>}
+        {canDelete && transit.transit_progress === PROGRESS.completed && <button type="button" className="danger-button" onClick={() => onDelete(transit)}>Delete Transit</button>}
+      </div>}
     </article>
   );
 }
 
-export default function TransitModule({ supabase, canEdit, canDelete, canCreateLocation = false, onItemClick, view = "active" }) {
+function TransitDetailPage({ transit, itemMap, locationMap, canEdit, canDelete, onBack, onItemClick, onEdit, onStartMoving, onCancel, onDelete }) {
+  const transitItems = transit.item_ids.map((id) => itemMap[id]).filter(Boolean);
+  return (
+    <section className="transit-detail-page">
+      <div className="transit-detail-toolbar">
+        <button type="button" className="secondary-button" onClick={onBack}>← Back to Transits</button>
+        <span className={`transit-progress-badge transit-progress-${progressClass(transit.transit_progress)}`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
+      </div>
+      <header className="transit-detail-header">
+        <p className="section-kicker">TRANSIT DETAILS</p>
+        <h2>{locationMap[transit.from_location_id] || "—"} <span aria-hidden="true">→</span> {locationMap[transit.to_location_id] || "—"}</h2>
+        <p>Created {formatDate(transit.created_at)} · Updated {formatDate(transit.updated_at)}</p>
+      </header>
+      <div className="transit-detail-grid">
+        <div><span>Sent date &amp; time</span><strong>{formatDate(transit.sent_at)}</strong></div>
+        <div><span>Received date &amp; time</span><strong>{formatDate(transit.received_at)}</strong></div>
+        <div><span>Sender</span><strong>{transit.sender || "—"}</strong></div>
+        <div><span>Receiver</span><strong>{transit.receiver || "—"}</strong></div>
+        <div><span>Carrier</span><strong>{transit.carrier || "—"}</strong></div>
+        <div><span>Transit ID</span><strong>{transit.id}</strong></div>
+      </div>
+      <section className="transit-detail-items">
+        <div className="transit-section-heading"><div><p className="section-kicker">CONTENTS</p><h3>Items in this Transit</h3></div><span>{transitItems.length} item{transitItems.length === 1 ? "" : "s"}</span></div>
+        {transitItems.length ? <div className="transit-detail-item-list">{transitItems.map((item) => <button type="button" className="transit-detail-item" key={item.id} onClick={() => onItemClick?.(item.id)}><span><strong>{itemLabel(item)}</strong><small>{item.inventory_state || item.inventory_status_name || "—"}</small></span><span aria-hidden="true">↗</span></button>)}</div> : <div className="history-empty">No items are linked to this Transit.</div>}
+      </section>
+      {transit.note && <section className="transit-detail-note"><span>Transit note</span><p>{transit.note}</p></section>}
+      {(canEdit || canDelete) && <div className="transit-detail-actions">
+        {canEdit && transit.transit_progress === PROGRESS.standby && <>
+          <button type="button" className="secondary-button" onClick={() => onEdit(transit)}>Edit Transit</button>
+          <button type="button" className="primary-button" onClick={() => onStartMoving(transit)}>Start Moving</button>
+        </>}
+        {canEdit && transit.transit_progress === PROGRESS.moving && <button type="button" className="primary-button" onClick={() => onEdit(transit, "complete")}>Receive &amp; Complete</button>}
+        {canDelete && transit.transit_progress !== PROGRESS.completed && <button type="button" className="danger-button" onClick={() => onCancel(transit)}>Cancel Transit</button>}
+        {canDelete && transit.transit_progress === PROGRESS.completed && <button type="button" className="danger-button" onClick={() => onDelete(transit)}>Delete Transit</button>}
+      </div>}
+    </section>
+  );
+}
+
+export default function TransitModule({ supabase, canEdit, canDelete, canCreateLocation = false, onItemClick, view = "standby", selectedTransitId = null, onTransitClick, onTransitBack }) {
   const [items, setItems] = useState([]);
   const [locations, setLocations] = useState([]);
   const [inventoryStatuses, setInventoryStatuses] = useState([]);
@@ -1029,18 +1038,16 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
     [PROGRESS.completed]: filteredTransits.filter((x) => x.transit_progress === PROGRESS.completed),
   }), [filteredTransits]);
 
-  const activeTransits = useMemo(
-    () => [...grouped[PROGRESS.moving], ...grouped[PROGRESS.standby]],
-    [grouped]
-  );
-  const pastTransits = grouped[PROGRESS.completed];
+  const categoryProgress = view === "moving" ? PROGRESS.moving : view === "completed" ? PROGRESS.completed : PROGRESS.standby;
+  const categoryTransits = grouped[categoryProgress];
+  const selectedTransit = transits.find((transit) => transit.id === selectedTransitId) || null;
 
   useEffect(() => {
     setPastVisible(15);
   }, [search, startingLocationFilter, destinationLocationFilter, view]);
 
   useEffect(() => {
-    if (view !== "past" || pastVisible >= pastTransits.length || !pastLoadRef.current) return undefined;
+    if (view !== "completed" || pastVisible >= categoryTransits.length || !pastLoadRef.current) return undefined;
     const observer = new IntersectionObserver((entries) => {
       if (entries[0]?.isIntersecting) {
         setPastVisible((value) => Math.min(value + 9, pastTransits.length));
@@ -1048,7 +1055,7 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
     }, { rootMargin: "0px 0px 240px 0px" });
     observer.observe(pastLoadRef.current);
     return () => observer.disconnect();
-  }, [view, pastVisible, pastTransits.length]);
+  }, [view, pastVisible, categoryTransits.length]);
 
   function openCreate() {
     setEditingTransit(null);
@@ -1083,10 +1090,15 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
 
   async function startMoving(transit) {
     setError("");
+    if (!transit.sent_at) {
+      setError("This Transit has no sent date/time. Edit it and enter a specific time or use Current before starting movement.");
+      await openEdit(transit);
+      return;
+    }
     const { error: updateError } = await supabase.rpc("atomic_inventory_transit_operation", {
       p_operation: "start_transit",
       p_transit_id: transit.id,
-      p_payload: { sent_at: transit.sent_at || new Date().toISOString() },
+      p_payload: { sent_at: transit.sent_at },
       p_item_ids: [],
     });
 
@@ -1129,37 +1141,21 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
     await load();
   }
 
-  function renderSection(title, key, className, list, limit = list.length) {
+  function renderSection(title, className, list, limit = list.length) {
     return (
       <section className={`transit-section transit-section-${className}`}>
         <div className="transit-section-heading">
-          <div>
-            <p className="section-kicker">TRANSIT</p>
-            <h2>{title}</h2>
-          </div>
+          <div><p className="section-kicker">TRANSIT</p><h2>{title}</h2></div>
           <span>{list.length} Transit{list.length === 1 ? "" : "s"}</span>
         </div>
-        {list.length === 0 ? (
-          <div className="transit-empty-section">No {title.toLowerCase()} transits.</div>
-        ) : (
-          <div className={className === "moving" || className === "standby" ? "transit-box-list transit-box-carousel" : "transit-box-list"}>
+        {list.length === 0 ? <div className="transit-empty-section">No {title.toLowerCase()} transits.</div> : (
+          <div className="transit-list">
             {list.slice(0, limit).map((transit) => (
-              <TransitCard
-                key={transit.id}
-                transit={transit}
-                itemMap={itemMap}
-                locationMap={locationMap}
-                canEdit={canEdit}
-                canDelete={canDelete}
-                onEdit={(action, value) => {
-                  if (action === "item") onItemClick?.(value);
-                  else if (action === "complete") openComplete(value);
-                  else openEdit(value);
-                }}
-                onStartMoving={startMoving}
-                onCancel={deleteTransit}
-                onDelete={deleteTransit}
-              />
+              <TransitListRow key={transit.id} transit={transit} itemMap={itemMap} locationMap={locationMap}
+                canEdit={canEdit} canDelete={canDelete}
+                onOpen={(row) => onTransitClick?.(row.id)}
+                onEdit={(row, action) => action === "complete" ? openComplete(row) : openEdit(row)}
+                onStartMoving={startMoving} onCancel={deleteTransit} onDelete={deleteTransit} />
             ))}
           </div>
         )}
@@ -1167,70 +1163,52 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
     );
   }
 
+  if (selectedTransitId && loading) {
+    return <section className="content-card transit-page"><div className="history-empty">Loading Transit details...</div></section>;
+  }
+
+  if (selectedTransitId && !selectedTransit) {
+    return <section className="content-card transit-page"><div className="transit-detail-toolbar"><button type="button" className="secondary-button" onClick={onTransitBack}>← Back to Transits</button></div><div className="history-empty">This Transit could not be found. It may have been deleted.</div></section>;
+  }
+
   return (
     <section className="content-card transit-page">
-      <div className="section-heading transit-header">
-        <div>
-          <p className="section-kicker">TRANSIT</p>
-          <h2>{view === "past" ? "Past Transits" : "Active Transits"}</h2>
-          <p>Move one or more Global Stock items between locations.</p>
+      {selectedTransit ? (
+        <TransitDetailPage transit={selectedTransit} itemMap={itemMap} locationMap={locationMap} canEdit={canEdit} canDelete={canDelete}
+          onBack={onTransitBack} onItemClick={onItemClick}
+          onEdit={(row, action) => action === "complete" ? openComplete(row) : openEdit(row)}
+          onStartMoving={startMoving} onCancel={deleteTransit} onDelete={deleteTransit} />
+      ) : <>
+        <div className="section-heading transit-header">
+          <div><p className="section-kicker">TRANSIT</p><h2>{view === "moving" ? "Moving Transits" : view === "completed" ? "Completed Transits" : "Stand-By Transits"}</h2><p>Move one or more Global Stock items between locations.</p></div>
+          <div className="transit-header-actions">
+            <button className="secondary-button" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
+            {canEdit && view === "standby" && <button className="primary-button" onClick={openCreate}>+ Create Transit</button>}
+          </div>
         </div>
-        <div className="transit-header-actions">
-          <button className="secondary-button" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
-          {canEdit && view === "active" && <button className="primary-button" onClick={openCreate}>+ Create Transit</button>}
+        <div className="stock-filters transit-filters">
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search item, sender, carrier, location..." />
+          <select value={startingLocationFilter} onChange={(event) => setStartingLocationFilter(event.target.value)}>
+            <option value="all">All starting locations</option>
+            {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+          </select>
+          <select value={destinationLocationFilter} onChange={(event) => setDestinationLocationFilter(event.target.value)}>
+            <option value="all">All destination locations</option>
+            {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
+          </select>
         </div>
-      </div>
-
-      <div className="stock-filters transit-filters">
-        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search item, sender, carrier, location..." />
-        <select value={startingLocationFilter} onChange={(event) => setStartingLocationFilter(event.target.value)}>
-          <option value="all">All starting locations</option>
-          {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-        </select>
-        <select value={destinationLocationFilter} onChange={(event) => setDestinationLocationFilter(event.target.value)}>
-          <option value="all">All destination locations</option>
-          {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-        </select>
-      </div>
-
-      {error && <div className="error-message stock-error">{error}</div>}
-
-      {loading ? (
-        <div className="history-empty">Loading Transits...</div>
-      ) : (
-        <div className="transit-sections">
-          {view === "active" ? (
-            <>
-              {renderSection("Moving", PROGRESS.moving, "moving", grouped[PROGRESS.moving])}
-              {renderSection("Stand-By", PROGRESS.standby, "standby", grouped[PROGRESS.standby])}
-            </>
-          ) : (
-            <>
-              {renderSection("Completed", PROGRESS.completed, "completed", pastTransits, pastVisible)}
-              {pastVisible < pastTransits.length && <div ref={pastLoadRef} className="transit-infinite-sentinel" aria-hidden="true" />}
-            </>
-          )}
-        </div>
-      )}
-
-      {showForm && (
-        <TransitForm
-          supabase={supabase}
-          items={items}
-          locations={locations}
-          canCreateLocation={canCreateLocation}
-          onLocationCreated={(createdLocation) => {
-            setLocations((current) => [...current.filter((location) => location.id !== createdLocation.id), createdLocation]
-              .filter((location) => location.is_active !== false)
-              .sort((a, b) => a.name.localeCompare(b.name)));
-          }}
-          editRecord={editingTransit}
-          initialItemIds={editingItemIds}
-          mode={formMode}
-          onClose={() => { setShowForm(false); setEditingTransit(null); setEditingItemIds([]); }}
-          onSaved={afterSave}
-        />
-      )}
+        {error && <div className="error-message stock-error">{error}</div>}
+        {loading ? <div className="history-empty">Loading Transits...</div> : (
+          <div className="transit-sections">{renderSection(view === "moving" ? "Moving" : view === "completed" ? "Completed" : "Stand-By", view === "moving" ? "moving" : view === "completed" ? "completed" : "standby", categoryTransits, view === "completed" ? pastVisible : categoryTransits.length)}
+            {view === "completed" && pastVisible < categoryTransits.length && <div ref={pastLoadRef} className="transit-infinite-sentinel" aria-hidden="true" />}
+          </div>
+        )}
+      </>}
+      {showForm && <TransitForm supabase={supabase} items={items} locations={locations} canCreateLocation={canCreateLocation}
+        onLocationCreated={(createdLocation) => setLocations((current) => [...current.filter((location) => location.id !== createdLocation.id), createdLocation].filter((location) => location.is_active !== false).sort((a, b) => a.name.localeCompare(b.name)))}
+        editRecord={editingTransit} initialItemIds={editingItemIds} mode={formMode}
+        onClose={() => { setShowForm(false); setEditingTransit(null); setEditingItemIds([]); }}
+        onSaved={afterSave} />}
     </section>
   );
 }
