@@ -933,6 +933,7 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
   const [startingLocationFilter, setStartingLocationFilter] = useState("all");
   const [destinationLocationFilter, setDestinationLocationFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
+  const [selectedTransitId, setSelectedTransitId] = useState(null);
   const [formMode, setFormMode] = useState("edit");
   const [editingTransit, setEditingTransit] = useState(null);
   const [editingItemIds, setEditingItemIds] = useState([]);
@@ -1143,24 +1144,24 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
         {list.length === 0 ? (
           <div className="transit-empty-section">No {title.toLowerCase()} transits.</div>
         ) : (
-          <div className={className === "moving" || className === "standby" ? "transit-box-list transit-box-carousel" : "transit-box-list"}>
+          <div className="transit-row-list">
             {list.slice(0, limit).map((transit) => (
-              <TransitCard
-                key={transit.id}
-                transit={transit}
-                itemMap={itemMap}
-                locationMap={locationMap}
-                canEdit={canEdit}
-                canDelete={canDelete}
-                onEdit={(action, value) => {
-                  if (action === "item") onItemClick?.(value);
-                  else if (action === "complete") openComplete(value);
-                  else openEdit(value);
-                }}
-                onStartMoving={startMoving}
-                onCancel={deleteTransit}
-                onDelete={deleteTransit}
-              />
+              <div className="transit-list-row" key={transit.id}>
+                <button type="button" className="transit-list-open" onClick={() => setSelectedTransitId(transit.id)}>
+                  <span className="transit-list-route">{locationMap[transit.from_location_id] || "—"} <span aria-hidden="true">→</span> {locationMap[transit.to_location_id] || "—"}</span>
+                  <span className="transit-list-meta">{transit.item_count} item{transit.item_count === 1 ? "" : "s"} · {transit.sender || "—"} · {formatDate(transit.sent_at || transit.created_at)}</span>
+                  <span className={`transit-progress-badge transit-progress-${progressClass(transit.transit_progress)}`}>{PROGRESS_LABEL[transit.transit_progress] || transit.transit_progress}</span>
+                  <span className="transit-list-chevron" aria-hidden="true">›</span>
+                </button>
+                {(canEdit || canDelete) && <div className="transit-list-actions">
+                  {canEdit && transit.transit_progress === PROGRESS.standby && <>
+                    <button type="button" className="secondary-button" onClick={() => openEdit(transit)}>Edit</button>
+                    <button type="button" className="primary-button" onClick={() => startMoving(transit)}>Start Moving</button>
+                  </>}
+                  {canEdit && transit.transit_progress === PROGRESS.moving && <button type="button" className="primary-button" onClick={() => openComplete(transit)}>Receive & Complete</button>}
+                  {canDelete && <button type="button" className="danger-button" onClick={() => deleteTransit(transit)}>{transit.transit_progress === PROGRESS.completed ? "Delete Transit" : "Cancel Transit"}</button>}
+                </div>}
+              </div>
             ))}
           </div>
         )}
@@ -1173,17 +1174,18 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
       <div className="section-heading transit-header">
         <div>
           <p className="section-kicker">TRANSIT</p>
-          <h2>{view === "standby" ? "Stand-By Transits" : view === "moving" ? "Moving Transits" : "Completed Transits"}</h2>
+          <h2>{selectedTransitId ? "Transit Details" : view === "standby" ? "Stand-By Transits" : view === "moving" ? "Moving Transits" : "Completed Transits"}</h2>
           <p>Move one or more Global Stock items between locations.</p>
         </div>
         <div className="transit-header-actions">
-          <button className="secondary-button" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>
-          {canEdit && view === "completed" && <button className="primary-button" onClick={openCreate}>+ Create Past Transit</button>}
-          {canEdit && view !== "completed" && <button className="primary-button" onClick={openCreate}>+ Create Transit</button>}
+          {selectedTransitId && <button className="secondary-button" onClick={() => setSelectedTransitId(null)}>← Back to Transits</button>}
+          {!selectedTransitId && <button className="secondary-button" onClick={load} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button>}
+          {!selectedTransitId && canEdit && view === "completed" && <button className="primary-button" onClick={openCreate}>+ Create Past Transit</button>}
+          {!selectedTransitId && canEdit && view !== "completed" && <button className="primary-button" onClick={openCreate}>+ Create Transit</button>}
         </div>
       </div>
 
-      <div className="stock-filters transit-filters">
+      {!selectedTransitId && <div className="stock-filters transit-filters">
         <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search item, sender, carrier, location..." />
         <select value={startingLocationFilter} onChange={(event) => setStartingLocationFilter(event.target.value)}>
           <option value="all">All starting locations</option>
@@ -1193,11 +1195,20 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
           <option value="all">All destination locations</option>
           {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
         </select>
-      </div>
+      </div>}
 
       {error && <div className="error-message stock-error">{error}</div>}
 
-      {loading ? (
+      {selectedTransitId ? (
+        <div className="transit-detail-page">
+          {(() => {
+            const transit = transits.find((row) => row.id === selectedTransitId);
+            return transit ? <TransitCard transit={transit} itemMap={itemMap} locationMap={locationMap} canEdit={canEdit} canDelete={canDelete}
+              onEdit={(action, value) => { if (action === "item") onItemClick?.(value); else if (action === "complete") openComplete(value); else openEdit(value); }}
+              onStartMoving={startMoving} onCancel={deleteTransit} onDelete={deleteTransit} /> : <div className="transit-empty-section">Transit not found.</div>;
+          })()}
+        </div>
+      ) : loading ? (
         <div className="history-empty">Loading Transits...</div>
       ) : (
         <div className="transit-sections">
