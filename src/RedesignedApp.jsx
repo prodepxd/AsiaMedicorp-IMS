@@ -273,7 +273,7 @@ export default function App() {
             className={active === "Global Stock" ? "primary-tab active" : "primary-tab"}
             onClick={() => {
               setOpenNavMenu(null);
-              navigateTo({ active: "Global Stock", selectedItemId: null });
+              navigateTo({ active: "Global Stock", selectedItemId: null, selectedTransitId: null });
             }}
           >
             <span aria-hidden="true">▦</span> Global Stock
@@ -295,7 +295,7 @@ export default function App() {
                   type="button"
                   className={active.startsWith("Transit") && transitCategory === "standby" ? "active" : ""}
                   onClick={() => {
-                    navigateTo({ active: "Transit / Stand-By Transits", transitCategory: "standby", selectedItemId: null });
+                    navigateTo({ active: "Transit / Stand-By Transits", transitCategory: "standby", selectedItemId: null, selectedTransitId: null });
                     setOpenNavMenu(null);
                   }}
                 >Stand-By Transits</button>
@@ -303,7 +303,7 @@ export default function App() {
                   type="button"
                   className={active.startsWith("Transit") && transitCategory === "moving" ? "active" : ""}
                   onClick={() => {
-                    navigateTo({ active: "Transit / Moving Transits", transitCategory: "moving", selectedItemId: null });
+                    navigateTo({ active: "Transit / Moving Transits", transitCategory: "moving", selectedItemId: null, selectedTransitId: null });
                     setOpenNavMenu(null);
                   }}
                 >Moving Transits</button>
@@ -311,7 +311,7 @@ export default function App() {
                   type="button"
                   className={active.startsWith("Transit") && transitCategory === "completed" ? "active" : ""}
                   onClick={() => {
-                    navigateTo({ active: "Transit / Completed Transits", transitCategory: "completed", selectedItemId: null });
+                    navigateTo({ active: "Transit / Completed Transits", transitCategory: "completed", selectedItemId: null, selectedTransitId: null });
                     setOpenNavMenu(null);
                   }}
                 >Completed Transits</button>
@@ -338,7 +338,7 @@ export default function App() {
                       key={group.key}
                       className={active === "Admin / Master Data" && masterCategory === group.key ? "active" : ""}
                       onClick={() => {
-                        navigateTo({ active: "Admin / Master Data", masterCategory: group.key, selectedItemId: null });
+                        navigateTo({ active: "Admin / Master Data", masterCategory: group.key, selectedItemId: null, selectedTransitId: null });
                         setOpenNavMenu(null);
                       }}
                     >{group.label}</button>
