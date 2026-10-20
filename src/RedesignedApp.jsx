@@ -79,6 +79,7 @@ export default function App() {
   const [transitCategory, setTransitCategory] = useState("standby");
   const [globalStockType, setGlobalStockType] = useState("Machine");
   const [selectedItemId, setSelectedItemId] = useState(null);
+  const [selectedTransitId, setSelectedTransitId] = useState(null);
   const [error, setError] = useState("");
   const navigationIndexRef = useRef(0);
   const currentViewRef = useRef(null);
@@ -102,7 +103,7 @@ export default function App() {
     };
   }, [openNavMenu]);
 
-  const currentView = { active, masterCategory, transitCategory, globalStockType, selectedItemId };
+  const currentView = { active, masterCategory, transitCategory, globalStockType, selectedItemId, selectedTransitId };
   currentViewRef.current = currentView;
 
   const applyView = useCallback((view) => {
@@ -111,17 +112,19 @@ export default function App() {
     setTransitCategory(view.transitCategory);
     setGlobalStockType(view.globalStockType || "Machine");
     setSelectedItemId(view.selectedItemId);
+    setSelectedTransitId(view.selectedTransitId || null);
   }, []);
 
   const navigateTo = useCallback((updates) => {
-    const current = currentViewRef.current || { active, masterCategory, transitCategory, globalStockType, selectedItemId };
+    const current = currentViewRef.current || { active, masterCategory, transitCategory, globalStockType, selectedItemId, selectedTransitId };
     const next = { ...current, ...updates };
     if (
       next.active === current.active &&
       next.masterCategory === current.masterCategory &&
       next.transitCategory === current.transitCategory &&
       next.globalStockType === current.globalStockType &&
-      next.selectedItemId === current.selectedItemId
+      next.selectedItemId === current.selectedItemId &&
+      next.selectedTransitId === current.selectedTransitId
     ) return;
 
     const currentIndex = Number(window.history.state?.imsIndex ?? navigationIndexRef.current ?? 0);
@@ -131,7 +134,7 @@ export default function App() {
     currentViewRef.current = next;
     applyView(next);
     setCanGoBack(nextIndex > 0);
-  }, [active, masterCategory, transitCategory, globalStockType, selectedItemId, applyView]);
+  }, [active, masterCategory, transitCategory, globalStockType, selectedItemId, selectedTransitId, applyView]);
 
   const goBack = useCallback(() => {
     const currentIndex = Number(window.history.state?.imsIndex ?? navigationIndexRef.current ?? 0);
@@ -349,9 +352,9 @@ export default function App() {
       {error && <div className="error-message">{error}</div>}
       <WorkspaceErrorBoundary key={active}>
         {active==="Global Stock" && <div style={{ display: selectedItemId ? "none" : "contents" }}><RedesignedGlobalStock supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} activeType={globalStockType} onActiveTypeChange={(type) => navigateTo({ globalStockType: type })} onItemClick={(id) => navigateTo({ selectedItemId: id })} /></div>}
-        {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onBack={goBack} onDeleted={goBack} onItemClick={(id) => navigateTo({ selectedItemId: id })} />}
+        {active==="Global Stock" && selectedItemId && <RedesignedItemView supabase={supabase} itemId={selectedItemId} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} onBack={goBack} onDeleted={goBack} onItemClick={(id) => navigateTo({ selectedItemId: id })} onTransitClick={(id) => navigateTo({ active: "Transit / Detail", selectedTransitId: id })} />}
         {active==="Admin / Master Data" && <RedesignedMasterData supabase={supabase} canEdit={profile.role==="admin"} activeKey={masterCategory} onActiveChange={(key) => navigateTo({ masterCategory: key })} />}
-        {active.startsWith("Transit") && <TransitModule supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} canCreateLocation={profile.role==="admin"} view={transitCategory} onItemClick={(id) => navigateTo({ active: "Global Stock", selectedItemId: id })} />}
+        {active.startsWith("Transit") && <TransitModule supabase={supabase} canEdit={profile.role==="admin" || profile.role==="manager"} canDelete={profile.role==="admin"} canCreateLocation={profile.role==="admin"} view={active === "Transit / Detail" ? "detail" : transitCategory} selectedTransitId={selectedTransitId} onTransitClick={(id) => navigateTo({ active: "Transit / Detail", selectedTransitId: id })} onTransitBack={() => navigateTo({ active: `Transit / ${transitCategory === "standby" ? "Stand-By Transits" : transitCategory === "moving" ? "Moving Transits" : "Completed Transits"}`, selectedTransitId: null })} onItemClick={(id) => navigateTo({ active: "Global Stock", selectedItemId: id, selectedTransitId: null })} />}
       </WorkspaceErrorBoundary>
       {active!=="Global Stock" && active!=="Admin / Master Data" && !active.startsWith("Transit") && <section className="content-card"><div className="section-heading">
         <div><p className="section-kicker">{active.toUpperCase()}</p><h2>Module ready</h2><p>Authentication and role access are connected. This module will be built on the live IMS database next.</p></div>
