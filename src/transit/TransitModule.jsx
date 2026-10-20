@@ -256,7 +256,9 @@ function TransitForm({
       setItemSearch("");
       if (!fromLocationId) { setSelectedItemIds([]); setAvailableItems([]); setMachineComponents({}); setMovingItemIds([]); return; }
       setItemsLoading(true);
-      const { data, error: itemError } = await supabase.from("items").select("id,serial_number,item_type,current_location_id,inventory_status_id").eq("current_location_id", fromLocationId).order("serial_number");
+      let itemQuery = supabase.from("items").select("id,serial_number,item_type,current_location_id,inventory_status_id");
+      if (mode !== "past") itemQuery = itemQuery.eq("current_location_id", fromLocationId);
+      const { data, error: itemError } = await itemQuery.order("serial_number");
       if (!alive) return;
       if (itemError) { setAvailableItems([]); setMachineComponents({}); setMovingItemIds([]); setError(itemError.message); setItemsLoading(false); return; }
       const statusIds = [...new Set((data || []).map((item) => item.inventory_status_id).filter(Boolean))];
@@ -323,7 +325,7 @@ function TransitForm({
     }
     loadItemsAtLocation();
     return () => { alive = false; };
-  }, [supabase, fromLocationId]);
+  }, [supabase, fromLocationId, mode]);
 
   const selectedDisplayItems = useMemo(
     () => selectedItemIds.map((id) => itemMap[id]).filter(Boolean),
