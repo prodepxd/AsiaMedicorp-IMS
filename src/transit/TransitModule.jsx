@@ -406,7 +406,6 @@ function TransitForm({
     if (!fromLocationId) return setError("Select the source location first.");
     if (selectedItemIds.length === 0) return setError("Select at least one Global Stock item from the selected source location.");
     if (!toLocationId) return setError("To location is required.");
-    if (fromLocationId === toLocationId) return setError("From and To locations must be different.");
     if (!sender.trim()) return setError("Sender is required.");
     if (!carrier.trim()) return setError("Carrier is required.");
     if (mode === "complete" && !sentAt) return setError("Sent date/time is required to complete the Transit. Use Current if it should be now.");
