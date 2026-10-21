@@ -15,14 +15,14 @@ const ITEM_TYPES = [
 ];
 
 const TYPE_CONFIG = {
-  Machine: ["manufacturer", "model", "functions", "quality_note"],
+  Machine: ["manufacturer", "model", "quality_note"],
   Probe: ["manufacturer", "model", "probe_type", "quality_note"],
-  Board: ["compatible_machine", "board_type", "part_number", "version_number", "repaired"],
-  PSU: ["compatible_machine"],
-  Monitor: ["compatible_machine", "monitor_size", "video_input"],
-  "EMI Filter": ["emi_type"],
-  "Hard Disk": ["manufacturer", "capacity_gb", "size_inches", "hard_disk_type", "compatible_machine", "software_version"],
-  Keyboard: ["compatible_machine"],
+  Board: ["compatible_machine", "board_type", "part_number", "version_number", "quality_note"],
+  PSU: ["compatible_machine", "quality_note"],
+  Monitor: ["compatible_machine", "monitor_size", "video_input", "quality_note"],
+  "EMI Filter": ["emi_type", "quality_note"],
+  "Hard Disk": ["manufacturer", "capacity_gb", "size_inches", "hard_disk_type", "compatible_machine", "software_version", "quality_note"],
+  Keyboard: ["compatible_machine", "quality_note"],
 };
 
 const FIELD_LABELS = {
@@ -1853,7 +1853,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
         <div className="stock-filter-actions"><button className="secondary-button stock-icon-button" aria-label="Clear filters" title="Clear filters" onClick={()=>{setSearch("");setFilters({model:"",manufacturer:"",probeType:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>⌫</button><button className="secondary-button stock-icon-button" aria-label="Refresh stock" title="Refresh stock" onClick={loadItems}>↻</button></div>
       </div>
       {error && <div className="error-message">{error}</div>}
-      <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>Serial number</th>{columns.map(c=><th key={c}>{FIELD_LABELS[c]}</th>)}<th>Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
+      <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>SERIAL #</th>{columns.map(c=><th key={c}>{({"part_number":"PART #","version_number":"VERSION #","software_version":"S/W VERSION"}[c] || FIELD_LABELS[c])}</th>)}<th>Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
         {!loading && filtered.length===0 && <tr><td colSpan={columns.length+4} className="empty-cell">{items.length?"No matching items.":"No items of this type yet."}</td></tr>}
         {filtered.map((item,index)=><tr ref={index === filtered.length - 1 ? lastStockRowRef : null} key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{item.inventory_state || (masters.inventoryStatuses || []).find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{(masters.qualities || []).find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{(masters.locations || []).find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
       </tbody></table></div>
