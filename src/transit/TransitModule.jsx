@@ -1049,7 +1049,7 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
     if (view !== "completed" || pastVisible >= categoryTransits.length || !pastLoadRef.current) return undefined;
     const observer = new IntersectionObserver((entries) => {
       if (entries[0]?.isIntersecting) {
-        setPastVisible((value) => Math.min(value + 9, pastTransits.length));
+        setPastVisible((value) => Math.min(value + 9, categoryTransits.length));
       }
     }, { rootMargin: "0px 0px 240px 0px" });
     observer.observe(pastLoadRef.current);
@@ -1211,4 +1211,3 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
     </section>
   );
 }
-
