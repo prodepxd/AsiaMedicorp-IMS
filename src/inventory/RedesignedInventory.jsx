@@ -1643,7 +1643,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ model: "", manufacturer: "", location: "", note: "", status: "", quality: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
+  const [filters, setFilters] = useState({ model: "", manufacturer: "", probeType: "", location: "", note: "", status: "", quality: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
   const [showAdd, setShowAdd] = useState(false);
   const filtersRef = useRef(null);
   const lastStockRowRef = useRef(null);
@@ -1720,8 +1720,8 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
       const noteQuery = filters.note.trim().toLowerCase();
       if (noteQuery && !String(item.quality_note || "").toLowerCase().includes(noteQuery)) return false;
       if (selectedLocation && item.current_location_id !== selectedLocation) return false;
-      if (activeType !== "Hard Disk" && filters.status && item.inventory_status_id !== filters.status) return false;
-      if (activeType !== "Hard Disk" && filters.quality && item.quality_status_id !== filters.quality) return false;
+      if (filters.status && item.inventory_status_id !== filters.status) return false;
+      if (filters.quality && item.quality_status_id !== filters.quality) return false;
       if ((activeType === "Probe" || activeType === "Machine") && selectedManufacturer && d.manufacturer_id !== selectedManufacturer) return false;
       if (activeType === "Probe" && filters.probeType && d.probe_type_id !== filters.probeType) return false;
       if (selectedModel) {
@@ -1847,10 +1847,10 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
           <label className="stock-filter-field"><span>Size</span><FilterDropdown value={filters.size} onChange={(value) => setFilters((current) => ({ ...current, size: value }))} options={hardDiskSizeOptions} placeholder="All" searchPlaceholder="Search sizes..." /></label>
           <label className="stock-filter-field"><span>Capacity (GB)</span><input type="number" min="0" value={filters.capacity} onChange={e=>setFilters(current=>({...current,capacity:e.target.value}))} placeholder="-" /></label>
         </>}
-        {activeType !== "Hard Disk" && <label className="stock-filter-field"><span>Status</span><FilterDropdown value={filters.status || ""} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={statusOptions} placeholder="All" searchPlaceholder="Search statuses..." /></label>}
-        {activeType !== "Hard Disk" && <label className="stock-filter-field"><span>Quality</span><FilterDropdown value={filters.quality || ""} onChange={(value) => setFilters((current) => ({ ...current, quality: value }))} options={qualityOptions} placeholder="All" searchPlaceholder="Search qualities..." /></label>}
+        <label className="stock-filter-field"><span>Status</span><FilterDropdown value={filters.status || ""} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={statusOptions} placeholder="All" searchPlaceholder="Search statuses..." /></label>
+        <label className="stock-filter-field"><span>Quality</span><FilterDropdown value={filters.quality || ""} onChange={(value) => setFilters((current) => ({ ...current, quality: value }))} options={qualityOptions} placeholder="All" searchPlaceholder="Search qualities..." /></label>
         <label className="stock-filter-field"><span>Location</span><FilterDropdown value={filters.location} onChange={(value) => setFilters((current) => ({ ...current, location: value }))} options={locationOptions} placeholder="All" searchPlaceholder="Search locations..." /></label>
-        <div className="stock-filter-actions"><button className="secondary-button stock-icon-button" aria-label="Clear filters" title="Clear filters" onClick={()=>{setSearch("");setFilters({model:"",manufacturer:"",probeType:"",location:"",note:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>⌫</button><button className="secondary-button stock-icon-button" aria-label="Refresh stock" title="Refresh stock" onClick={loadItems}>↻</button></div>
+        <div className="stock-filter-actions"><button className="secondary-button stock-icon-button" aria-label="Clear filters" title="Clear filters" onClick={()=>{setSearch("");setFilters({model:"",manufacturer:"",probeType:"",location:"",note:"",status:"",quality:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>⌫</button><button className="secondary-button stock-icon-button" aria-label="Refresh stock" title="Refresh stock" onClick={loadItems}>↻</button></div>
       </div>
       {error && <div className="error-message">{error}</div>}
       <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>SERIAL #</th>{columns.map(c=><th key={c}>{({"part_number":"PART #","version_number":"VERSION #","software_version":"S/W VERSION"}[c] || FIELD_LABELS[c])}</th>)}<th>Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
