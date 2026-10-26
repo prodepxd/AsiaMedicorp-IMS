@@ -160,7 +160,7 @@ function FilterDropdown({ value, onChange, options, placeholder = "Select...", s
 
   return (
     <div ref={dropdownRef} className={open ? "transit-item-dropdown open stock-filter-dropdown" : "transit-item-dropdown stock-filter-dropdown"}>
-      <button type="button" className="transit-item-dropdown-trigger" onClick={() => setOpen((current) => !current)}>
+      <button type="button" className="transit-item-dropdown-trigger" title={selected?.title} onClick={() => setOpen((current) => !current)}>
         <span>{value ? (selected?.label || placeholder) : (options.some((option) => option.value === "") ? "All" : (selected?.label || placeholder))}</span><span className="transit-item-dropdown-chevron">▾</span>
       </button>
       {open && <div className="transit-item-dropdown-menu stock-filter-dropdown-menu">
@@ -169,7 +169,7 @@ function FilterDropdown({ value, onChange, options, placeholder = "Select...", s
           {visibleOptions.length ? visibleOptions.map((option) => option.separator ? (
             <div key="__separator__" className="stock-filter-dropdown-separator" role="separator">{option.label}</div>
           ) : (
-            <button type="button" key={option.value || "__all"} className={option.value === value ? "stock-filter-dropdown-option selected" : "stock-filter-dropdown-option"} onClick={() => choose(option.value)}>{option.label}</button>
+            <button type="button" key={option.value || "__all"} title={option.title} aria-label={option.title ? `${option.label}. ${option.title}` : undefined} className={option.value === value ? "stock-filter-dropdown-option selected" : "stock-filter-dropdown-option"} onClick={() => choose(option.value)}>{option.label}</button>
           )) : <div className="stock-filter-dropdown-empty">No matching options.</div>}
         </div>
       </div>}
@@ -1883,7 +1883,15 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   const filterModelOptions = activeType === "Probe"
     ? (masters.probeModels || []).map((model) => {
         const manufacturer = (masters.equipmentManufacturers || []).find((entry) => entry.id === model.manufacturer_id)?.name || "";
-        return { value: model.id, label: [manufacturer, model.name].filter(Boolean).join(" ") };
+        const compatibleMachines = probeCompatibleNamesMap[model.id] || [];
+        const hoverText = compatibleMachines.length
+          ? `Compatible machines: ${compatibleMachines.join(", ")}`
+          : "Compatible machines: None assigned";
+        return {
+          value: model.id,
+          label: [manufacturer, model.name].filter(Boolean).join(" "),
+          title: hoverText,
+        };
       })
     : machineModelFilterOptions;
   const officeLocations = (masters.locations || []).filter((location) => OFFICE_LOCATION_IDS.includes(location.id));
