@@ -765,6 +765,25 @@ function getInventoryStatusRank(statusText) {
   return 5;
 }
 
+const QUALITY_SORT_ORDER = {
+  working: 0,
+  repairable: 1,
+  "non-working": 2,
+  "non working": 2,
+  nonworking: 2,
+  unchked: 3,
+  unchecked: 3,
+  scrap: 4,
+};
+
+function getQualityStatusRank(qualityText) {
+  const normalized = String(qualityText || "").trim().toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(QUALITY_SORT_ORDER, normalized)) {
+    return QUALITY_SORT_ORDER[normalized];
+  }
+  return 5;
+}
+
 function getInventoryStatusColorClass(statusText) {
   const normalized = String(statusText || "").trim().toLowerCase();
   if (normalized === "idle") return "inventory-status-idle";
@@ -1753,26 +1772,25 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
 
   const probeCompatibleNamesMap = useMemo(() => {
     const machineModelMap = Object.fromEntries((masters.machineModels || []).map((m) => [m.id, m]));
-    const manufacturerMap = Object.fromEntries((masters.equipmentManufacturers || []).map((m) => [m.id, m.name]));
     const result = {};
     Object.entries(probeCompatibilityMap).forEach(([probeModelId, machineModelIds]) => {
       const names = machineModelIds
-        .map((id) => {
-          const model = machineModelMap[id];
-          if (!model) return null;
-          const manufacturer = manufacturerMap[model.manufacturer_id];
-          return manufacturer ? `${manufacturer} ${model.name}` : model.name;
-        })
+        .map((id) => machineModelMap[id]?.name || null)
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
       result[probeModelId] = names;
     });
     return result;
-  }, [probeCompatibilityMap, masters.machineModels, masters.equipmentManufacturers]);
+  }, [probeCompatibilityMap, masters.machineModels]);
 
   const statusNameById = useMemo(
     () => Object.fromEntries((masters.inventoryStatuses || []).map((status) => [status.id, status.name])),
     [masters.inventoryStatuses]
+  );
+
+  const qualityNameById = useMemo(
+    () => Object.fromEntries((masters.qualities || []).map((quality) => [quality.id, quality.name])),
+    [masters.qualities]
   );
 
   const filtered = useMemo(() => {
@@ -1816,13 +1834,17 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
     return [...matching].sort((a, b) => {
       const statusA = a.inventory_state || statusNameById[a.inventory_status_id] || "";
       const statusB = b.inventory_state || statusNameById[b.inventory_status_id] || "";
-      const rankDiff = getInventoryStatusRank(statusA) - getInventoryStatusRank(statusB);
-      if (rankDiff !== 0) return rankDiff;
+      const statusDiff = getInventoryStatusRank(statusA) - getInventoryStatusRank(statusB);
+      if (statusDiff !== 0) return statusDiff;
+      const qualityA = qualityNameById[a.quality_status_id] || "";
+      const qualityB = qualityNameById[b.quality_status_id] || "";
+      const qualityDiff = getQualityStatusRank(qualityA) - getQualityStatusRank(qualityB);
+      if (qualityDiff !== 0) return qualityDiff;
       const timeA = new Date(a.created_at || 0).getTime();
       const timeB = new Date(b.created_at || 0).getTime();
       return timeB - timeA;
     });
-  }, [items, search, filters, activeType, probeCompatibilityMap, statusNameById]);
+  }, [items, search, filters, activeType, probeCompatibilityMap, statusNameById, qualityNameById]);
 
   useEffect(() => {
     const updateScrollControls = () => {
