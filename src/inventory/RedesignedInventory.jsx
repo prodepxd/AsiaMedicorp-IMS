@@ -749,6 +749,32 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
   </div></div>;
 }
 
+const STATUS_SORT_ORDER = {
+  idle: 0,
+  testing: 1,
+  reserved: 2,
+  sold: 3,
+  missing: 4,
+};
+
+function getInventoryStatusRank(statusText) {
+  const normalized = String(statusText || "").trim().toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(STATUS_SORT_ORDER, normalized)) {
+    return STATUS_SORT_ORDER[normalized];
+  }
+  return 5;
+}
+
+function getInventoryStatusColorClass(statusText) {
+  const normalized = String(statusText || "").trim().toLowerCase();
+  if (normalized === "idle") return "inventory-status-idle";
+  if (normalized === "missing") return "inventory-status-missing";
+  if (normalized === "reserved") return "inventory-status-reserved";
+  if (normalized === "sold") return "inventory-status-sold";
+  if (normalized === "testing") return "inventory-status-testing";
+  return "";
+}
+
 export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBack, onDeleted, onItemClick, onTransitClick }) {
   const [item, setItem] = useState(null);
   const [masters, setMasters] = useState({
@@ -1074,9 +1100,11 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
 
   const name = (list, id) => (list || []).find((x) => x.id === id)?.name || "—";
   const statusName = name(masters.inventoryStatuses || [], item?.inventory_status_id);
+  const rawStatusText = item?.inventory_state || statusName;
+  const itemStatusColorClass = getInventoryStatusColorClass(rawStatusText);
   const statusValue = parentMachine
     ? <><span>In Machine (</span><button type="button" className="inline-machine-link" onClick={() => onItemClick?.(parentMachine.id)}>{parentMachine.serial_number || "Machine"}</button><span>)</span></>
-    : (item?.inventory_state || statusName);
+    : (itemStatusColorClass ? <span className={`inventory-status-text ${itemStatusColorClass}`}>{rawStatusText}</span> : rawStatusText);
   const compatibleName = (id) => {
     const model = (masters.machineModels || []).find((x) => x.id === id);
     const manufacturer = (masters.equipmentManufacturers || []).find((x) => x.id === model?.manufacturer_id);
@@ -1639,11 +1667,11 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
 
 export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine", onActiveTypeChange, onItemClick }) {
   const [items, setItems] = useState([]);
-  const [masters, setMasters] = useState({ inventoryStatuses: [], qualities: [], locations: [], equipmentManufacturers: [], hardDiskManufacturers: [], machineModels: [], probeModels: [], probeTypes: [], boardTypes: [] });
+  const [masters, setMasters] = useState({ inventoryStatuses: [], qualities: [], locations: [], equipmentManufacturers: [], hardDiskManufacturers: [], machineModels: [], probeModels: [], probeTypes: [], boardTypes: [], probeCompatibilities: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ model: "", manufacturer: "", probeType: "", location: "", note: "", status: "", quality: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
+  const [filters, setFilters] = useState({ model: "", manufacturer: "", probeType: "", compatibleMachine: "", location: "", note: "", status: "", quality: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
   const [showAdd, setShowAdd] = useState(false);
   const filtersRef = useRef(null);
   const lastStockRowRef = useRef(null);
@@ -1651,7 +1679,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   async function loadMasters() {
-    const [s,q,l,em,hm,mm,pm,pt,bt] = await Promise.all([
+    const [s,q,l,em,hm,mm,pm,pt,bt,pc] = await Promise.all([
       supabase.from("inventory_statuses").select("id,name").eq("is_active",true).order("name"),
       supabase.from("quality_statuses").select("id,name").eq("is_active",true).order("name"),
       supabase.from("locations").select("id,name").eq("is_active",true).order("name"),
@@ -1661,13 +1689,15 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
       supabase.from("probe_models").select("id,name,manufacturer_id").order("name"),
       supabase.from("probe_types").select("id,name").order("name"),
       supabase.from("board_types").select("id,name").order("name"),
+      supabase.from("probe_model_machine_models").select("probe_model_id,machine_model_id"),
     ]);
-    const bad = [s,q,l,em,hm,mm,pm,pt,bt].find(x=>x.error);
+    const bad = [s,q,l,em,hm,mm,pm,pt,bt,pc].find(x=>x.error);
     if (bad) { setError(bad.error.message); return; }
     setMasters({
       inventoryStatuses:s.data||[], qualities:q.data||[], locations:l.data||[],
       equipmentManufacturers:em.data||[], hardDiskManufacturers:hm.data||[],
       machineModels:mm.data||[], probeModels:pm.data||[], probeTypes:pt.data||[], boardTypes:bt.data||[],
+      probeCompatibilities:pc.data||[],
     });
   }
 
@@ -1709,21 +1739,61 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
 
 
 
+  const probeCompatibilityMap = useMemo(() => {
+    const map = {};
+    (masters.probeCompatibilities || []).forEach((row) => {
+      if (!row?.probe_model_id || !row?.machine_model_id) return;
+      if (!map[row.probe_model_id]) map[row.probe_model_id] = [];
+      if (!map[row.probe_model_id].includes(row.machine_model_id)) {
+        map[row.probe_model_id].push(row.machine_model_id);
+      }
+    });
+    return map;
+  }, [masters.probeCompatibilities]);
+
+  const probeCompatibleNamesMap = useMemo(() => {
+    const machineModelMap = Object.fromEntries((masters.machineModels || []).map((m) => [m.id, m]));
+    const manufacturerMap = Object.fromEntries((masters.equipmentManufacturers || []).map((m) => [m.id, m.name]));
+    const result = {};
+    Object.entries(probeCompatibilityMap).forEach(([probeModelId, machineModelIds]) => {
+      const names = machineModelIds
+        .map((id) => {
+          const model = machineModelMap[id];
+          if (!model) return null;
+          const manufacturer = manufacturerMap[model.manufacturer_id];
+          return manufacturer ? `${manufacturer} ${model.name}` : model.name;
+        })
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+      result[probeModelId] = names;
+    });
+    return result;
+  }, [probeCompatibilityMap, masters.machineModels, masters.equipmentManufacturers]);
+
+  const statusNameById = useMemo(
+    () => Object.fromEntries((masters.inventoryStatuses || []).map((status) => [status.id, status.name])),
+    [masters.inventoryStatuses]
+  );
+
   const filtered = useMemo(() => {
     const serialQuery = search.trim().toLowerCase();
     const selectedModel = filters.model;
     const selectedLocation = filters.location;
     const selectedManufacturer = filters.manufacturer;
-    return items.filter((item) => {
+    const matching = items.filter((item) => {
       const d = item.detail || {};
       if (serialQuery && !String(item.serial_number || "").toLowerCase().includes(serialQuery)) return false;
       const noteQuery = filters.note.trim().toLowerCase();
       if (noteQuery && !String(item.quality_note || "").toLowerCase().includes(noteQuery)) return false;
       if (selectedLocation && item.current_location_id !== selectedLocation) return false;
-      if (filters.status && item.inventory_status_id !== filters.status) return false;
-      if (filters.quality && item.quality_status_id !== filters.quality) return false;
+      if (activeType !== "Hard Disk" && filters.status && item.inventory_status_id !== filters.status) return false;
+      if (activeType !== "Hard Disk" && filters.quality && item.quality_status_id !== filters.quality) return false;
       if ((activeType === "Probe" || activeType === "Machine") && selectedManufacturer && d.manufacturer_id !== selectedManufacturer) return false;
       if (activeType === "Probe" && filters.probeType && d.probe_type_id !== filters.probeType) return false;
+      if (activeType === "Probe" && filters.compatibleMachine) {
+        const compatibleIds = probeCompatibilityMap[d.model_id] || [];
+        if (!compatibleIds.includes(filters.compatibleMachine)) return false;
+      }
       if (selectedModel) {
         const modelId = activeType === "Machine" || activeType === "Probe"
           ? d.model_id
@@ -1742,7 +1812,17 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
       }
       return true;
     });
-  }, [items, search, filters, activeType]);
+
+    return [...matching].sort((a, b) => {
+      const statusA = a.inventory_state || statusNameById[a.inventory_status_id] || "";
+      const statusB = b.inventory_state || statusNameById[b.inventory_status_id] || "";
+      const rankDiff = getInventoryStatusRank(statusA) - getInventoryStatusRank(statusB);
+      if (rankDiff !== 0) return rankDiff;
+      const timeA = new Date(a.created_at || 0).getTime();
+      const timeB = new Date(b.created_at || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [items, search, filters, activeType, probeCompatibilityMap, statusNameById]);
 
   useEffect(() => {
     const updateScrollControls = () => {
@@ -1774,10 +1854,16 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   }
 
   const columns = machineSpecificColumns();
-  const filterModelOptions = (activeType === "Probe" ? (masters.probeModels || []) : (masters.machineModels || [])).map((model) => {
+  const machineModelFilterOptions = (masters.machineModels || []).map((model) => {
     const manufacturer = (masters.equipmentManufacturers || []).find((entry) => entry.id === model.manufacturer_id)?.name || "";
     return { value: model.id, label: [manufacturer, model.name].filter(Boolean).join(" ") };
   });
+  const filterModelOptions = activeType === "Probe"
+    ? (masters.probeModels || []).map((model) => {
+        const manufacturer = (masters.equipmentManufacturers || []).find((entry) => entry.id === model.manufacturer_id)?.name || "";
+        return { value: model.id, label: [manufacturer, model.name].filter(Boolean).join(" ") };
+      })
+    : machineModelFilterOptions;
   const officeLocations = (masters.locations || []).filter((location) => OFFICE_LOCATION_IDS.includes(location.id));
   const otherLocations = (masters.locations || []).filter((location) => !OFFICE_LOCATION_IDS.includes(location.id));
   const locationOptions = [{ value: "", label: "All locations" }, ...officeLocations.map((location) => ({ value: location.id, label: location.name })), { value: "__separator__", label: "──────── Other locations ────────", separator: true }, ...otherLocations.map((location) => ({ value: location.id, label: location.name }))];
@@ -1798,7 +1884,15 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
     if (key==="manufacturer") return manufacturerName(item);
     if (key==="model") {
       const list = activeType === "Machine" ? masters.machineModels : masters.probeModels;
-      return (list || []).find(x=>x.id===d.model_id)?.name || "—";
+      const modelName = (list || []).find(x=>x.id===d.model_id)?.name || "—";
+      if (activeType === "Probe") {
+        const compatibleMachines = probeCompatibleNamesMap[d.model_id] || [];
+        const hoverText = compatibleMachines.length
+          ? `Compatible machines: ${compatibleMachines.join(", ")}`
+          : "Compatible machines: None assigned";
+        return <span className="probe-model-cell" title={hoverText} aria-label={`${modelName}. ${hoverText}`}>{modelName}</span>;
+      }
+      return modelName;
     }
     if (key==="compatible_machine") {
       const model = (masters.machineModels || []).find(x=>x.id===d.compatible_machine_model_id);
@@ -1828,7 +1922,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   return (
     <section className="content-card redesign-stock">
       <div className="section-heading"><div><p className="section-kicker">GLOBAL STOCK</p><h2>Inventory by item type</h2><p>Item types are fixed by the IMS design. Select a type to see only its relevant characteristics.</p></div><div className="stock-result-actions"><span className="stock-result-count">Showing <strong>{filtered.length}</strong> results</span><button className="primary-button" onClick={()=>setShowAdd(true)} disabled={!canEdit}>+ Add item</button></div></div>
-      <div className="redesign-tabs redesign-tabs-single-row">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{onActiveTypeChange?.(type);setSearch("");setFilters({model:"",manufacturer:"",probeType:"",location:"",note:"",status:"",quality:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
+      <div className="redesign-tabs redesign-tabs-single-row">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{onActiveTypeChange?.(type);setSearch("");setFilters({model:"",manufacturer:"",probeType:"",compatibleMachine:"",location:"",note:"",status:"",quality:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
       <div className="redesign-toolbar redesign-stock-filters" ref={filtersRef}>
         <label className="stock-filter-field"><span>Serial number</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="-" /></label>
         <label className="stock-filter-field"><span>Note</span><input value={filters.note} onChange={e=>setFilters(current=>({...current,note:e.target.value}))} placeholder="-" /></label>
@@ -1837,6 +1931,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
           <FilterDropdown value={filters.model} onChange={(value) => setFilters((current) => ({ ...current, model: value }))} options={[{ value: "", label: "All models" }, ...filterModelOptions]} placeholder="All" searchPlaceholder="Search Manufacturer Model..." />
         </label>}
         {activeType === "Probe" && <label className="stock-filter-field"><span>Probe type</span><FilterDropdown value={filters.probeType || ""} onChange={(value) => setFilters((current) => ({ ...current, probeType: value }))} options={probeTypeOptions} placeholder="All" searchPlaceholder="Search probe types..." /></label>}
+        {activeType === "Probe" && <label className="stock-filter-field stock-model-filter"><span>Compatible machine</span><FilterDropdown value={filters.compatibleMachine || ""} onChange={(value) => setFilters((current) => ({ ...current, compatibleMachine: value }))} options={[{ value: "", label: "All models" }, ...machineModelFilterOptions]} placeholder="All" searchPlaceholder="Search Manufacturer Model..." /></label>}
         {activeType === "Board" && <>
           <label className="stock-filter-field"><span>Board type</span><FilterDropdown value={filters.boardType} onChange={(value) => setFilters((current) => ({ ...current, boardType: value }))} options={boardTypeOptions} placeholder="All" searchPlaceholder="Search board types..." /></label>
           <label className="stock-filter-field"><span>Part number</span><input value={filters.partNumber} onChange={e=>setFilters(current=>({...current,partNumber:e.target.value}))} placeholder="-" /></label>
@@ -1847,15 +1942,31 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
           <label className="stock-filter-field"><span>Size</span><FilterDropdown value={filters.size} onChange={(value) => setFilters((current) => ({ ...current, size: value }))} options={hardDiskSizeOptions} placeholder="All" searchPlaceholder="Search sizes..." /></label>
           <label className="stock-filter-field"><span>Capacity (GB)</span><input type="number" min="0" value={filters.capacity} onChange={e=>setFilters(current=>({...current,capacity:e.target.value}))} placeholder="-" /></label>
         </>}
-        <label className="stock-filter-field"><span>Status</span><FilterDropdown value={filters.status || ""} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={statusOptions} placeholder="All" searchPlaceholder="Search statuses..." /></label>
-        <label className="stock-filter-field"><span>Quality</span><FilterDropdown value={filters.quality || ""} onChange={(value) => setFilters((current) => ({ ...current, quality: value }))} options={qualityOptions} placeholder="All" searchPlaceholder="Search qualities..." /></label>
+        {activeType !== "Hard Disk" && <label className="stock-filter-field"><span>Status</span><FilterDropdown value={filters.status || ""} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={statusOptions} placeholder="All" searchPlaceholder="Search statuses..." /></label>}
+        {activeType !== "Hard Disk" && <label className="stock-filter-field"><span>Quality</span><FilterDropdown value={filters.quality || ""} onChange={(value) => setFilters((current) => ({ ...current, quality: value }))} options={qualityOptions} placeholder="All" searchPlaceholder="Search qualities..." /></label>}
         <label className="stock-filter-field"><span>Location</span><FilterDropdown value={filters.location} onChange={(value) => setFilters((current) => ({ ...current, location: value }))} options={locationOptions} placeholder="All" searchPlaceholder="Search locations..." /></label>
-        <div className="stock-filter-actions"><button className="secondary-button stock-icon-button" aria-label="Clear filters" title="Clear filters" onClick={()=>{setSearch("");setFilters({model:"",manufacturer:"",probeType:"",location:"",note:"",status:"",quality:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>⌫</button><button className="secondary-button stock-icon-button" aria-label="Refresh stock" title="Refresh stock" onClick={loadItems}>↻</button></div>
+        <div className="stock-filter-actions"><button className="secondary-button stock-icon-button" aria-label="Clear filters" title="Clear filters" onClick={()=>{setSearch("");setFilters({model:"",manufacturer:"",probeType:"",compatibleMachine:"",location:"",note:"",status:"",quality:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>⌫</button><button className="secondary-button stock-icon-button" aria-label="Refresh stock" title="Refresh stock" onClick={loadItems}>↻</button></div>
       </div>
       {error && <div className="error-message">{error}</div>}
       <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>SERIAL #</th>{columns.map(c=><th key={c}>{({"part_number":"PART #","version_number":"VERSION #","software_version":"S/W VERSION"}[c] || FIELD_LABELS[c])}</th>)}<th>Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
         {!loading && filtered.length===0 && <tr><td colSpan={columns.length+4} className="empty-cell">{items.length?"No matching items.":"No items of this type yet."}</td></tr>}
-        {filtered.map((item,index)=><tr ref={index === filtered.length - 1 ? lastStockRowRef : null} key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}><td><strong>{item.serial_number||"—"}</strong></td>{columns.map(c=><td key={c}>{display(item,c)}</td>)}<td>{item.inventory_state || (masters.inventoryStatuses || []).find(x=>x.id===item.inventory_status_id)?.name||"—"}</td><td>{(masters.qualities || []).find(x=>x.id===item.quality_status_id)?.name||"—"}</td><td>{(masters.locations || []).find(x=>x.id===item.current_location_id)?.name||"—"}</td></tr>)}
+        {filtered.map((item,index)=>{
+          const statusLabel = item.inventory_state || statusNameById[item.inventory_status_id] || "—";
+          const statusColorClass = getInventoryStatusColorClass(statusLabel);
+          const probeCompatibleList = activeType === "Probe" ? (probeCompatibleNamesMap[item.detail?.model_id] || []) : [];
+          const probeModelTitle = activeType === "Probe"
+            ? (probeCompatibleList.length ? `Compatible machines: ${probeCompatibleList.join(", ")}` : "Compatible machines: None assigned")
+            : undefined;
+          return (
+            <tr ref={index === filtered.length - 1 ? lastStockRowRef : null} key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}>
+              <td><strong>{item.serial_number||"—"}</strong></td>
+              {columns.map(c=><td key={c} title={c === "model" && activeType === "Probe" ? probeModelTitle : undefined}>{display(item,c)}</td>)}
+              <td className={statusColorClass || undefined}><span className={statusColorClass ? `inventory-status-text ${statusColorClass}` : undefined}>{statusLabel}</span></td>
+              <td>{(masters.qualities || []).find(x=>x.id===item.quality_status_id)?.name||"—"}</td>
+              <td>{(masters.locations || []).find(x=>x.id===item.current_location_id)?.name||"—"}</td>
+            </tr>
+          );
+        })}
       </tbody></table></div>
       {showScrollTop && <button type="button" className="stock-scroll-control stock-scroll-top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Scroll to top" title="Scroll to top">↑ Top</button>}
       {showScrollBottom && <button type="button" className="stock-scroll-control stock-scroll-bottom" onClick={() => lastStockRowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })} aria-label="Scroll to last stock row" title="Scroll to last stock row">↓ Bottom</button>}

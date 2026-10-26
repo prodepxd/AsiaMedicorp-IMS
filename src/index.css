@@ -2544,3 +2544,31 @@ button { cursor: pointer; }
 .transit-history-progress { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 @media (max-width: 800px) { .transit-list-row { grid-template-columns: 1fr; } .transit-list-actions { max-width: none; justify-content: flex-start; } .transit-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .transit-timestamp-control { grid-template-columns: minmax(0, 1fr); } .transit-current-button { justify-self: start; } .transit-detail-grid { grid-template-columns: 1fr; } }
+
+
+/* Inventory status colors across all item types */
+.stock-table td.inventory-status-idle,
+.inventory-status-text.inventory-status-idle {
+  color: #ffffff;
+  font-weight: 600;
+}
+.stock-table td.inventory-status-missing,
+.inventory-status-text.inventory-status-missing {
+  color: #fca5a5;
+  font-weight: 600;
+}
+.stock-table td.inventory-status-reserved,
+.inventory-status-text.inventory-status-reserved {
+  color: #fde68a;
+  font-weight: 600;
+}
+.stock-table td.inventory-status-sold,
+.inventory-status-text.inventory-status-sold {
+  color: #86efac;
+  font-weight: 600;
+}
+.stock-table td.inventory-status-testing,
+.inventory-status-text.inventory-status-testing {
+  color: #93c5fd;
+  font-weight: 600;
+}
