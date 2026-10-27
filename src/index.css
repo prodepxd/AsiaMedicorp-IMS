@@ -2193,7 +2193,7 @@ button { cursor: pointer; }
 /* Global Stock filter and navigation refinements */
 .redesign-tabs-single-row {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-columns: repeat(9, minmax(0, 1fr));
   align-items: stretch;
   justify-content: stretch;
   width: 100%;
