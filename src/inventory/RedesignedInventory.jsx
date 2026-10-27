@@ -12,6 +12,7 @@ const ITEM_TYPES = [
   "EMI Filter",
   "Hard Disk",
   "Keyboard",
+  "Misc",
 ];
 
 const TYPE_CONFIG = {
@@ -23,6 +24,7 @@ const TYPE_CONFIG = {
   "EMI Filter": ["emi_type", "quality_note"],
   "Hard Disk": ["manufacturer", "capacity_gb", "size_inches", "hard_disk_type", "compatible_machine", "software_version", "quality_note"],
   Keyboard: ["compatible_machine", "quality_note"],
+  Misc: ["compatible_machine", "details", "quality_note"],
 };
 
 const FIELD_LABELS = {
@@ -47,6 +49,7 @@ const FIELD_LABELS = {
   capacity_gb: "Capacity (GB)",
   size_inches: "Size (inches)",
   hard_disk_type: "Hard disk type",
+  details: "Details",
 };
 
 export const MASTER_GROUPS = [
@@ -99,6 +102,7 @@ function emptyForm() {
     capacity_gb: "",
     size_inches: "",
     hard_disk_type: "",
+    details: "",
   };
 }
 
@@ -160,7 +164,7 @@ function FilterDropdown({ value, onChange, options, placeholder = "Select...", s
 
   return (
     <div ref={dropdownRef} className={open ? "transit-item-dropdown open stock-filter-dropdown" : "transit-item-dropdown stock-filter-dropdown"}>
-      <button type="button" className="transit-item-dropdown-trigger" onClick={() => setOpen((current) => !current)}>
+      <button type="button" className="transit-item-dropdown-trigger" title={selected?.title} onClick={() => setOpen((current) => !current)}>
         <span>{value ? (selected?.label || placeholder) : (options.some((option) => option.value === "") ? "All" : (selected?.label || placeholder))}</span><span className="transit-item-dropdown-chevron">▾</span>
       </button>
       {open && <div className="transit-item-dropdown-menu stock-filter-dropdown-menu">
@@ -169,7 +173,7 @@ function FilterDropdown({ value, onChange, options, placeholder = "Select...", s
           {visibleOptions.length ? visibleOptions.map((option) => option.separator ? (
             <div key="__separator__" className="stock-filter-dropdown-separator" role="separator">{option.label}</div>
           ) : (
-            <button type="button" key={option.value || "__all"} className={option.value === value ? "stock-filter-dropdown-option selected" : "stock-filter-dropdown-option"} onClick={() => choose(option.value)}>{option.label}</button>
+            <button type="button" key={option.value || "__all"} title={option.title} aria-label={option.title ? `${option.label}. ${option.title}` : undefined} className={option.value === value ? "stock-filter-dropdown-option selected" : "stock-filter-dropdown-option"} onClick={() => choose(option.value)}>{option.label}</button>
           )) : <div className="stock-filter-dropdown-empty">No matching options.</div>}
         </div>
       </div>}
@@ -270,6 +274,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
           capacity_gb: d.capacity_gb ?? "",
           size_inches: d.size_inches == null ? "" : (String(d.size_inches).endsWith('"') ? String(d.size_inches) : String(d.size_inches) + '"'),
           hard_disk_type: d.disk_type || "",
+          details: d.details || "",
         });
       } else {
         setForm((current) => ({ ...current, inventory_status_id: stock?.id || "", quality_status_id: good?.id || "" }));
@@ -366,6 +371,15 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     ],
     Keyboard: [
       {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",required:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",required:true},
+      {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+    ],
+    Misc: [
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",optional:true},
+      {key:"details",label:"Details",type:"multiline_text",optional:true},
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",required:true},
       {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
@@ -561,13 +575,13 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     if (field.type === "select") return <Select value={value} onChange={onChange}
       options={field.options} required={field.required} />;
 
-    // Quality notes support multiple lines during both item creation and editing.
-    if (field.key === "quality_note") {
+    // Quality notes and Misc details support multiple lines during both item creation and editing.
+    if (field.key === "quality_note" || field.key === "details" || field.type === "multiline_text") {
       return <textarea
         rows={4}
         value={value}
         onChange={onChange}
-        placeholder="Enter note (line breaks supported)"
+        placeholder={field.key === "details" ? "Enter details (line breaks supported)" : "Enter note (line breaks supported)"}
         autoFocus
       />;
     }
@@ -630,6 +644,10 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       software_version: form.software_version.trim() || null,
     };
     if (type === "Keyboard") details = { compatible_machine_model_id: form.machine_model_id };
+    if (type === "Misc") details = {
+      compatible_machine_model_id: form.machine_model_id || null,
+      details: form.details.trim() || null,
+    };
 
     const table = {
       Machine:"machine_details",
@@ -640,6 +658,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       "EMI Filter":"emi_filter_details",
       "Hard Disk":"hard_disk_details",
       Keyboard:"keyboard_details",
+      Misc:"misc_details",
     }[type];
 
     if (editItem) {
@@ -768,11 +787,11 @@ function getInventoryStatusRank(statusText) {
 const QUALITY_SORT_ORDER = {
   working: 0,
   repairable: 1,
-  "non-working": 2,
-  "non working": 2,
-  nonworking: 2,
-  unchked: 3,
-  unchecked: 3,
+  unchked: 2,
+  unchecked: 2,
+  "non-working": 3,
+  "non working": 3,
+  nonworking: 3,
   scrap: 4,
 };
 
@@ -827,6 +846,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
     "EMI Filter":"emi_filter_details",
     "Hard Disk":"hard_disk_details",
     Keyboard:"keyboard_details",
+    Misc:"misc_details",
   })[type];
 
   const componentTypes = ["Probe", "Board", "PSU", "Monitor", "Hard Disk", "Keyboard"];
@@ -1182,6 +1202,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       disk_type: d.disk_type || "",
       capacity_gb: d.capacity_gb ?? "",
       size_inches: d.size_inches ?? "",
+      details: d.details || "",
     };
     const draft = { [field]: current[field] };
     if (field === "compatible_machine") {
@@ -1327,6 +1348,17 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
     if (field === "filter_type") return editSelect(SELECT_OPTIONS.emi_type, field, "Select");
     if (field === "disk_type") return editSelect(SELECT_OPTIONS.hard_disk_type, field, "Select");
     if (field === "size_inches") return editSelect(['2.5"', '3.5"'], field, "Select size");
+    if (field === "details") {
+      return (
+        <textarea
+          rows={4}
+          value={value}
+          onChange={(event) => setEditDraft((current) => ({ ...current, [field]: event.target.value }))}
+          placeholder="Enter details (line breaks supported)"
+          autoFocus
+        />
+      );
+    }
     const numeric = ["manufacturer_year", "year", "capacity_gb"].includes(field);
     return (
       <input
@@ -1390,6 +1422,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
         disk_type: "disk_type",
         capacity_gb: "capacity_gb",
         size_inches: "size_inches",
+        details: "details",
       };
       if (field === "compatible_machine") {
         payload = { compatible_machine_model_id: editValue("compatible_machine_model_id") || null };
@@ -1473,6 +1506,10 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
         {key:"software_version",label:"Software version",value:d.software_version || "—"},
       ],
       Keyboard: [{key:"compatible_machine",label:"Compatible machine",value:compatibleName(d.compatible_machine_model_id)}],
+      Misc: [
+        {key:"compatible_machine",label:"Compatible machine",value:d.compatible_machine_model_id ? compatibleName(d.compatible_machine_model_id) : "—"},
+        {key:"details",label:"Details",value:d.details ? <span className="stock-note-cell" title={d.details}>{d.details}</span> : "—"},
+      ],
     };
     return [...(specific[item.item_type] || []), ...base];
   }
@@ -1690,7 +1727,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState({ model: "", manufacturer: "", probeType: "", compatibleMachine: "", location: "", note: "", status: "", quality: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
+  const [filters, setFilters] = useState({ model: "", manufacturer: "", probeType: "", compatibleMachine: "", details: "", location: "", note: "", status: "", quality: "", boardType: "", partNumber: "", softwareVersion: "", hardDiskType: "", size: "", capacity: "" });
   const [showAdd, setShowAdd] = useState(false);
   const filtersRef = useRef(null);
   const lastStockRowRef = useRef(null);
@@ -1726,7 +1763,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
     if (itemError) { setError(itemError.message); setItems([]); setLoading(false); return; }
     const rows = data || [];
     const ids = rows.map(x=>x.id);
-    const table = {Machine:"machine_details",Probe:"probe_details",Board:"board_details",PSU:"psu_details",Monitor:"monitor_details","EMI Filter":"emi_filter_details","Hard Disk":"hard_disk_details",Keyboard:"keyboard_details"}[activeType];
+    const table = {Machine:"machine_details",Probe:"probe_details",Board:"board_details",PSU:"psu_details",Monitor:"monitor_details","EMI Filter":"emi_filter_details","Hard Disk":"hard_disk_details",Keyboard:"keyboard_details",Misc:"misc_details"}[activeType];
     let details = [];
     if (ids.length) {
       const result = await supabase.from(table).select("*").in("item_id",ids);
@@ -1804,8 +1841,8 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
       const noteQuery = filters.note.trim().toLowerCase();
       if (noteQuery && !String(item.quality_note || "").toLowerCase().includes(noteQuery)) return false;
       if (selectedLocation && item.current_location_id !== selectedLocation) return false;
-      if (activeType !== "Hard Disk" && filters.status && item.inventory_status_id !== filters.status) return false;
-      if (activeType !== "Hard Disk" && filters.quality && item.quality_status_id !== filters.quality) return false;
+      if (filters.status && item.inventory_status_id !== filters.status) return false;
+      if (filters.quality && item.quality_status_id !== filters.quality) return false;
       if ((activeType === "Probe" || activeType === "Machine") && selectedManufacturer && d.manufacturer_id !== selectedManufacturer) return false;
       if (activeType === "Probe" && filters.probeType && d.probe_type_id !== filters.probeType) return false;
       if (activeType === "Probe" && filters.compatibleMachine) {
@@ -1817,6 +1854,9 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
           ? d.model_id
           : d.compatible_machine_model_id;
         if (modelId !== selectedModel) return false;
+      }
+      if (activeType === "Misc") {
+        if (filters.details && !String(d.details || "").toLowerCase().includes(filters.details.trim().toLowerCase())) return false;
       }
       if (activeType === "Board") {
         if (filters.boardType && d.board_type_id !== filters.boardType) return false;
@@ -1883,7 +1923,15 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   const filterModelOptions = activeType === "Probe"
     ? (masters.probeModels || []).map((model) => {
         const manufacturer = (masters.equipmentManufacturers || []).find((entry) => entry.id === model.manufacturer_id)?.name || "";
-        return { value: model.id, label: [manufacturer, model.name].filter(Boolean).join(" ") };
+        const compatibleMachines = probeCompatibleNamesMap[model.id] || [];
+        const hoverText = compatibleMachines.length
+          ? `Compatible machines: ${compatibleMachines.join(", ")}`
+          : "Compatible machines: None assigned";
+        return {
+          value: model.id,
+          label: [manufacturer, model.name].filter(Boolean).join(" "),
+          title: hoverText,
+        };
       })
     : machineModelFilterOptions;
   const officeLocations = (masters.locations || []).filter((location) => OFFICE_LOCATION_IDS.includes(location.id));
@@ -1902,6 +1950,10 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
     if (key==="quality_note") {
       const note = String(item.quality_note || "");
       return <span className="stock-note-cell" title={note || "No note"}>{note || "—"}</span>;
+    }
+    if (key==="details") {
+      const detailsText = String(d.details || "");
+      return <span className="stock-note-cell" title={detailsText || "No details"}>{detailsText || "—"}</span>;
     }
     if (key==="manufacturer") return manufacturerName(item);
     if (key==="model") {
@@ -1944,16 +1996,17 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   return (
     <section className="content-card redesign-stock">
       <div className="section-heading"><div><p className="section-kicker">GLOBAL STOCK</p><h2>Inventory by item type</h2><p>Item types are fixed by the IMS design. Select a type to see only its relevant characteristics.</p></div><div className="stock-result-actions"><span className="stock-result-count">Showing <strong>{filtered.length}</strong> results</span><button className="primary-button" onClick={()=>setShowAdd(true)} disabled={!canEdit}>+ Add item</button></div></div>
-      <div className="redesign-tabs redesign-tabs-single-row">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{onActiveTypeChange?.(type);setSearch("");setFilters({model:"",manufacturer:"",probeType:"",compatibleMachine:"",location:"",note:"",status:"",quality:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
+      <div className="redesign-tabs redesign-tabs-single-row">{ITEM_TYPES.map(type=><button key={type} className={type===activeType?"redesign-tab active":"redesign-tab"} onClick={()=>{onActiveTypeChange?.(type);setSearch("");setFilters({model:"",manufacturer:"",probeType:"",compatibleMachine:"",details:"",location:"",note:"",status:"",quality:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>{type}</button>)}</div>
       <div className="redesign-toolbar redesign-stock-filters" ref={filtersRef}>
         <label className="stock-filter-field"><span>Serial number</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="-" /></label>
         <label className="stock-filter-field"><span>Note</span><input value={filters.note} onChange={e=>setFilters(current=>({...current,note:e.target.value}))} placeholder="-" /></label>
         {["Probe", "Machine"].includes(activeType) && <label className="stock-filter-field"><span>Manufacturer</span><FilterDropdown value={filters.manufacturer} onChange={(value) => setFilters((current) => ({ ...current, manufacturer: value }))} options={manufacturerOptions} placeholder="All" searchPlaceholder="Search manufacturers..." /></label>}
-        {(["Machine", "Probe"].includes(activeType) || ["Board", "PSU", "Monitor", "Hard Disk", "Keyboard"].includes(activeType)) && <label className="stock-filter-field stock-model-filter"><span>{["Machine", "Probe"].includes(activeType) ? "Model" : "Compatible machine"}</span>
+        {(["Machine", "Probe"].includes(activeType) || ["Board", "PSU", "Monitor", "Hard Disk", "Keyboard", "Misc"].includes(activeType)) && <label className="stock-filter-field stock-model-filter"><span>{["Machine", "Probe"].includes(activeType) ? "Model" : "Compatible machine"}</span>
           <FilterDropdown value={filters.model} onChange={(value) => setFilters((current) => ({ ...current, model: value }))} options={[{ value: "", label: "All models" }, ...filterModelOptions]} placeholder="All" searchPlaceholder="Search Manufacturer Model..." />
         </label>}
         {activeType === "Probe" && <label className="stock-filter-field"><span>Probe type</span><FilterDropdown value={filters.probeType || ""} onChange={(value) => setFilters((current) => ({ ...current, probeType: value }))} options={probeTypeOptions} placeholder="All" searchPlaceholder="Search probe types..." /></label>}
         {activeType === "Probe" && <label className="stock-filter-field stock-model-filter"><span>Compatible machine</span><FilterDropdown value={filters.compatibleMachine || ""} onChange={(value) => setFilters((current) => ({ ...current, compatibleMachine: value }))} options={[{ value: "", label: "All models" }, ...machineModelFilterOptions]} placeholder="All" searchPlaceholder="Search Manufacturer Model..." /></label>}
+        {activeType === "Misc" && <label className="stock-filter-field"><span>Details</span><input value={filters.details || ""} onChange={e=>setFilters(current=>({...current,details:e.target.value}))} placeholder="-" /></label>}
         {activeType === "Board" && <>
           <label className="stock-filter-field"><span>Board type</span><FilterDropdown value={filters.boardType} onChange={(value) => setFilters((current) => ({ ...current, boardType: value }))} options={boardTypeOptions} placeholder="All" searchPlaceholder="Search board types..." /></label>
           <label className="stock-filter-field"><span>Part number</span><input value={filters.partNumber} onChange={e=>setFilters(current=>({...current,partNumber:e.target.value}))} placeholder="-" /></label>
@@ -1964,10 +2017,10 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
           <label className="stock-filter-field"><span>Size</span><FilterDropdown value={filters.size} onChange={(value) => setFilters((current) => ({ ...current, size: value }))} options={hardDiskSizeOptions} placeholder="All" searchPlaceholder="Search sizes..." /></label>
           <label className="stock-filter-field"><span>Capacity (GB)</span><input type="number" min="0" value={filters.capacity} onChange={e=>setFilters(current=>({...current,capacity:e.target.value}))} placeholder="-" /></label>
         </>}
-        {activeType !== "Hard Disk" && <label className="stock-filter-field"><span>Status</span><FilterDropdown value={filters.status || ""} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={statusOptions} placeholder="All" searchPlaceholder="Search statuses..." /></label>}
-        {activeType !== "Hard Disk" && <label className="stock-filter-field"><span>Quality</span><FilterDropdown value={filters.quality || ""} onChange={(value) => setFilters((current) => ({ ...current, quality: value }))} options={qualityOptions} placeholder="All" searchPlaceholder="Search qualities..." /></label>}
+        <label className="stock-filter-field"><span>Status</span><FilterDropdown value={filters.status || ""} onChange={(value) => setFilters((current) => ({ ...current, status: value }))} options={statusOptions} placeholder="All" searchPlaceholder="Search statuses..." /></label>
+        <label className="stock-filter-field"><span>Quality</span><FilterDropdown value={filters.quality || ""} onChange={(value) => setFilters((current) => ({ ...current, quality: value }))} options={qualityOptions} placeholder="All" searchPlaceholder="Search qualities..." /></label>
         <label className="stock-filter-field"><span>Location</span><FilterDropdown value={filters.location} onChange={(value) => setFilters((current) => ({ ...current, location: value }))} options={locationOptions} placeholder="All" searchPlaceholder="Search locations..." /></label>
-        <div className="stock-filter-actions"><button className="secondary-button stock-icon-button" aria-label="Clear filters" title="Clear filters" onClick={()=>{setSearch("");setFilters({model:"",manufacturer:"",probeType:"",compatibleMachine:"",location:"",note:"",status:"",quality:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>⌫</button><button className="secondary-button stock-icon-button" aria-label="Refresh stock" title="Refresh stock" onClick={loadItems}>↻</button></div>
+        <div className="stock-filter-actions"><button className="secondary-button stock-icon-button" aria-label="Clear filters" title="Clear filters" onClick={()=>{setSearch("");setFilters({model:"",manufacturer:"",probeType:"",compatibleMachine:"",details:"",location:"",note:"",status:"",quality:"",boardType:"",partNumber:"",softwareVersion:"",hardDiskType:"",size:"",capacity:""});}}>⌫</button><button className="secondary-button stock-icon-button" aria-label="Refresh stock" title="Refresh stock" onClick={loadItems}>↻</button></div>
       </div>
       {error && <div className="error-message">{error}</div>}
       <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>SERIAL #</th>{columns.map(c=><th key={c}>{({"part_number":"PART #","version_number":"VERSION #","software_version":"S/W VERSION"}[c] || FIELD_LABELS[c])}</th>)}<th>Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
