@@ -189,12 +189,27 @@ function activeOrCurrent(list, currentIds = []) {
 async function loadInventoryStateMap(supabase, itemIds) {
   const ids = [...new Set((itemIds || []).filter(Boolean))];
   if (!ids.length) return {};
-  const { data, error } = await supabase
-    .from("item_inventory_state")
-    .select("item_id,inventory_state")
-    .in("item_id", ids);
-  if (error) throw error;
-  return Object.fromEntries((data || []).map((row) => [row.item_id, row.inventory_state]));
+  const CHUNK_SIZE = 60;
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+    chunks.push(ids.slice(i, i + CHUNK_SIZE));
+  }
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      supabase
+        .from("item_inventory_state")
+        .select("item_id,inventory_state")
+        .in("item_id", chunk)
+    )
+  );
+  const map = {};
+  for (const res of results) {
+    if (res.error) throw res.error;
+    (res.data || []).forEach((row) => {
+      map[row.item_id] = row.inventory_state;
+    });
+  }
+  return map;
 }
 
 function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSaved }) {
@@ -371,15 +386,6 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     ],
     Keyboard: [
       {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",required:true},
-      {key:"serial_number",label:"Serial number",type:"text",optional:true},
-      {key:"current_location_id",label:"Location",type:"location",required:true},
-      {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
-      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
-      {key:"quality_note",label:"Quality note",type:"text",optional:true},
-    ],
-    Misc: [
-      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",optional:true},
-      {key:"details",label:"Details",type:"multiline_text",optional:true},
       {key:"serial_number",label:"Serial number",type:"text",optional:true},
       {key:"current_location_id",label:"Location",type:"location",required:true},
       {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
@@ -575,7 +581,7 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
     if (field.type === "select") return <Select value={value} onChange={onChange}
       options={field.options} required={field.required} />;
 
-    // Quality notes and Misc details support multiple lines during both item creation and editing.
+    // Quality notes support multiple lines during both item creation and editing.
     if (field.key === "quality_note" || field.key === "details" || field.type === "multiline_text") {
       return <textarea
         rows={4}
@@ -846,7 +852,6 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
     "EMI Filter":"emi_filter_details",
     "Hard Disk":"hard_disk_details",
     Keyboard:"keyboard_details",
-    Misc:"misc_details",
   })[type];
 
   const componentTypes = ["Probe", "Board", "PSU", "Monitor", "Hard Disk", "Keyboard"];
@@ -1202,7 +1207,6 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       disk_type: d.disk_type || "",
       capacity_gb: d.capacity_gb ?? "",
       size_inches: d.size_inches ?? "",
-      details: d.details || "",
     };
     const draft = { [field]: current[field] };
     if (field === "compatible_machine") {
@@ -1506,10 +1510,6 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
         {key:"software_version",label:"Software version",value:d.software_version || "—"},
       ],
       Keyboard: [{key:"compatible_machine",label:"Compatible machine",value:compatibleName(d.compatible_machine_model_id)}],
-      Misc: [
-        {key:"compatible_machine",label:"Compatible machine",value:d.compatible_machine_model_id ? compatibleName(d.compatible_machine_model_id) : "—"},
-        {key:"details",label:"Details",value:d.details ? <span className="stock-note-cell" title={d.details}>{d.details}</span> : "—"},
-      ],
     };
     return [...(specific[item.item_type] || []), ...base];
   }
@@ -1735,7 +1735,7 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
   const [showScrollBottom, setShowScrollBottom] = useState(false);
 
   async function loadMasters() {
-    const [s,q,l,em,hm,mm,pm,pt,bt,pc] = await Promise.all([
+    const [s,q,l,em,hm,mm,pm,pt,bt] = await Promise.all([
       supabase.from("inventory_statuses").select("id,name").eq("is_active",true).order("name"),
       supabase.from("quality_statuses").select("id,name").eq("is_active",true).order("name"),
       supabase.from("locations").select("id,name").eq("is_active",true).order("name"),
@@ -1745,15 +1745,13 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
       supabase.from("probe_models").select("id,name,manufacturer_id").order("name"),
       supabase.from("probe_types").select("id,name").order("name"),
       supabase.from("board_types").select("id,name").order("name"),
-      supabase.from("probe_model_machine_models").select("probe_model_id,machine_model_id"),
     ]);
-    const bad = [s,q,l,em,hm,mm,pm,pt,bt,pc].find(x=>x.error);
+    const bad = [s,q,l,em,hm,mm,pm,pt,bt].find(x=>x.error);
     if (bad) { setError(bad.error.message); return; }
     setMasters({
       inventoryStatuses:s.data||[], qualities:q.data||[], locations:l.data||[],
       equipmentManufacturers:em.data||[], hardDiskManufacturers:hm.data||[],
       machineModels:mm.data||[], probeModels:pm.data||[], probeTypes:pt.data||[], boardTypes:bt.data||[],
-      probeCompatibilities:pc.data||[],
     });
   }
 
@@ -1780,10 +1778,31 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
       setLoading(false);
       return;
     }
+    let movingTransitMap = {};
+    if (ids.length) {
+      const CHUNK_SIZE = 60;
+      for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+        const chunk = ids.slice(i, i + CHUNK_SIZE);
+        const { data: transitRows } = await supabase
+          .from("transit_items")
+          .select("item_id,transit_id,transits(id,transit_progress,created_at)")
+          .in("item_id", chunk);
+        (transitRows || []).forEach((entry) => {
+          const t = entry.transits;
+          if (t?.transit_progress === "moving") {
+            const existing = movingTransitMap[entry.item_id];
+            if (!existing || new Date(t.created_at || 0).getTime() > new Date(existing.created_at || 0).getTime()) {
+              movingTransitMap[entry.item_id] = t;
+            }
+          }
+        });
+      }
+    }
     setItems(rows.map(x=>({
       ...x,
       detail:detailMap[x.id]||{},
       inventory_state: inventoryStateMap[x.id] || null,
+      movingTransit: movingTransitMap[x.id] || null,
     })));
     setLoading(false);
   }
@@ -2026,8 +2045,10 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
       <div className="stock-table-wrap"><table className="stock-table"><thead><tr><th>SERIAL #</th>{columns.map(c=><th key={c}>{({"part_number":"PART #","version_number":"VERSION #","software_version":"S/W VERSION"}[c] || FIELD_LABELS[c])}</th>)}<th>Status</th><th>Quality</th><th>Location</th></tr></thead><tbody>
         {!loading && filtered.length===0 && <tr><td colSpan={columns.length+4} className="empty-cell">{items.length?"No matching items.":"No items of this type yet."}</td></tr>}
         {filtered.map((item,index)=>{
-          const statusLabel = item.inventory_state || statusNameById[item.inventory_status_id] || "—";
-          const statusColorClass = getInventoryStatusColorClass(statusLabel);
+          const rawStatus = item.inventory_state || statusNameById[item.inventory_status_id] || "—";
+          const isMoving = Boolean(item.movingTransit);
+          const statusLabel = isMoving ? "Moving" : rawStatus;
+          const statusColorClass = isMoving ? "inventory-status-testing" : getInventoryStatusColorClass(statusLabel);
           const probeCompatibleList = activeType === "Probe" ? (probeCompatibleNamesMap[item.detail?.model_id] || []) : [];
           const probeModelTitle = activeType === "Probe"
             ? (probeCompatibleList.length ? `Compatible machines: ${probeCompatibleList.join(", ")}` : "Compatible machines: None assigned")
@@ -2036,7 +2057,23 @@ export function RedesignedGlobalStock({ supabase, canEdit, activeType = "Machine
             <tr ref={index === filtered.length - 1 ? lastStockRowRef : null} key={item.id} className="stock-row-clickable" onClick={() => onItemClick?.(item.id)}>
               <td><strong>{item.serial_number||"—"}</strong></td>
               {columns.map(c=><td key={c} title={c === "model" && activeType === "Probe" ? probeModelTitle : undefined}>{display(item,c)}</td>)}
-              <td className={statusColorClass || undefined}><span className={statusColorClass ? `inventory-status-text ${statusColorClass}` : undefined}>{statusLabel}</span></td>
+              <td className={statusColorClass || undefined}>
+                {isMoving ? (
+                  <button
+                    type="button"
+                    className="item-moving-link"
+                    title="Open moving Transit"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTransitClick?.(item.movingTransit.id, "moving");
+                    }}
+                  >
+                    Moving
+                  </button>
+                ) : (
+                  <span className={statusColorClass ? `inventory-status-text ${statusColorClass}` : undefined}>{statusLabel}</span>
+                )}
+              </td>
               <td>{(masters.qualities || []).find(x=>x.id===item.quality_status_id)?.name||"—"}</td>
               <td>{(masters.locations || []).find(x=>x.id===item.current_location_id)?.name||"—"}</td>
             </tr>

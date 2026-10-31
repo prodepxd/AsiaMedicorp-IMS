@@ -35,12 +35,28 @@ function progressClass(progress) {
 async function loadInventoryStateMap(supabase, itemIds) {
   const ids = [...new Set((itemIds || []).filter(Boolean))];
   if (!ids.length) return {};
-  const { data, error } = await supabase
-    .from("item_inventory_state")
-    .select("item_id,inventory_state")
-    .in("item_id", ids);
-  if (error) throw error;
-  return Object.fromEntries((data || []).map((row) => [row.item_id, row.inventory_state]));
+  // Batch requests in chunks of 60 to prevent HTTP 400 Bad Request / 414 Request-URI Too Long
+  const CHUNK_SIZE = 60;
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += CHUNK_SIZE) {
+    chunks.push(ids.slice(i, i + CHUNK_SIZE));
+  }
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      supabase
+        .from("item_inventory_state")
+        .select("item_id,inventory_state")
+        .in("item_id", chunk)
+    )
+  );
+  const map = {};
+  for (const res of results) {
+    if (res.error) throw res.error;
+    (res.data || []).forEach((row) => {
+      map[row.item_id] = row.inventory_state;
+    });
+  }
+  return map;
 }
 
 function LocationCombobox({
@@ -473,7 +489,7 @@ function TransitForm({
         if (timestampError) throw timestampError;
       }
 
-      await onSaved();
+      await onSaved(mode);
     } catch (saveError) {
       setError(saveError?.message || "The Transit could not be saved.");
     } finally {
@@ -929,7 +945,7 @@ function TransitDetailPage({ transit, itemMap, locationMap, canEdit, canDelete, 
   );
 }
 
-export default function TransitModule({ supabase, canEdit, canDelete, canCreateLocation = false, onItemClick, view = "standby", selectedTransitId = null, onTransitClick, onTransitBack }) {
+export default function TransitModule({ supabase, canEdit, canDelete, canCreateLocation = false, onItemClick, view = "standby", onViewChange, selectedTransitId = null, onTransitClick, onTransitBack }) {
   const [items, setItems] = useState([]);
   const [locations, setLocations] = useState([]);
   const [inventoryStatuses, setInventoryStatuses] = useState([]);
@@ -1106,6 +1122,9 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
       return;
     }
     await load();
+    if (view === "standby") {
+      onViewChange?.("moving");
+    }
   }
 
   async function deleteTransit(transit) {
@@ -1133,11 +1152,14 @@ export default function TransitModule({ supabase, canEdit, canDelete, canCreateL
     await load();
   }
 
-  async function afterSave() {
+  async function afterSave(savedMode) {
     setShowForm(false);
     setEditingTransit(null);
     setEditingItemIds([]);
     await load();
+    if (savedMode === "complete" || view === "moving") {
+      onViewChange?.("completed");
+    }
   }
 
   function renderSection(title, className, list, limit = list.length) {
