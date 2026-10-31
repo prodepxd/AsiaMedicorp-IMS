@@ -392,6 +392,15 @@ function ItemForm({ supabase, type: initialType, editItem = null, onClose, onSav
       {key:"quality_status_id",label:"Quality",type:"quality",required:true},
       {key:"quality_note",label:"Quality note",type:"text",optional:true},
     ],
+    Misc: [
+      {key:"compatible_machine",label:"Compatible machine",type:"compatible_machine",optional:true},
+      {key:"details",label:"Details",type:"text",optional:true},
+      {key:"serial_number",label:"Serial number",type:"text",optional:true},
+      {key:"current_location_id",label:"Location",type:"location",required:true},
+      {key:"inventory_status_id",label:"Inventory Status",type:"status",required:true},
+      {key:"quality_status_id",label:"Quality",type:"quality",required:true},
+      {key:"quality_note",label:"Quality note",type:"text",optional:true},
+    ],
   };
 
   const steps = type ? stepsForType[type] || [] : [];
@@ -852,6 +861,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
     "EMI Filter":"emi_filter_details",
     "Hard Disk":"hard_disk_details",
     Keyboard:"keyboard_details",
+    Misc:"misc_details",
   })[type];
 
   const componentTypes = ["Probe", "Board", "PSU", "Monitor", "Hard Disk", "Keyboard"];
@@ -1207,6 +1217,7 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
       disk_type: d.disk_type || "",
       capacity_gb: d.capacity_gb ?? "",
       size_inches: d.size_inches ?? "",
+      details: d.details || "",
     };
     const draft = { [field]: current[field] };
     if (field === "compatible_machine") {
@@ -1510,6 +1521,10 @@ export function RedesignedItemView({ supabase, itemId, canEdit, canDelete, onBac
         {key:"software_version",label:"Software version",value:d.software_version || "—"},
       ],
       Keyboard: [{key:"compatible_machine",label:"Compatible machine",value:compatibleName(d.compatible_machine_model_id)}],
+      Misc: [
+        {key:"compatible_machine",label:"Compatible machine",value:d.compatible_machine_model_id ? compatibleName(d.compatible_machine_model_id) : "—"},
+        {key:"details",label:"Details",value:d.details || "—"},
+      ],
     };
     return [...(specific[item.item_type] || []), ...base];
   }
